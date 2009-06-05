@@ -305,9 +305,18 @@ struct intel_context
     */
    GLboolean is_front_buffer_rendering;
 
+   GLboolean use_swzr_cliprects, try_swzr;
+
    GLboolean use_texture_tiling;
 
    drm_clip_rect_t fboRect;     /**< cliprect for FBO rendering */
+
+#define SWZR_W 128
+#define SWZR_H 128
+
+   drm_clip_rect_t swzr_cliprects[4096 * 4096 / SWZR_W / SWZR_H];
+
+   int num_swzr_cliprects;
 
    int perf_boxes;
 

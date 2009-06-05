@@ -115,6 +115,11 @@ intel_get_cliprects(struct intel_context *intel,
       *num_cliprects = 1;
       *x_off = 0;
       *y_off = 0;
+   } else if (intel->use_swzr_cliprects) {
+      *cliprects = intel->swzr_cliprects;
+      *num_cliprects = intel->num_swzr_cliprects;
+      *x_off = 0;
+      *y_off = 0;
    } else if (intel->front_cliprects || dPriv->numBackClipRects == 0) {
       /* use the front clip rects */
       *cliprects = dPriv->pClipRects;
@@ -219,6 +224,38 @@ intel_draw_buffer(GLcontext * ctx, struct gl_framebuffer *fb)
 	 colorRegions[0] = (irb && irb->region) ? irb->region : NULL;
 	 intel->constant_cliprect = GL_TRUE;
       }
+   }
+
+   if (intel->try_swzr && intel->constant_cliprect) {
+      drm_clip_rect_t bounds;
+      int x, y;
+
+      intel->constant_cliprect = GL_FALSE;
+      intel->num_swzr_cliprects = 0;
+      intel->use_swzr_cliprects = GL_TRUE;
+
+      bounds.x1 = 0;
+      bounds.y1 = 0;
+      bounds.x2 = ctx->DrawBuffer->Width;
+      bounds.y2 = ctx->DrawBuffer->Height;
+
+      for (y = 0; y < 4096; y += SWZR_H) {
+	 for (x = 0; x < 4096; x += SWZR_W) {
+	    drm_clip_rect_t result, box;
+
+	    box.x1 = x;
+	    box.y1 = y;
+	    box.x2 = x + SWZR_W;
+	    box.y2 = y + SWZR_H;
+
+	    if (intel_intersect_cliprects(&result, &box, &bounds)) {
+	       intel->swzr_cliprects[intel->num_swzr_cliprects] = box;
+	       intel->num_swzr_cliprects++;
+	    }
+	 }
+      }
+   } else {
+      intel->use_swzr_cliprects = GL_FALSE;
    }
 
    if (!colorRegions[0]) {

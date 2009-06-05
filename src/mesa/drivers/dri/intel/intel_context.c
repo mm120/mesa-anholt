@@ -727,6 +727,8 @@ intelInitContext(struct intel_context *intel,
    intel->use_texture_tiling = driQueryOptionb(&intel->optionCache,
 					       "texture_tiling");
 
+   intel->try_swzr = driQueryOptionb(&intel->optionCache, "swzr");
+
    intel->prim.primitive = ~0;
 
    /* Force all software fallbacks */

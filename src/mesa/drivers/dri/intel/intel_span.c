@@ -29,6 +29,7 @@
 #include "main/macros.h"
 #include "main/mtypes.h"
 #include "main/colormac.h"
+#include "x86/sse.h"
 
 #include "intel_buffers.h"
 #include "intel_fbo.h"
@@ -61,6 +62,16 @@ get_span_cache(struct intel_renderbuffer *irb, uint32_t offset)
    if (!irb->span_cache_pages[page_index]) {
       irb->span_cache_pages[page_index] = 1;
 
+#ifdef USE_SSE4_1_ASM
+      if (irb->use_movntdqa) {
+	 drm_intel_gem_bo_map_gtt(irb->region->buffer);
+	 _mesa_sse_movntdqa(irb->span_cache + page_offset,
+			    irb->region->buffer->virtual + page_offset,
+			    SPAN_CACHE_SIZE);
+	 drm_intel_gem_bo_unmap_gtt(irb->region->buffer);
+	 return;
+      }
+#endif
       dri_bo_get_subdata(irb->region->buffer,
 			 page_offset,
 			 SPAN_CACHE_SIZE,
@@ -415,7 +426,7 @@ intel_renderbuffer_map(struct intel_context *intel, struct gl_renderbuffer *rb)
       return;
 
    if (irb->span_cache == NULL) {
-      irb->span_cache = _mesa_malloc(irb->region->buffer->size);
+      irb->span_cache = _mesa_align_malloc(irb->region->buffer->size, 64);
       irb->span_cache_pages = _mesa_malloc(ALIGN(irb->region->buffer->size,
 						 SPAN_CACHE_SIZE) /
 					   SPAN_CACHE_SIZE);
@@ -623,6 +634,14 @@ intel_set_span_functions(struct intel_context *intel,
       tiling = irb->region->tiling;
    else
       tiling = I915_TILING_NONE;
+
+   irb->use_movntdqa = GL_FALSE;
+#ifdef USE_SSE4_1_ASM
+   if (intel->intelScreen->kernel_exec_fencing && cpu_has_sse4_1) {
+      irb->use_movntdqa = GL_TRUE;
+      tiling = I915_TILING_NONE;
+   }
+#endif
 
    switch (irb->texformat) {
    case MESA_FORMAT_RGB565:

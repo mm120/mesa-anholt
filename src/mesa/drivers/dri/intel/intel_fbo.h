@@ -69,6 +69,7 @@ struct intel_renderbuffer
    uint8_t *span_cache;
    uint8_t *span_cache_pages;
    GLboolean span_cache_valid;
+   GLboolean use_movntdqa;
 };
 
 

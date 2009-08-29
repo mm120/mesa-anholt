@@ -274,6 +274,10 @@ ASM_C_SOURCES =	\
 	ppc/common_ppc.c \
 	x86-64/x86-64.c
 
+### Conditionally compiled asm source requiring specific compile flags.
+SSE4_1_SOURCES = \
+	x86/movntdqa.c
+
 X86_SOURCES =			\
 	x86/common_x86_asm.S	\
 	x86/x86_xform2.S	\
@@ -327,6 +331,7 @@ MESA_SOURCES = \
 	$(SWRAST_SETUP_SOURCES)	\
 	$(COMMON_DRIVER_SOURCES)\
 	$(ASM_C_SOURCES)	\
+	$(CONDITIONAL_ASM_C_SOURCES)	\
 	$(SLANG_SOURCES)
 
 # Sources for building Gallium drivers
@@ -364,7 +369,6 @@ GLAPI_OBJECTS = \
 
 
 COMMON_DRIVER_OBJECTS = $(COMMON_DRIVER_SOURCES:.c=.o)
-
 
 
 ### Include directories

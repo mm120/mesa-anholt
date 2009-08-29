@@ -35,6 +35,7 @@ common_x86_asm.o: matypes.h
 3dnow_xform4.o: matypes.h
 mmx_blend.o: matypes.h
 sse_normal.o: matypes.h
+sse_movntdqa.o: matypes.h
 sse_xform1.o: matypes.h
 sse_xform2.o: matypes.h
 sse_xform3.o: matypes.h
@@ -43,4 +44,3 @@ x86_cliptest.o: matypes.h
 x86_xform2.o: matypes.h
 x86_xform3.o: matypes.h
 x86_xform4.o: matypes.h
-

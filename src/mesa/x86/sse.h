@@ -35,4 +35,6 @@
 
 void _mesa_init_sse_transform_asm( void );
 
+void _mesa_sse_movntdqa(void *dst, void *src, unsigned int len);
+
 #endif

@@ -58,6 +58,8 @@ asm_subdirs:
 		(cd x86-64 && $(MAKE)) || exit 1 ; \
 	fi
 
+x86/movntdqa.o: x86/movntdqa.c
+	$(CC) -c $(INCLUDE_DIRS) $(CFLAGS) $(ASM_FLAGS) -msse4.1 $< -o $@
 
 ######################################################################
 # Dependency generation

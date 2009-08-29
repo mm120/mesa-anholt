@@ -1,4 +1,3 @@
-
 /*
  * Mesa 3-D graphics library
  * Version:  5.1
@@ -43,6 +42,8 @@
 #define X86_FEATURE_XMM2	(1<<6)
 #define X86_FEATURE_3DNOWEXT	(1<<7)
 #define X86_FEATURE_3DNOW	(1<<8)
+#define X86_FEATURE_XMM3	(1<<9)
+#define X86_FEATURE_SSE4_1	(1<<10)
 
 /* standard X86 CPU features */
 #define X86_CPU_FPU		(1<<0)
@@ -56,12 +57,16 @@
 #define X86_CPUEXT_3DNOW_EXT	(1<<30)
 #define X86_CPUEXT_3DNOW	(1<<31)
 
+/* extended X86 CPU features */
+#define X86_CPUEXT_SSE4_1	(1<<19)
+
 #define cpu_has_mmx		(_mesa_x86_cpu_features & X86_FEATURE_MMX)
 #define cpu_has_mmxext		(_mesa_x86_cpu_features & X86_FEATURE_MMXEXT)
 #define cpu_has_xmm		(_mesa_x86_cpu_features & X86_FEATURE_XMM)
 #define cpu_has_xmm2		(_mesa_x86_cpu_features & X86_FEATURE_XMM2)
 #define cpu_has_3dnow		(_mesa_x86_cpu_features & X86_FEATURE_3DNOW)
 #define cpu_has_3dnowext	(_mesa_x86_cpu_features & X86_FEATURE_3DNOWEXT)
+#define cpu_has_sse4_1		(_mesa_x86_cpu_features & X86_FEATURE_SSE4_1)
 
 #endif
 

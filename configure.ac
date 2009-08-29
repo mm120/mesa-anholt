@@ -274,6 +274,7 @@ asm_arch=""
 ASM_FLAGS=""
 MESA_ASM_SOURCES=""
 GLAPI_ASM_SOURCES=""
+CONDITIONAL_ASM_C_SOURCES=""
 AC_MSG_CHECKING([whether to enable assembly])
 test "x$enable_asm" = xno && AC_MSG_RESULT([no])
 # disable if cross compiling on x86/x86_64 since we must run gen_matypes
@@ -324,6 +325,18 @@ if test "x$enable_asm" = xyes; then
         MESA_ASM_SOURCES='$(X86_SOURCES)'
         GLAPI_ASM_SOURCES='$(X86_API)'
         AC_MSG_RESULT([yes, x86])
+
+	dnl Check for the compiler supporting sse4.1 in inline asm.
+	SAVE_CFLAGS="$CFLAGS"
+	CFLAGS="$CFLAGS -msse4.1"
+	AC_COMPILE_IFELSE(AC_LANG_PROGRAM([]),
+			  [have_msse4_1=yes],
+			  [have_msse4_1=no])
+	CFLAGS="$SAVE_CFLAGS"
+	if test "x$have_msse4_1" = "xyes"; then
+		ASM_FLAGS="$ASM_FLAGS -DUSE_SSE4_1_ASM"
+		CONDITIONAL_ASM_C_SOURCES="$CONDITIONAL_ASM_C_SOURCES \$(SSE4_1_SOURCES)"
+	fi
         ;;
     x86_64)
         ASM_FLAGS="-DUSE_X86_64_ASM"
@@ -350,6 +363,7 @@ fi
 AC_SUBST([ASM_FLAGS])
 AC_SUBST([MESA_ASM_SOURCES])
 AC_SUBST([GLAPI_ASM_SOURCES])
+AC_SUBST([CONDITIONAL_ASM_C_SOURCES])
 
 dnl PIC code macro
 MESA_PIC_FLAGS

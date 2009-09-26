@@ -67,7 +67,8 @@ struct intel_renderbuffer
    GLuint vbl_pending;   /**< vblank sequence number of pending flip */
 
    uint8_t *span_cache;
-   unsigned long span_cache_offset;
+   uint8_t *span_cache_pages;
+   GLboolean span_cache_valid;
 };
 
 

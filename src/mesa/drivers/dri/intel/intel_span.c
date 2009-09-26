@@ -48,22 +48,30 @@ intel_set_span_functions(struct intel_context *intel,
 static void
 get_span_cache(struct intel_renderbuffer *irb, uint32_t offset)
 {
-   if (irb->span_cache == NULL) {
-      irb->span_cache = _mesa_malloc(SPAN_CACHE_SIZE);
-      irb->span_cache_offset = -1;
+   uint32_t page_offset = offset & ~(SPAN_CACHE_SIZE - 1);
+   uint32_t page_index = page_offset / SPAN_CACHE_SIZE;
+
+   if (!irb->span_cache_valid) {
+      irb->span_cache_valid = 1;
+      memset(irb->span_cache_pages, 0,
+	     ALIGN(irb->region->buffer->size,
+		   SPAN_CACHE_SIZE) / SPAN_CACHE_SIZE);
    }
 
-   if ((offset & ~(SPAN_CACHE_SIZE - 1)) != irb->span_cache_offset) {
-      irb->span_cache_offset = offset & ~(SPAN_CACHE_SIZE - 1);
-      dri_bo_get_subdata(irb->region->buffer, irb->span_cache_offset,
-			 SPAN_CACHE_SIZE, irb->span_cache);
+   if (!irb->span_cache_pages[page_index]) {
+      irb->span_cache_pages[page_index] = 1;
+
+      dri_bo_get_subdata(irb->region->buffer,
+			 page_offset,
+			 SPAN_CACHE_SIZE,
+			 irb->span_cache + page_offset);
    }
 }
 
 static void
 clear_span_cache(struct intel_renderbuffer *irb)
 {
-   irb->span_cache_offset = -1;
+   irb->span_cache_valid = 0;
 }
 
 static uint32_t
@@ -71,7 +79,7 @@ pread_32(struct intel_renderbuffer *irb, uint32_t offset)
 {
    get_span_cache(irb, offset);
 
-   return *(uint32_t *)(irb->span_cache + (offset & (SPAN_CACHE_SIZE - 1)));
+   return *(uint32_t *)(irb->span_cache + offset);
 }
 
 static uint32_t
@@ -79,7 +87,7 @@ pread_xrgb8888(struct intel_renderbuffer *irb, uint32_t offset)
 {
    get_span_cache(irb, offset);
 
-   return *(uint32_t *)(irb->span_cache + (offset & (SPAN_CACHE_SIZE - 1))) |
+   return *(uint32_t *)(irb->span_cache + offset) |
       0xff000000;
 }
 
@@ -88,7 +96,7 @@ pread_16(struct intel_renderbuffer *irb, uint32_t offset)
 {
    get_span_cache(irb, offset);
 
-   return *(uint16_t *)(irb->span_cache + (offset & (SPAN_CACHE_SIZE - 1)));
+   return *(uint16_t *)(irb->span_cache + offset);
 }
 
 static uint8_t
@@ -96,7 +104,7 @@ pread_8(struct intel_renderbuffer *irb, uint32_t offset)
 {
    get_span_cache(irb, offset);
 
-   return *(uint8_t *)(irb->span_cache + (offset & (SPAN_CACHE_SIZE - 1)));
+   return *(uint8_t *)(irb->span_cache + offset);
 }
 
 static void
@@ -405,6 +413,14 @@ intel_renderbuffer_map(struct intel_context *intel, struct gl_renderbuffer *rb)
 
    if (irb == NULL || irb->region == NULL)
       return;
+
+   if (irb->span_cache == NULL) {
+      irb->span_cache = _mesa_malloc(irb->region->buffer->size);
+      irb->span_cache_pages = _mesa_malloc(ALIGN(irb->region->buffer->size,
+						 SPAN_CACHE_SIZE) /
+					   SPAN_CACHE_SIZE);
+      irb->span_cache_valid = 0;
+   }
 
    intel_set_span_functions(intel, rb);
 }

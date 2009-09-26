@@ -69,8 +69,10 @@ intel_delete_renderbuffer(struct gl_renderbuffer *rb)
 
    ASSERT(irb);
 
-   if (irb->span_cache != NULL)
+   if (irb->span_cache != NULL) {
       _mesa_free(irb->span_cache);
+      _mesa_free(irb->span_cache_pages);
+   }
 
    if (intel && irb->region) {
       intel_region_release(&irb->region);

@@ -168,5 +168,6 @@ AC_OUTPUT([
 	src/trivial/Makefile
 	src/util/Makefile
 	src/vp/Makefile
+	src/windml/Makefile
 	src/xdemos/Makefile
 ])

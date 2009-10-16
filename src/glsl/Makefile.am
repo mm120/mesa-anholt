@@ -99,7 +99,6 @@ EXTRA_DIST = \
 	CH11-toyball.vert \
 	CH18-mandel.frag \
 	CH18-mandel.vert \
-	README \
 	brick.shtest \
 	convolution.vert \
 	cubemap.frag \

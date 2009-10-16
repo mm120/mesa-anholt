@@ -20,7 +20,6 @@ draw2arrays
 drawarrays
 drawelements
 drawrange
-extfuncs.h
 flat-clip
 fs-tri
 line
@@ -77,8 +76,6 @@ quadstrip
 quadstrip-clip
 quadstrip-cont
 quadstrip-flat
-readtex.c
-readtex.h
 readpixels
 sub-tex
 tex-quads

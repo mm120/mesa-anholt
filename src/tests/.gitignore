@@ -30,8 +30,8 @@ crossbar
 cva
 drawbuffers
 drawbuffers2
-extfuncs.h
 exactrast
+ext422square
 fbotest1
 fbotest2
 fillrate
@@ -58,6 +58,8 @@ mipmap_comp_tests
 mipmap_limits
 mipmap_view
 multipal
+multitexarray
+multiwindow
 no_s3tc
 packedpixels
 persp_hint
@@ -67,15 +69,11 @@ prog_parameter
 quads
 random
 readrate
-readtex.c
-readtex.h
 rubberband
 scissor
 scissor-viewport
 seccolor
 shader_api
-shaderutil.c
-shaderutil.h
 sharedtex
 stencil_twoside
 stencilwrap
@@ -86,8 +84,10 @@ subtexrate
 tex1d
 texcompress2
 texcompsub
+texcmp
 texdown
 texfilt
+texgenmix
 texline
 texobj
 texobjshare
@@ -97,6 +97,7 @@ unfilledclip
 vao-01
 vao-02
 vparray
+vpeval
 vptest1
 vptest2
 vptest3

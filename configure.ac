@@ -167,4 +167,5 @@ AC_OUTPUT([
 	src/glsl/Makefile
 	src/trivial/Makefile
 	src/util/Makefile
+	src/vp/Makefile
 ])

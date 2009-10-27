@@ -119,6 +119,10 @@ translate_wrap_mode(GLenum wrap)
       return TEXCOORDMODE_CLAMP_BORDER;
    case GL_MIRRORED_REPEAT:
       return TEXCOORDMODE_MIRROR;
+   case GL_MIRROR_CLAMP_EXT: /* not quite correct, like GL_CLAMP */
+      return TEXCOORDMODE_MIRROR_ONCE;
+   case GL_MIRROR_CLAMP_TO_EDGE_EXT:
+      return TEXCOORDMODE_MIRROR_ONCE;
    default:
       return TEXCOORDMODE_WRAP;
    }

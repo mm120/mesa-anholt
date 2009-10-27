@@ -53,14 +53,18 @@ static GLuint translate_wrap_mode( GLenum wrap )
    switch( wrap ) {
    case GL_REPEAT: 
       return BRW_TEXCOORDMODE_WRAP;
-   case GL_CLAMP:  
-      return BRW_TEXCOORDMODE_CLAMP;
-   case GL_CLAMP_TO_EDGE: 
+   case GL_CLAMP:
       return BRW_TEXCOORDMODE_CLAMP; /* conform likes it this way */
+   case GL_CLAMP_TO_EDGE:
+      return BRW_TEXCOORDMODE_CLAMP;
    case GL_CLAMP_TO_BORDER: 
       return BRW_TEXCOORDMODE_CLAMP_BORDER;
    case GL_MIRRORED_REPEAT: 
       return BRW_TEXCOORDMODE_MIRROR;
+   case GL_MIRROR_CLAMP_EXT:
+      return BRW_TEXCOORDMODE_MIRROR_ONCE; /* Same as GL_CLAMP handling. */
+   case GL_MIRROR_CLAMP_TO_EDGE_EXT:
+      return BRW_TEXCOORDMODE_MIRROR_ONCE;
    default: 
       return BRW_TEXCOORDMODE_WRAP;
    }

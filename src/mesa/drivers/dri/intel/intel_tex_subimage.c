@@ -166,6 +166,19 @@ intelTexSubImage2D(GLcontext * ctx,
                    struct gl_texture_object *texObj,
                    struct gl_texture_image *texImage)
 {
+   /* Shortcut full-image TexSubImage to TexImage, since it's faster for us
+    * to reallocate new storage (and potentially blit later) than to wait for
+    * the GPU to finish.
+    */
+   if (xoffset == 0 && yoffset == 0 &&
+       width == texImage->Width && height == texImage->Height) {
+      ctx->Driver.TexImage2D(ctx, target, level, texImage->InternalFormat,
+			     width, height, 0,
+			     format, type, pixels,
+			     packing, texObj, texImage);
+      return;
+   }
+
    intelTexSubimage(ctx, 2,
                     target, level,
                     xoffset, yoffset, 0,

@@ -361,7 +361,8 @@ static GLboolean brw_try_draw_prims( GLcontext *ctx,
 
       hw_prim = brw_set_prim(brw, prim[i].mode);
 
-      if (first_time || (brw->state.dirty.brw & BRW_NEW_PRIMITIVE)) {
+      if (first_time || (brw->state.dirty.brw & (BRW_NEW_PRIMITIVE |
+						 BRW_NEW_BATCH))) {
 	 first_time = GL_FALSE;
 
 	 brw_validate_state(brw);

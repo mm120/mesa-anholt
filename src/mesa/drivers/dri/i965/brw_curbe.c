@@ -198,7 +198,7 @@ static void prepare_constant_buffer(struct brw_context *brw)
       return;
    }
 
-   buf = (GLfloat *) _mesa_calloc(bufsz);
+   buf = (GLfloat *) _mesa_malloc(bufsz);
 
    /* fragment shader constants */
    if (brw->curbe.wm_size) {

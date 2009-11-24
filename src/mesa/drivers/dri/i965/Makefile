@@ -95,7 +95,8 @@ DRIVER_SOURCES = \
 	gen6_urb.c \
 	gen6_viewport_state.c \
 	gen6_vs_state.c \
-	gen6_wm_state.c
+	gen6_wm_state.c \
+	hash_table.c
 
 C_SOURCES = \
 	$(COMMON_SOURCES) \

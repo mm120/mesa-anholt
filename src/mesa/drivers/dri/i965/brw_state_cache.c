@@ -59,6 +59,7 @@
 #include "main/imports.h"
 #include "brw_state.h"
 #include "intel_batchbuffer.h"
+#include "hash_table.h"
 
 /* XXX: Fixme - have to include these to get the sizes of the prog_key
  * structs:
@@ -113,65 +114,19 @@ update_cache_last(struct brw_cache *cache, enum brw_cache_id cache_id,
 }
 
 static int
-brw_cache_item_equals(const struct brw_cache_item *a,
-		      const struct brw_cache_item *b)
+brw_cache_item_equals(const void *in_a,
+		      const void *in_b)
 {
+   const struct brw_cache_item *a = in_a;
+   const struct brw_cache_item *b = in_b;
+
    return a->cache_id == b->cache_id &&
-      a->hash == b->hash &&
       a->key_size == b->key_size &&
       (memcmp(a->key, b->key, a->key_size) == 0) &&
       a->nr_reloc_bufs == b->nr_reloc_bufs &&
       (memcmp(a->reloc_bufs, b->reloc_bufs,
 	      a->nr_reloc_bufs * sizeof(dri_bo *)) == 0);
 }
-
-static struct brw_cache_item *
-search_cache(struct brw_cache *cache, GLuint hash,
-	     struct brw_cache_item *lookup)
-{
-   struct brw_cache_item *c;
-
-#if 0
-   int bucketcount = 0;
-
-   for (c = cache->items[hash % cache->size]; c; c = c->next)
-      bucketcount++;
-
-   fprintf(stderr, "bucket %d/%d = %d/%d items\n", hash % cache->size,
-	   cache->size, bucketcount, cache->n_items);
-#endif
-
-   for (c = cache->items[hash % cache->size]; c; c = c->next) {
-      if (brw_cache_item_equals(lookup, c))
-	 return c;
-   }
-
-   return NULL;
-}
-
-
-static void
-rehash(struct brw_cache *cache)
-{
-   struct brw_cache_item **items;
-   struct brw_cache_item *c, *next;
-   GLuint size, i;
-
-   size = cache->size * 3;
-   items = (struct brw_cache_item**) _mesa_calloc(size * sizeof(*items));
-
-   for (i = 0; i < cache->size; i++)
-      for (c = cache->items[i]; c; c = next) {
-	 next = c->next;
-	 c->next = items[c->hash % size];
-	 items[c->hash % size] = c;
-      }
-
-   FREE(cache->items);
-   cache->items = items;
-   cache->size = size;
-}
-
 
 /**
  * Returns the buffer object matching cache_id and key, or NULL.
@@ -184,8 +139,10 @@ brw_search_cache(struct brw_cache *cache,
                  dri_bo **reloc_bufs, GLuint nr_reloc_bufs,
                  void *aux_return)
 {
-   struct brw_cache_item *item;
    struct brw_cache_item lookup;
+   const struct brw_cache_item *item;
+   struct hash_entry *entry;
+   drm_intel_bo *bo;
    GLuint hash;
 
    lookup.cache_id = cache_id;
@@ -194,20 +151,21 @@ brw_search_cache(struct brw_cache *cache,
    lookup.reloc_bufs = reloc_bufs;
    lookup.nr_reloc_bufs = nr_reloc_bufs;
    hash = hash_key(&lookup);
-   lookup.hash = hash;
 
-   item = search_cache(cache, hash, &lookup);
-
-   if (item == NULL)
+   entry = hash_table_search(cache->ht, hash, &lookup);
+   if (!entry)
       return NULL;
 
+   bo = entry->data;
+
+   item = entry->key;
    if (aux_return)
       *(void **)aux_return = (void *)((char *)item->key + item->key_size);
 
-   update_cache_last(cache, cache_id, item->bo);
+   update_cache_last(cache, cache_id, bo);
 
-   dri_bo_reference(item->bo);
-   return item->bo;
+   drm_intel_bo_reference(bo);
+   return bo;
 }
 
 
@@ -237,7 +195,6 @@ brw_upload_cache_with_auxdata(struct brw_cache *cache,
    item->reloc_bufs = reloc_bufs;
    item->nr_reloc_bufs = nr_reloc_bufs;
    hash = hash_key(item);
-   item->hash = hash;
 
    /* Create the buffer object to contain the data */
    bo = dri_bo_alloc(cache->brw->intel.bufmgr,
@@ -258,16 +215,9 @@ brw_upload_cache_with_auxdata(struct brw_cache *cache,
    item->key = tmp;
    item->reloc_bufs = tmp + key_size + aux_size;
 
-   item->bo = bo;
    dri_bo_reference(bo);
 
-   if (cache->n_items > cache->size * 1.5)
-      rehash(cache);
-
-   hash %= cache->size;
-   item->next = cache->items[hash];
-   cache->items[hash] = item;
-   cache->n_items++;
+   hash_table_insert(cache->ht, hash, item, bo);
 
    if (aux_return) {
       *(void **)aux_return = (void *)((char *)item->key + item->key_size);
@@ -323,7 +273,8 @@ brw_cache_data(struct brw_cache *cache,
 	       GLuint nr_reloc_bufs)
 {
    dri_bo *bo;
-   struct brw_cache_item *item, lookup;
+   struct brw_cache_item lookup;
+   struct hash_entry *entry;
    GLuint hash;
 
    lookup.cache_id = cache_id;
@@ -332,13 +283,13 @@ brw_cache_data(struct brw_cache *cache,
    lookup.reloc_bufs = reloc_bufs;
    lookup.nr_reloc_bufs = nr_reloc_bufs;
    hash = hash_key(&lookup);
-   lookup.hash = hash;
 
-   item = search_cache(cache, hash, &lookup);
-   if (item) {
-      update_cache_last(cache, cache_id, item->bo);
-      dri_bo_reference(item->bo);
-      return item->bo;
+   entry = hash_table_search(cache->ht, hash, &lookup);
+   if (entry) {
+      drm_intel_bo *bo = entry->data;
+      update_cache_last(cache, cache_id, bo);
+      dri_bo_reference(bo);
+      return bo;
    }
 
    bo = brw_upload_cache(cache, cache_id,
@@ -370,11 +321,7 @@ brw_init_non_surface_cache(struct brw_context *brw)
    struct brw_cache *cache = &brw->cache;
 
    cache->brw = brw;
-
-   cache->size = 7;
-   cache->n_items = 0;
-   cache->items = (struct brw_cache_item **)
-      _mesa_calloc(cache->size * sizeof(struct brw_cache_item));
+   cache->ht = hash_table_create(brw_cache_item_equals);
 
    brw_init_cache_id(cache, "CC_VP", BRW_CC_VP);
    brw_init_cache_id(cache, "CC_UNIT", BRW_CC_UNIT);
@@ -407,11 +354,7 @@ brw_init_surface_cache(struct brw_context *brw)
    struct brw_cache *cache = &brw->surface_cache;
 
    cache->brw = brw;
-
-   cache->size = 7;
-   cache->n_items = 0;
-   cache->items = (struct brw_cache_item **)
-      _mesa_calloc(cache->size * sizeof(struct brw_cache_item));
+   cache->ht = hash_table_create(brw_cache_item_equals);
 
    brw_init_cache_id(cache, "SS_SURFACE", BRW_SS_SURFACE);
    brw_init_cache_id(cache, "SS_SURF_BIND", BRW_SS_SURF_BIND);
@@ -425,40 +368,17 @@ brw_init_caches(struct brw_context *brw)
    brw_init_surface_cache(brw);
 }
 
-
 static void
-brw_clear_cache(struct brw_context *brw, struct brw_cache *cache)
+brw_free_cache_item(struct hash_entry *entry)
 {
-   struct brw_cache_item *c, *next;
-   GLuint i;
+   struct brw_cache_item *c = (void *)entry->key;
+   int i;
 
-   if (INTEL_DEBUG & DEBUG_STATE)
-      _mesa_printf("%s\n", __FUNCTION__);
-
-   for (i = 0; i < cache->size; i++) {
-      for (c = cache->items[i]; c; c = next) {
-	 int j;
-
-	 next = c->next;
-	 for (j = 0; j < c->nr_reloc_bufs; j++)
-	    dri_bo_unreference(c->reloc_bufs[j]);
-	 dri_bo_unreference(c->bo);
-	 free((void *)c->key);
-	 free(c);
-      }
-      cache->items[i] = NULL;
-   }
-
-   cache->n_items = 0;
-
-   if (brw->curbe.last_buf) {
-      _mesa_free(brw->curbe.last_buf);
-      brw->curbe.last_buf = NULL;
-   }
-
-   brw->state.dirty.mesa |= ~0;
-   brw->state.dirty.brw |= ~0;
-   brw->state.dirty.cache |= ~0;
+   for (i = 0; i < c->nr_reloc_bufs; i++)
+      dri_bo_unreference(c->reloc_bufs[i]);
+   dri_bo_unreference(entry->data);
+   free((void *)c->key);
+   free(c);
 }
 
 /* Clear all entries from the cache that point to the given bo.
@@ -469,31 +389,44 @@ brw_clear_cache(struct brw_context *brw, struct brw_cache *cache)
 void
 brw_state_cache_bo_delete(struct brw_cache *cache, dri_bo *bo)
 {
-   struct brw_cache_item **prev;
-   GLuint i;
+   struct hash_entry *entry;
+
+   if (cache->ht == NULL)
+      return;
 
    if (INTEL_DEBUG & DEBUG_STATE)
       _mesa_printf("%s\n", __FUNCTION__);
 
-   for (i = 0; i < cache->size; i++) {
-      for (prev = &cache->items[i]; *prev;) {
-	 struct brw_cache_item *c = *prev;
-
-	 if (drm_intel_bo_references(c->bo, bo)) {
-	    int j;
-
-	    *prev = c->next;
-
-	    for (j = 0; j < c->nr_reloc_bufs; j++)
-	       dri_bo_unreference(c->reloc_bufs[j]);
-	    dri_bo_unreference(c->bo);
-	    free((void *)c->key);
-	    free(c);
-	    cache->n_items--;
-	 } else {
-	    prev = &c->next;
-	 }
+   for (entry = hash_table_next_entry(cache->ht, NULL);
+	entry != NULL;
+	entry = hash_table_next_entry(cache->ht, entry)) {
+      if (drm_intel_bo_references(entry->data, bo)) {
+	 brw_free_cache_item(entry);
+	 hash_table_remove(cache->ht, entry);
       }
+   }
+}
+
+static void
+_brw_state_cache_check_size(struct brw_cache *cache)
+{
+   /* Arbitrary limit on cache entries.  So far, hitting the limit is uncommon.
+    * ETQW does, but only every 10 or so frames (due to SF_VP+SF_UNIT state
+    * updates for stencil scissoring)
+    */
+   while (cache->ht->entries > 1000) {
+      struct hash_entry *entry = hash_table_random_entry(cache->ht, NULL);
+      const struct brw_cache_item *item = entry->key;
+
+      /* Because the aux_data isn't refcounted along with the bo, we
+       * can't free an item from the cache while its bo and aux_data
+       * are referenced by the context.
+       */
+      if (cache->last_bo[item->cache_id] == entry->data)
+	 continue;
+
+      brw_free_cache_item(entry);
+      hash_table_remove(cache->ht, entry);
    }
 }
 
@@ -501,16 +434,12 @@ void
 brw_state_cache_check_size(struct brw_context *brw)
 {
    if (INTEL_DEBUG & DEBUG_STATE)
-      _mesa_printf("%s (n_items=%d)\n", __FUNCTION__, brw->cache.n_items);
+      _mesa_printf("%s (n_items=%d,%d)\n", __FUNCTION__,
+		   brw->cache.ht->entries,
+		   brw->surface_cache.ht->entries);
 
-   /* un-tuned guess.  We've got around 20 state objects for a total of around
-    * 32k, so 1000 of them is around 1.5MB.
-    */
-   if (brw->cache.n_items > 1000)
-      brw_clear_cache(brw, &brw->cache);
-
-   if (brw->surface_cache.n_items > 1000)
-      brw_clear_cache(brw, &brw->surface_cache);
+   _brw_state_cache_check_size(&brw->cache);
+   _brw_state_cache_check_size(&brw->surface_cache);
 }
 
 
@@ -522,14 +451,12 @@ brw_destroy_cache(struct brw_context *brw, struct brw_cache *cache)
    if (INTEL_DEBUG & DEBUG_STATE)
       _mesa_printf("%s\n", __FUNCTION__);
 
-   brw_clear_cache(brw, cache);
+   hash_table_destroy(cache->ht, brw_free_cache_item);
+   cache->ht = NULL;
    for (i = 0; i < BRW_MAX_CACHE; i++) {
       dri_bo_unreference(cache->last_bo[i]);
       free(cache->name[i]);
    }
-   free(cache->items);
-   cache->items = NULL;
-   cache->size = 0;
 }
 
 

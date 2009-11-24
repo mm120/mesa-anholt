@@ -85,7 +85,8 @@ DRIVER_SOURCES = \
 	brw_wm_pass2.c \
 	brw_wm_sampler_state.c \
 	brw_wm_state.c \
-	brw_wm_surface_state.c 
+	brw_wm_surface_state.c \
+	hash_table.c
 
 C_SOURCES = \
 	$(COMMON_SOURCES) \

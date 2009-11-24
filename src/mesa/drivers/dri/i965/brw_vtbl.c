@@ -74,6 +74,7 @@ static void brw_destroy_context( struct intel_context *intel )
    brw->state.nr_color_regions = 0;
    intel_region_release(&brw->state.depth_region);
 
+   _mesa_free(brw->curbe.last_buf);
    dri_bo_release(&brw->curbe.curbe_bo);
    dri_bo_release(&brw->vs.prog_bo);
    dri_bo_release(&brw->vs.state_bo);

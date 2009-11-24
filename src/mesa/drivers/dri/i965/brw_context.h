@@ -312,23 +312,18 @@ struct brw_cache_item {
     */
    enum brw_cache_id cache_id;
    /** 32-bit hash of the key data */
-   GLuint hash;
    GLuint key_size;		/* for variable-sized keys */
    const void *key;
    dri_bo **reloc_bufs;
    GLuint nr_reloc_bufs;
-
-   dri_bo *bo;
-
-   struct brw_cache_item *next;
 };   
 
 
 
 struct brw_cache {
    struct brw_context *brw;
+   struct hash_table *ht;
 
-   struct brw_cache_item **items;
    GLuint size, n_items;
 
    GLuint aux_size[BRW_MAX_CACHE];

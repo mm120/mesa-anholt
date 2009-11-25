@@ -70,28 +70,29 @@
 #include "brw_sf.h"
 #include "brw_gs.h"
 
+static uint32_t
+add_fnv1a_hash(uint32_t hash, const void *data, size_t len)
+{
+   const uint8_t *byte = data;
+
+   while (len--) {
+      hash ^= *byte;
+      hash *= 0x01000193;
+      byte++;
+   }
+
+   return hash;
+}
 
 static GLuint
 hash_key(struct brw_cache_item *item)
 {
-   GLuint *ikey = (GLuint *)item->key;
-   GLuint hash = item->cache_id, i;
+   GLuint hash = 2166136261ul;
 
-   assert(item->key_size % 4 == 0);
-
-   /* I'm sure this can be improved on:
-    */
-   for (i = 0; i < item->key_size/4; i++) {
-      hash ^= ikey[i];
-      hash = (hash << 5) | (hash >> 27);
-   }
-
-   /* Include the BO pointers as key data as well */
-   ikey = (GLuint *)item->reloc_bufs;
-   for (i = 0; i < item->nr_reloc_bufs * sizeof(drm_intel_bo *) / 4; i++) {
-      hash ^= ikey[i];
-      hash = (hash << 5) | (hash >> 27);
-   }
+   hash = add_fnv1a_hash(hash, &item->cache_id, sizeof(item->cache_id));
+   hash = add_fnv1a_hash(hash, item->key, item->key_size);
+   hash = add_fnv1a_hash(hash, item->reloc_bufs,
+			 item->nr_reloc_bufs * sizeof(drm_intel_bo *));
 
    return hash;
 }

@@ -235,6 +235,21 @@ if test "$have_glut" = "xyes"; then
     AC_CHECK_LIB([GLUT],[glutInit],[],[have_glut=no])
 fi
 
+dnl glew detection for demos build
+have_glew=yes
+AC_ARG_WITH([glew],
+    [AS_HELP_STRING([--with-glew=DIR],
+        [glew install directory])],[
+    GLEW_INCLUDES="-I$withval/include"
+    CPPFLAGS="$CPPFLAGS GLEW_INCLUDES"
+    LDFLAGS="$LDFLAGS -L$withval/$LIB_DIR"
+    GLEW_LIB="-L$withval/$LIB_DIR -lGLEW"
+    ])
+AC_CHECK_HEADER([GL/glew.h],[],[have_glew=no])
+if test "$have_glew" = "xyes"; then
+    AC_CHECK_LIB([GLEW],[glewInit],[],[have_glew=no])
+fi
+
 dnl
 dnl library names
 dnl
@@ -425,7 +440,7 @@ esac
 dnl
 dnl Driver specific build directories
 dnl
-SRC_DIRS="glsl mesa glew"
+SRC_DIRS="glsl mesa"
 GLU_DIRS="sgi"
 WINDOW_SYSTEM=""
 GALLIUM_DIRS="auxiliary drivers state_trackers"
@@ -475,6 +490,12 @@ AC_ARG_WITH([demos],
     [with_demos="$default_demos"])
 if test "x$with_demos" = x; then
     with_demos=no
+fi
+if test "x$with_demos" = xyes; then
+    if test "x$have_glew" = xno; then
+	AC_MSG_WARN([GLEW is required for building demos])
+	with_demos=no
+    fi
 fi
 
 dnl If $with_demos is yes, directories will be added as libs available

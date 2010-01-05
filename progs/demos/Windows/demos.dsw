@@ -72,9 +72,6 @@ Package=<4>
     Project_Dep_Name pixeltex
     End Project Dependency
     Begin Project Dependency
-    Project_Dep_Name pointblast
-    End Project Dependency
-    Begin Project Dependency
     Project_Dep_Name rain
     End Project Dependency
     Begin Project Dependency
@@ -130,9 +127,6 @@ Package=<4>
     End Project Dependency
     Begin Project Dependency
     Project_Dep_Name winpos
-    End Project Dependency
-    Begin Project Dependency
-    Project_Dep_Name spriteblast
     End Project Dependency
     Begin Project Dependency
     Project_Dep_Name glut
@@ -453,21 +447,6 @@ Package=<4>
 
 ###############################################################################
 
-Project: "pointblast"=".\pointblast.dsp" - Package Owner=<4>
-
-Package=<5>
-{{{
-}}}
-
-Package=<4>
-{{{
-    Begin Project Dependency
-    Project_Dep_Name glut
-    End Project Dependency
-}}}
-
-###############################################################################
-
 Project: "rain"=".\rain.dsp" - Package Owner=<4>
 
 Package=<5>
@@ -559,21 +538,6 @@ Package=<4>
 ###############################################################################
 
 Project: "spectex"=".\spectex.dsp" - Package Owner=<4>
-
-Package=<5>
-{{{
-}}}
-
-Package=<4>
-{{{
-    Begin Project Dependency
-    Project_Dep_Name glut
-    End Project Dependency
-}}}
-
-###############################################################################
-
-Project: "spriteblast"=".\spriteblast.dsp" - Package Owner=<4>
 
 Package=<5>
 {{{

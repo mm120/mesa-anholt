@@ -39,7 +39,6 @@ PROGS = bounce \
 	osdemo \
 	paltex \
 	pixeltex \
-	pointblast \
 	ray \
 	readpix \
 	reflect \

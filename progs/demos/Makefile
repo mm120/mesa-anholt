@@ -19,7 +19,6 @@ PROGS = \
 	clearspd \
 	copypix \
 	cubemap \
-	dinoshade \
 	drawpix \
 	engine \
 	fbo_firecube \
@@ -41,7 +40,6 @@ PROGS = \
 	morph3d \
 	multiarb \
 	paltex \
-	pointblast \
 	projtex \
 	rain \
 	ray \
@@ -51,7 +49,6 @@ PROGS = \
 	shadowtex \
 	singlebuffer \
 	spectex \
-	spriteblast \
 	stex3d \
 	teapot \
 	terrain \

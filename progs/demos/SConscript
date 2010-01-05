@@ -28,7 +28,6 @@ progs = [
     'morph3d',
     'multiarb',
     'paltex',
-    'pointblast',
     'ray',
     'readpix',
     'reflect',
@@ -36,7 +35,6 @@ progs = [
     'shadowtex',
     'singlebuffer',
     'spectex',
-    'spriteblast',
     'stex3d',
     'teapot',
     'terrain',
@@ -49,7 +47,6 @@ progs = [
     'tunnel2',
     'vao_demo',
     'winpos',
-    'dinoshade',
     'fbotexture',
     'projtex',
 ]

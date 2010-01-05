@@ -23,7 +23,7 @@ LIB_DEP = [--.lib]$(GL_LIB) [--.lib]$(GLU_LIB) [--.lib]$(GLUT_LIB)
 
 PROGS = bounce.exe,clearspd.exe,drawpix.exe,gamma.exe,gears.exe,\
 	glinfo.exe,glutfx.exe,isosurf.exe,morph3d.exe,\
-	paltex.exe,pointblast.exe,reflect.exe,spectex.exe,stex3d.exe,\
+	paltex.exe,reflect.exe,spectex.exe,stex3d.exe,\
 	tessdemo.exe,texcyl.exe,texobj.exe,trispd.exe,winpos.exe
 
 
@@ -54,7 +54,6 @@ isosurf.exe : isosurf.obj $(LIB_DEP) [-.util]readtex.obj
 	cxxlink $(MMS$TARGET_NAME),[-.util]readtex.obj,$(GL_LIBS)
 morph3d.exe : morph3d.obj $(LIB_DEP)
 paltex.exe : paltex.obj $(LIB_DEP)
-pointblast.exe : pointblast.obj $(LIB_DEP)
 reflect.exe : reflect.obj [-.util]readtex.obj [-.util]showbuffer.obj\
 	$(LIB_DEP)
 	cxxlink $(MMS$TARGET_NAME),[-.util]readtex,showbuffer,$(GL_LIBS)
@@ -79,7 +78,6 @@ glutfx.obj : glutfx.c
 isosurf.obj : isosurf.c
 morph3d.obj : morph3d.c
 paltex.obj : paltex.c
-pointblast.obj : pointblast.c
 reflect.obj : reflect.c
 spectex.obj : spectex.c
 stex3d.obj : stex3d.c

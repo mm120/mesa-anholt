@@ -30,9 +30,9 @@ all:	OPENGL32.DLL GLU32.DLL GLUT32.DLL \
 	gears.exe geartrain.exe gloss.exe \
 	glinfo.exe glslnoise.exe \
 	gltestperf.exe glutfx.exe ipers.exe isosurf.exe lodbias.exe \
-	morph3d.exe multiarb.exe occlude.exe paltex.exe pointblast.exe \
+	morph3d.exe multiarb.exe occlude.exe paltex.exe \
 	ray.exe readpix.exe reflect.exe renormal.exe \
-	shadowtex.exe singlebuffer.exe spectex.exe spriteblast.exe \
+	shadowtex.exe singlebuffer.exe spectex.exe \
 	stex3d.exe teapot.exe terrain.exe tessdemo.exe texcyl.exe \
 	texdown.exe texenv.exe texobj.exe trispd.exe tunnel.exe tunnel2.exe \
 	winpos.exe
@@ -65,7 +65,6 @@ morph3d.exe: morph3d.obj
 multiarb.exe: multiarb.obj readtex.obj
 occlude.exe: occlude.obj
 paltex.exe: paltex.obj
-pointblast.exe: pointblast.obj
 ray.exe: ray.obj
 readpix.exe: readpix.obj readtex.obj
 reflect.exe: reflect.obj readtex.obj showbuffer.obj
@@ -73,7 +72,6 @@ renormal.exe: renormal.obj
 shadowtex.exe: shadowtex.obj showbuffer.obj
 singlebuffer.exe: singlebuffer.obj
 spectex.exe: spectex.obj
-spriteblast.exe: spriteblast.obj
 stex3d.exe: stex3d.obj
 teapot.exe: teapot.obj readtex.obj
 terrain.exe: terrain.obj

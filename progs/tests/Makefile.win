@@ -14,7 +14,6 @@ INCDIR = ..\include
 LIBDIR = ..\lib
 
 SRCS = cva.c \
-	dinoshade.c \
 	fogcoord.c \
 	manytex.c \
 	multipal.c \

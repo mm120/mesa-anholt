@@ -230,7 +230,7 @@ AC_ARG_WITH([glut],
     LDFLAGS="$LDFLAGS -L$withval/$LIB_DIR"
     GLUT_LIB="-L$withval/$LIB_DIR -lGLUT"
     ])
-AC_CHECK_HEADER([glut.h],[],[have_glut=no])
+AC_CHECK_HEADER([GL/glut.h],[],[have_glut=no])
 if test "$have_glut" = "xyes"; then
     AC_CHECK_LIB([GLUT],[glutInit],[],[have_glut=no])
 fi
@@ -490,7 +490,7 @@ yes)
     if test "$have_glut" = yes; then
         PROGRAM_DIRS="$PROGRAM_DIRS demos redbook samples glsl"
     else
-	AC_MESSAGE([glut is required for building most demos])
+	AC_MSG_WARN([glut is required for building most demos])
     fi
     ;;
 *)

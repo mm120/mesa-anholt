@@ -187,7 +187,6 @@ VERSION=7.7
 DIRECTORY = Mesa-$(VERSION)
 LIB_NAME = MesaLib-$(VERSION)
 DEMO_NAME = MesaDemos-$(VERSION)
-GLUT_NAME = MesaGLUT-$(VERSION)
 
 MAIN_FILES = \
 	$(DIRECTORY)/Makefile*						\
@@ -445,34 +444,10 @@ DEMO_FILES = \
 	$(DIRECTORY)/progs/windml/*.bmp			\
 	$(DIRECTORY)/progs/ggi/*.c
 
-GLUT_FILES = \
-	$(DIRECTORY)/include/GL/glut.h			\
-	$(DIRECTORY)/include/GL/glutf90.h		\
-	$(DIRECTORY)/src/glut/glx/Makefile*		\
-	$(DIRECTORY)/src/glut/glx/depend		\
-	$(DIRECTORY)/src/glut/glx/glut.pc.in		\
-	$(DIRECTORY)/src/glut/glx/*def			\
-	$(DIRECTORY)/src/glut/glx/*.[ch]		\
-	$(DIRECTORY)/src/glut/beos/*.[ch]		\
-	$(DIRECTORY)/src/glut/beos/*.cpp		\
-	$(DIRECTORY)/src/glut/beos/Makefile		\
-	$(DIRECTORY)/src/glut/dos/*.[ch]		\
-	$(DIRECTORY)/src/glut/dos/PC_HW/*.[chS]		\
-	$(DIRECTORY)/src/glut/ggi/*.[ch]		\
-	$(DIRECTORY)/src/glut/ggi/Makefile		\
-	$(DIRECTORY)/src/glut/fbdev/Makefile		\
-	$(DIRECTORY)/src/glut/fbdev/*[ch]		\
-	$(DIRECTORY)/src/glut/mini/*[ch]		\
-	$(DIRECTORY)/src/glut/mini/glut.pc.in		\
-	$(DIRECTORY)/src/glut/directfb/Makefile		\
-	$(DIRECTORY)/src/glut/directfb/NOTES		\
-	$(DIRECTORY)/src/glut/directfb/*[ch]
-
 DEPEND_FILES = \
 	$(TOP)/src/mesa/depend		\
 	$(TOP)/src/glx/x11/depend	\
 	$(TOP)/src/glw/depend		\
-	$(TOP)/src/glut/glx/depend	\
 	$(TOP)/src/glu/sgi/depend
 
 
@@ -486,8 +461,8 @@ LIB_FILES = \
 
 
 # Everything for new a Mesa release:
-tarballs: rm_depend configure aclocal.m4 lib_gz demo_gz glut_gz \
-	lib_bz2 demo_bz2 glut_bz2 lib_zip demo_zip glut_zip md5
+tarballs: rm_depend configure aclocal.m4 lib_gz demo_gz \
+	lib_bz2 demo_bz2 lib_zip demo_zip md5
 
 
 # Helper for autoconf builds
@@ -522,12 +497,6 @@ demo_gz:
 	gzip $(DEMO_NAME).tar ; \
 	mv $(DEMO_NAME).tar.gz $(DIRECTORY)
 
-glut_gz:
-	cd .. ; \
-	tar -cf $(GLUT_NAME).tar $(GLUT_FILES) ; \
-	gzip $(GLUT_NAME).tar ; \
-	mv $(GLUT_NAME).tar.gz $(DIRECTORY)
-
 lib_bz2: rm_config
 	cd .. ; \
 	tar -cf $(LIB_NAME).tar $(LIB_FILES) ; \
@@ -539,12 +508,6 @@ demo_bz2:
 	tar -cf $(DEMO_NAME).tar $(DEMO_FILES) ; \
 	bzip2 $(DEMO_NAME).tar ; \
 	mv $(DEMO_NAME).tar.bz2 $(DIRECTORY)
-
-glut_bz2:
-	cd .. ; \
-	tar -cf $(GLUT_NAME).tar $(GLUT_FILES) ; \
-	bzip2 $(GLUT_NAME).tar ; \
-	mv $(GLUT_NAME).tar.bz2 $(DIRECTORY)
 
 lib_zip: rm_config
 	rm -f $(LIB_NAME).zip ; \
@@ -558,12 +521,6 @@ demo_zip:
 	zip -qr $(DEMO_NAME).zip $(DEMO_FILES) ; \
 	mv $(DEMO_NAME).zip $(DIRECTORY)
 
-glut_zip:
-	rm -f $(GLUT_NAME).zip ; \
-	cd .. ; \
-	zip -qr $(GLUT_NAME).zip $(GLUT_FILES) ; \
-	mv $(GLUT_NAME).zip $(DIRECTORY)
-
 md5:
 	@-md5sum $(LIB_NAME).tar.gz
 	@-md5sum $(LIB_NAME).tar.bz2
@@ -571,11 +528,8 @@ md5:
 	@-md5sum $(DEMO_NAME).tar.gz
 	@-md5sum $(DEMO_NAME).tar.bz2
 	@-md5sum $(DEMO_NAME).zip
-	@-md5sum $(GLUT_NAME).tar.gz
-	@-md5sum $(GLUT_NAME).tar.bz2
-	@-md5sum $(GLUT_NAME).zip
 
 .PHONY: tarballs rm_depend rm_config md5 \
-	lib_gz demo_gz glut_gz \
-	lib_bz2 demo_bz2 glut_bz2 \
-	lib_zip demo_zip glut_zip
+	lib_gz demo_gz \
+	lib_bz2 demo_bz2 \
+	lib_zip demo_zip

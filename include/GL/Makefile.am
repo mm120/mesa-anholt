@@ -6,7 +6,6 @@ INC_GGI = ggimesa.h
 INC_OSMESA = osmesa.h
 INC_SVGA = svgamesa.h
 INC_X11 = glx.h glxext.h glx_mangle.h
-INC_GLUT = glut.h glutf90.h
 
 if HAVE_GGI
 sel_inc_ggi = $(INC_GGI)
@@ -24,15 +23,11 @@ if HAVE_X11
 sel_inc_x11 = $(INC_X11)
 endif
 
-if NEED_GLUT
-sel_inc_glut = $(INC_GLUT)
-endif
-
-EXTRA_HEADERS = amesa.h dosmesa.h foomesa.h glut_h.dja mesa_wgl.h mglmesa.h \
+EXTRA_HEADERS = amesa.h dosmesa.h foomesa.h mesa_wgl.h mglmesa.h \
 	vms_x_fix.h wmesa.h \
-	$(INC_GGI) $(INC_OSMESA) $(INC_SVGA) $(INC_X11) $(INC_GLUT)
+	$(INC_GGI) $(INC_OSMESA) $(INC_SVGA) $(INC_X11)
 
 GLinclude_HEADERS = gl.h glext.h gl_mangle.h glu.h glu_mangle.h \
 	$(sel_inc_ggi) $(sel_inc_osmesa) $(sel_inc_svga) \
-	$(sel_inc_x11) $(sel_inc_glut)
+	$(sel_inc_x11)
 include $(top_srcdir)/common_rules.make

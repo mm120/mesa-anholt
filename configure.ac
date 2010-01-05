@@ -220,6 +220,21 @@ if test "x$enable_debug" = xyes; then
     fi
 fi
 
+dnl glut detection for demos build
+have_glut=yes
+AC_ARG_WITH([glut],
+    [AS_HELP_STRING([--with-glut=DIR],
+        [glut install directory])],[
+    GLUT_INCLUDES="-I$withval/include"
+    CPPFLAGS="$CPPFLAGS GLUT_INCLUDES"
+    LDFLAGS="$LDFLAGS -L$withval/$LIB_DIR"
+    GLUT_LIB="-L$withval/$LIB_DIR -lGLUT"
+    ])
+AC_CHECK_HEADER([glut.h],[],[have_glut=no])
+if test "$have_glut" = "xyes"; then
+    AC_CHECK_LIB([GLUT],[glutInit],[],[have_glut=no])
+fi
+
 dnl
 dnl library names
 dnl
@@ -240,25 +255,21 @@ fi
 
 GL_LIB_NAME='lib$(GL_LIB).'${LIB_EXTENSION}
 GLU_LIB_NAME='lib$(GLU_LIB).'${LIB_EXTENSION}
-GLUT_LIB_NAME='lib$(GLUT_LIB).'${LIB_EXTENSION}
 GLW_LIB_NAME='lib$(GLW_LIB).'${LIB_EXTENSION}
 OSMESA_LIB_NAME='lib$(OSMESA_LIB).'${LIB_EXTENSION}
 
 GL_LIB_GLOB='lib$(GL_LIB).*'${LIB_EXTENSION}'*'
 GLU_LIB_GLOB='lib$(GLU_LIB).*'${LIB_EXTENSION}'*'
-GLUT_LIB_GLOB='lib$(GLUT_LIB).*'${LIB_EXTENSION}'*'
 GLW_LIB_GLOB='lib$(GLW_LIB).*'${LIB_EXTENSION}'*'
 OSMESA_LIB_GLOB='lib$(OSMESA_LIB).*'${LIB_EXTENSION}'*'
 
 AC_SUBST([GL_LIB_NAME])
 AC_SUBST([GLU_LIB_NAME])
-AC_SUBST([GLUT_LIB_NAME])
 AC_SUBST([GLW_LIB_NAME])
 AC_SUBST([OSMESA_LIB_NAME])
 
 AC_SUBST([GL_LIB_GLOB])
 AC_SUBST([GLU_LIB_GLOB])
-AC_SUBST([GLUT_LIB_GLOB])
 AC_SUBST([GLW_LIB_GLOB])
 AC_SUBST([OSMESA_LIB_GLOB])
 
@@ -474,6 +485,12 @@ yes)
     # If the driver isn't osmesa, we have libGL and can build xdemos
     if test "$mesa_driver" != osmesa; then
         PROGRAM_DIRS="xdemos"
+    fi
+
+    if test "$have_glut" = yes; then
+        PROGRAM_DIRS="$PROGRAM_DIRS demos redbook samples glsl"
+    else
+	AC_MESSAGE([glut is required for building most demos])
     fi
     ;;
 *)
@@ -1036,71 +1053,6 @@ AC_SUBST([GLW_PC_LIB_PRIV])
 AC_SUBST([GLW_PC_CFLAGS])
 
 dnl
-dnl GLUT configuration
-dnl
-if test -f "$srcdir/include/GL/glut.h"; then
-    default_glut=yes
-else
-    default_glut=no
-fi
-AC_ARG_ENABLE([glut],
-    [AS_HELP_STRING([--disable-glut],
-        [enable GLUT library @<:@default=enabled if source available@:>@])],
-    [enable_glut="$enableval"],
-    [enable_glut="$default_glut"])
-
-dnl Can't build glut if GLU not available
-if test "x$enable_glu$enable_glut" = xnoyes; then
-    AC_MSG_WARN([Disabling glut since GLU is disabled])
-    enable_glut=no
-fi
-dnl Don't build glut on osmesa
-if test "x$enable_glut" = xyes && test "$mesa_driver" = osmesa; then
-    AC_MSG_WARN([Disabling glut since the driver is OSMesa])
-    enable_glut=no
-fi
-
-if test "x$enable_glut" = xyes; then
-    SRC_DIRS="$SRC_DIRS glut/glx"
-    GLUT_CFLAGS=""
-    if test "x$GCC" = xyes; then
-        GLUT_CFLAGS="-fexceptions"
-    fi
-    if test "$x11_pkgconfig" = yes; then
-        PKG_CHECK_MODULES([GLUT],[x11 xmu xi])
-        GLUT_PC_REQ_PRIV="x11 xmu xi"
-        GLUT_LIB_DEPS="$GLUT_LIBS"
-    else
-        # should check these...
-        GLUT_LIB_DEPS="$X_LIBS -lX11 -lXmu -lXi"
-        GLUT_PC_LIB_PRIV="$GLUT_LIB_DEPS"
-        GLUT_PC_CFLAGS="$X11_INCLUDES"
-    fi
-    GLUT_LIB_DEPS="$GLUT_LIB_DEPS -lm"
-    GLUT_PC_LIB_PRIV="$GLUT_PC_LIB_PRIV -lm"
-
-    # If glut is available, we can build most programs
-    if test "$with_demos" = yes; then
-        PROGRAM_DIRS="$PROGRAM_DIRS demos redbook samples glsl"
-    fi
-
-    # If static, empty GLUT_LIB_DEPS and add libs for programs to link
-    if test "$enable_static" = no; then
-        GLUT_MESA_DEPS='-l$(GLU_LIB) -l$(GL_LIB)'
-    else
-        APP_LIB_DEPS="$APP_LIB_DEPS $GLUT_LIB_DEPS"
-        GLUT_LIB_DEPS=""
-        GLUT_MESA_DEPS=""
-    fi
-fi
-AC_SUBST([GLUT_LIB_DEPS])
-AC_SUBST([GLUT_MESA_DEPS])
-AC_SUBST([GLUT_CFLAGS])
-AC_SUBST([GLUT_PC_REQ_PRIV])
-AC_SUBST([GLUT_PC_LIB_PRIV])
-AC_SUBST([GLUT_PC_CFLAGS])
-
-dnl
 dnl Program library dependencies
 dnl    Only libm is added here if necessary as the libraries should
 dnl    be pulled in by the linker
@@ -1329,7 +1281,6 @@ echo "        Static libs:     $enable_static"
 echo "        EGL:             $enable_egl"
 echo "        GLU:             $enable_glu"
 echo "        GLw:             $enable_glw (Motif: $enable_motif)"
-echo "        glut:            $enable_glut"
 
 dnl Programs
 # cleanup the programs var for display

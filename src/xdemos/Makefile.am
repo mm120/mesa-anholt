@@ -47,8 +47,10 @@ bin_PROGRAMS = \
 	glxsnoop \
 	glxswapcontrol \
 	manywin \
+	msctest \
 	multictx \
 	offset \
+	omlsync \
 	overlay \
 	pbinfo \
 	pbdemo \

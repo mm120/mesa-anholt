@@ -42,6 +42,7 @@ EXTRA_DIST = \
 	abs.txt \
 	addimm.txt \
 	add.txt \
+	add-param-imm.txt \
 	arl-static.txt \
 	arl.txt \
 	arl-unused.txt \

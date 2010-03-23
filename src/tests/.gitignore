@@ -17,6 +17,7 @@ auxbuffer
 blendminmax
 blendsquare
 blendxor
+blitfb
 bufferobj
 bug_3050
 bug_3101
@@ -28,12 +29,15 @@ condrender
 copypixrate
 crossbar
 cva
+cva_huge
+cylwrap
 drawbuffers
 drawbuffers2
 exactrast
 ext422square
 fbotest1
 fbotest2
+fbotest3
 fillrate
 floattex
 fog
@@ -88,6 +92,7 @@ texcmp
 texdown
 texfilt
 texgenmix
+texleak
 texline
 texobj
 texobjshare

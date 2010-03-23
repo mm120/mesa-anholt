@@ -34,6 +34,7 @@ if HAVE_GLUT
 bin_PROGRAMS = \
 	clear \
 	clear-fbo \
+	clear-fbo-scissor \
 	clear-fbo-tex \
 	clear-random \
 	clear-repeat \
@@ -111,6 +112,8 @@ bin_PROGRAMS = \
 	quad-unfilled-clip \
 	quad-unfilled-stipple \
 	readpixels \
+	sub-tex \
+	tex-quads \
 	tri-alpha \
 	tri-alpha-tex \
 	tri-array-interleaved \
@@ -146,6 +149,7 @@ bin_PROGRAMS = \
 	tri-logicop-xor \
 	tri-mask-tri \
 	tri-multitex-vbo \
+	tri-point-line-clipped \
 	tri-orig \
 	tri-query \
 	tri-repeat \
@@ -178,7 +182,9 @@ bin_PROGRAMS = \
 	vbo-drawelements \
 	vbo-drawrange \
 	vbo-noninterleaved \
+	vbo-tri \
 	vp-array \
+	vp-array-hf \
 	vp-array-int \
 	vp-clip \
 	vp-line-clip \

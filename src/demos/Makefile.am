@@ -35,11 +35,13 @@ bin_PROGRAMS = \
 	arbfplight \
 	arbfslight \
 	arbocclude \
+	arbocclude2 \
 	bounce \
 	clearspd \
 	copypix \
 	cubemap \
 	dinoshade \
+	dissolve \
 	drawpix \
 	engine \
 	fbo_firecube \
@@ -91,6 +93,7 @@ tunnel_SOURCES = \
 
 copypix_LDADD = ../util/libutil.la
 cubemap_LDADD = ../util/libutil.la
+dissolve_LDADD = ../util/libutil.la
 drawpix_LDADD = ../util/libutil.la
 engine_LDADD = ../util/libutil.la
 fbo_firecube_LDADD = ../util/libutil.la

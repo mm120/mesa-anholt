@@ -71,11 +71,16 @@ EXTRA_DIST = \
 	min.txt \
 	mov-alias.txt \
 	mov.txt \
+	mov-imm.txt \
+	mov-param.txt \
 	mul-alias.txt \
 	mul-swz.txt \
 	mul.txt \
 	negate.txt \
 	position.txt \
+	position-frc-integer.txt \
+	position-frc.txt \
+	position-upper-left.txt \
 	pow.txt \
 	rcp.txt \
 	rsq.txt \

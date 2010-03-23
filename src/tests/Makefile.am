@@ -68,6 +68,7 @@ noinst_PROGRAMS = \
 	blendminmax \
 	blendsquare \
 	blendxor \
+	blitfb \
 	bufferobj \
 	bumpmap \
 	bug_3050 \
@@ -75,15 +76,20 @@ noinst_PROGRAMS = \
 	bug_3195 \
 	bug_texstore_i8 \
 	calibrate_rast \
+	condrender \
 	copypixrate \
 	crossbar \
 	cva \
+	cva_huge \
+	cylwrap \
 	drawbuffers \
+	drawbuffers2 \
 	exactrast \
 	ext422square \
 	floattex \
 	fbotest1 \
 	fbotest2 \
+	fbotest3 \
 	fillrate \
 	fog \
 	fogcoord \
@@ -136,6 +142,7 @@ noinst_PROGRAMS = \
 	texdown \
 	texfilt \
 	texgenmix \
+	texleak \
 	texline \
 	texobj \
 	texobjshare \
@@ -154,6 +161,7 @@ noinst_PROGRAMS = \
 	yuvrect \
 	yuvsquare \
 	zcomp \
+	zbitmap \
 	zdrawpix \
 	zreaddraw
 endif

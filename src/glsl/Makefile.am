@@ -95,6 +95,7 @@ EXTRA_DIST = \
 	CH06-brick.vert \
 	CH11-bumpmap.frag \
 	CH11-bumpmap.vert \
+	CH11-bumpmaptex.frag \
 	CH11-toyball.frag \
 	CH11-toyball.vert \
 	CH18-mandel.frag \

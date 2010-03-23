@@ -23,22 +23,5 @@
 #    Eric Anholt <eric@anholt.net>
 
 SUBDIRS = \
-	util \
-	demos \
-	es1 \
-	es2 \
-	fp \
-	fpglsl \
-	glsl \
-	perf \
-	rbug \
-	redbook \
-	samples \
-	slang \
-	tests \
-	tools \
-	trivial \
-	vp \
-	vpglsl \
-	wgl \
-	xdemos
+	screen \
+	xegl

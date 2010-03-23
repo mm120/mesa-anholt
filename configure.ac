@@ -88,6 +88,31 @@ AC_CHECK_LIB([GLEW],
 DEMO_CFLAGS="$DEMO_CFLAGS $GLEW_CFLAGS"
 DEMO_LIBS="$DEMO_CFLAGS $GLEW_LIBS"
 
+dnl Check for EGL
+EGL_CFLAGS=""
+EGL_LIB=-lEGL
+egl_enabled=yes
+AC_ARG_WITH([egl],
+	[AS_HELP_STRING([--with-egl=DIR],
+			[EGL install directory])],
+	[EGL_CFLAGS="-I$withval/include"
+	 EGL_LIB="-L$withval/lib -lEGL"])
+AC_CHECK_HEADER([EGL/glut.h],
+		[],
+		[egl_enabled=no])
+AC_CHECK_LIB([egl],
+		[eglGetDisplay],
+		[],
+		[egl_enabled=no])
+
+dnl Finish adding detection for GLES.
+glesv1_enabled=no
+GLESV1_CFLAGS=""
+GLESV1_LIBS=""
+glesv2_enabled=no
+GLESV2_CFLAGS=""
+GLESV2_LIBS=""
+
 dnl Compiler macros
 case "$host_os" in
 linux*|*-gnu*|gnu*)
@@ -149,12 +174,21 @@ AC_SUBST([APP_LIB_DEPS])
 
 AC_SUBST([DEMO_CFLAGS])
 AC_SUBST([DEMO_LIBS])
+AC_SUBST([EGL_CFLAGS])
+AC_SUBST([EGL_LIBS])
+AC_SUBST([GLESV1_CFLAGS])
+AC_SUBST([GLESV1_LIBS])
+AC_SUBST([GLESV2_CFLAGS])
+AC_SUBST([GLESV2_LIBS])
 AC_SUBST([GLUT_CFLAGS])
 AC_SUBST([GLUT_LIBS])
 AC_SUBST([X11_CFLAGS])
 AC_SUBST([X11_LIBS])
 AC_SUBST([MESA_GLAPI])
 
+AM_CONDITIONAL(HAVE_EGL, test "x$egl_enabled" = "xyes")
+AM_CONDITIONAL(HAVE_GLESV1, test "x$glesv1_enabled" = "xyes")
+AM_CONDITIONAL(HAVE_GLESV2, test "x$glesv2_enabled" = "xyes")
 AM_CONDITIONAL(HAVE_GLUT, test "x$glut_enabled" = "xyes")
 AM_CONDITIONAL(HAVE_X11, test "x$x11_enabled" = "xyes")
 AM_CONDITIONAL(BUILD_GLTRACE, false)
@@ -164,6 +198,11 @@ AC_OUTPUT([
 	Makefile
 	src/Makefile
 	src/demos/Makefile
+	src/es1/Makefile
+	src/es1/screen/Makefile
+	src/es1/xegl/Makefile
+	src/es2/Makefile
+	src/es2/xegl/Makefile
 	src/fp/Makefile
 	src/fpglsl/Makefile
 	src/glsl/Makefile

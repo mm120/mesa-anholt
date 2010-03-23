@@ -171,4 +171,6 @@ texrect_LDADD = ../util/libutil.la
 
 EXTRA_DIST = \
 	Makefile.am \
-	getprocaddress.py
+	getprocaddress.py \
+	texcomp_image.h \
+	tkmap.c

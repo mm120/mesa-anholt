@@ -345,15 +345,17 @@ static GLboolean brw_try_draw_prims( GLcontext *ctx,
 
    for (i = 0; i < nr_prims; i++) {
       uint32_t hw_prim;
+      int required_space_estimate = 0;
 
-      /* Flush the batch if it's approaching full, so that we don't wrap while
-       * we've got validated state that needs to be in the same batch as the
-       * primitives.  This fraction is just a guess (minimal full state plus
-       * a primitive is around 512 bytes), and would be better if we had
-       * an upper bound of how much we might emit in a single
-       * brw_try_draw_prims().
+      /* Flush the batch if it's approaching full, so that we don't
+       * wrap while we've got validated state that needs to be in the
+       * same batch as the primitives.  This fraction is just a guess,
+       * and would be better if we had an upper bound of how much we
+       * might emit in a single brw_try_draw_prims().
        */
-      intel_batchbuffer_require_space(intel->batch, intel->batch->size / 4);
+      required_space_estimate += 512; /* batchbuffer state */
+      required_space_estimate += 4096; /* streamed curbe */
+      intel_batchbuffer_require_space(intel->batch, required_space_estimate);
 
       hw_prim = brw_set_prim(brw, &prim[i]);
 

@@ -277,6 +277,7 @@ static void prepare_constant_buffer(struct brw_context *brw)
        memcmp(buf, brw->curbe.last_buf, bufsz) == 0) {
       /* constants have not changed */
    } else {
+      void *map;
       /* Update the record of what our last set of constants was.  We
        * don't just flip the pointers because we don't fill in the
        * data in the padding between the entries.
@@ -284,37 +285,10 @@ static void prepare_constant_buffer(struct brw_context *brw)
       memcpy(brw->curbe.last_buf, buf, bufsz);
       brw->curbe.last_bufsz = bufsz;
 
-      if (brw->curbe.curbe_bo != NULL &&
-	  brw->curbe.curbe_next_offset + bufsz > brw->curbe.curbe_bo->size)
-      {
-	 drm_intel_gem_bo_unmap_gtt(brw->curbe.curbe_bo);
-	 drm_intel_bo_unreference(brw->curbe.curbe_bo);
-	 brw->curbe.curbe_bo = NULL;
-      }
-
-      if (brw->curbe.curbe_bo == NULL) {
-	 /* Allocate a single page for CURBE entries for this batchbuffer.
-	  * They're generally around 64b.
-	  */
-	 brw->curbe.curbe_bo = drm_intel_bo_alloc(brw->intel.bufmgr, "CURBE",
-						  4096, 1 << 6);
-	 brw->curbe.curbe_next_offset = 0;
-	 drm_intel_gem_bo_map_gtt(brw->curbe.curbe_bo);
-	 assert(bufsz < 4096);
-      }
-
-      brw->curbe.curbe_offset = brw->curbe.curbe_next_offset;
-      brw->curbe.curbe_next_offset += bufsz;
-      brw->curbe.curbe_next_offset = ALIGN(brw->curbe.curbe_next_offset, 64);
-
-      /* Copy data to the buffer:
-       */
-      memcpy(brw->curbe.curbe_bo->virtual + brw->curbe.curbe_offset,
-	     buf,
-	     bufsz);
+      map = brw_state_batch(brw, bufsz, 64,
+			    &brw->curbe.curbe_bo, &brw->curbe.curbe_offset);
+      memcpy(map, buf, bufsz);
    }
-
-   brw_add_validated_bo(brw, brw->curbe.curbe_bo);
 
    /* Because this provokes an action (ie copy the constants into the
     * URB), it shouldn't be shortcircuited if identical to the

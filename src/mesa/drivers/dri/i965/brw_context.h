@@ -465,7 +465,7 @@ struct brw_context
        * This can be a fixed number as we only have a limited number of
        * objects referenced from the batchbuffer in a primitive emit,
        * consisting of the vertex buffers, pipelined state pointers,
-       * the CURBE, the depth buffer, and a query BO.
+       * the depth buffer, and a query BO.
        */
       drm_intel_bo *validated_bos[VERT_ATTRIB_MAX + BRW_WM_MAX_SURF + 16];
       int validated_bo_count;
@@ -576,8 +576,6 @@ struct brw_context
       drm_intel_bo *curbe_bo;
       /** Offset within curbe_bo of space for current curbe entry */
       GLuint curbe_offset;
-      /** Offset within curbe_bo of space for next curbe entry */
-      GLuint curbe_next_offset;
 
       /**
        * Copy of the last set of CURBEs uploaded.  Frequently we'll end up

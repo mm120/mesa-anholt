@@ -57,6 +57,7 @@
 #define need_GL_EXT_provoking_vertex
 #define need_GL_EXT_secondary_color
 #define need_GL_EXT_stencil_two_side
+#define need_GL_EXT_texture_array
 #define need_GL_EXT_timer_query
 #define need_GL_APPLE_vertex_array_object
 #define need_GL_APPLE_object_purgeable
@@ -173,12 +174,14 @@ static const struct dri_extension brw_extensions[] = {
    { "GL_EXT_draw_buffers2",              GL_EXT_draw_buffers2_functions },
    { "GL_EXT_shadow_funcs",               NULL },
    { "GL_EXT_stencil_two_side",           GL_EXT_stencil_two_side_functions },
+   { "GL_EXT_texture_array",              GL_EXT_texture_array_functions },
    { "GL_EXT_texture_sRGB",		  NULL },
    { "GL_EXT_texture_swizzle",		  NULL },
    { "GL_EXT_vertex_array_bgra",	  NULL },
    { "GL_ATI_envmap_bumpmap",             GL_ATI_envmap_bumpmap_functions },
    { "GL_ATI_separate_stencil",           GL_ATI_separate_stencil_functions },
    { "GL_ATI_texture_env_combine3",       NULL },
+   { "GL_MESA_texture_array",             NULL },
    { "GL_NV_texture_env_combine4",        NULL },
    { NULL,                                NULL }
 };

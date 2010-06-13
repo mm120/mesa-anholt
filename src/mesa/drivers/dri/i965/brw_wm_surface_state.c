@@ -54,6 +54,8 @@ static GLuint translate_tex_target( GLenum target )
       return BRW_SURFACE_2D;
 
    case GL_TEXTURE_2D: 
+   case GL_TEXTURE_2D_ARRAY_EXT:
+   case GL_TEXTURE_1D_ARRAY_EXT:
       return BRW_SURFACE_2D;
 
    case GL_TEXTURE_3D: 

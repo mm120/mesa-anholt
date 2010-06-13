@@ -33,6 +33,8 @@ intel_calculate_first_last_level(struct intel_context *intel,
    case GL_TEXTURE_1D:
    case GL_TEXTURE_2D:
    case GL_TEXTURE_3D:
+   case GL_TEXTURE_1D_ARRAY_EXT:
+   case GL_TEXTURE_2D_ARRAY_EXT:
    case GL_TEXTURE_CUBE_MAP:
       if (tObj->MinFilter == GL_NEAREST || tObj->MinFilter == GL_LINEAR) {
          /* GL_NEAREST and GL_LINEAR only care about GL_TEXTURE_BASE_LEVEL.

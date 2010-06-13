@@ -307,15 +307,21 @@ intel_miptree_get_image_offset(struct intel_mipmap_tree *mt,
 			       GLuint level, GLuint face, GLuint depth,
 			       GLuint *x, GLuint *y)
 {
-   if (mt->target == GL_TEXTURE_CUBE_MAP_ARB) {
+   switch (mt->target) {
+   case GL_TEXTURE_CUBE_MAP_ARB:
       *x = mt->level[level].x_offset[face];
       *y = mt->level[level].y_offset[face];
-   } else if (mt->target == GL_TEXTURE_3D) {
+      break;
+   case GL_TEXTURE_3D:
+   case GL_TEXTURE_2D_ARRAY_EXT:
+   case GL_TEXTURE_1D_ARRAY_EXT:
       *x = mt->level[level].x_offset[depth];
       *y = mt->level[level].y_offset[depth];
-   } else {
+      break;
+   default:
       *x = mt->level[level].x_offset[0];
       *y = mt->level[level].y_offset[0];
+      break;
    }
 }
 
@@ -335,23 +341,33 @@ intel_miptree_image_map(struct intel_context * intel,
                         GLuint * row_stride, GLuint * image_offsets)
 {
    GLuint x, y;
+   int i;
+
    DBG("%s \n", __FUNCTION__);
 
    if (row_stride)
       *row_stride = mt->region->pitch * mt->cpp;
 
-   if (mt->target == GL_TEXTURE_3D) {
-      int i;
-
+   switch (mt->target) {
+   case GL_TEXTURE_3D:
       for (i = 0; i < mt->level[level].depth; i++) {
-
 	 intel_miptree_get_image_offset(mt, level, face, i,
 					&x, &y);
 	 image_offsets[i] = x + y * mt->region->pitch;
       }
-
       return intel_region_map(intel, mt->region);
-   } else {
+
+   case GL_TEXTURE_2D_ARRAY_EXT:
+   case GL_TEXTURE_1D_ARRAY_EXT:
+      for (i = 0; i < mt->depth0; i++) {
+	 intel_miptree_get_image_offset(mt, level, face, i,
+					&x, &y);
+	 image_offsets[i] = x + y * mt->region->pitch;
+      }
+      return intel_region_map(intel, mt->region);
+      break;
+
+   default:
       assert(mt->level[level].depth == 1);
       intel_miptree_get_image_offset(mt, level, face, 0,
 				     &x, &y);

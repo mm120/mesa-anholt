@@ -38,6 +38,37 @@
 #include "main/macros.h"
 
 #define FILE_DEBUG_FLAG DEBUG_MIPTREE
+static void
+brw_miptree_layout_texture_array(struct intel_context *intel,
+				 struct intel_mipmap_tree *mt,
+				 uint32_t tiling,
+				 int layers)
+{
+   GLuint align_h = 2;
+   GLuint level;
+   GLuint qpitch = 0;
+   int h0, h1, q;
+
+   /* On Ironlake, cube maps are finally represented as just a series
+    * of MIPLAYOUT_BELOW 2D textures (like 2D texture arrays), separated
+    * by a pitch of qpitch rows, where qpitch is defined by the equation
+    * given in Volume 1 of the BSpec.
+    */
+   h0 = ALIGN(mt->height0, align_h);
+   h1 = ALIGN(minify(h0), align_h);
+   qpitch = (h0 + h1 + 11 * align_h);
+   if (mt->compressed)
+      qpitch /= 4;
+
+   i945_miptree_layout_2d(intel, mt, tiling, layers);
+
+   for (level = mt->first_level; level <= mt->last_level; level++) {
+      for (q = 0; q < layers; q++) {
+	 intel_miptree_set_image_offset(mt, level, q, 0, q * qpitch);
+      }
+   }
+   mt->total_height = qpitch * layers;
+}
 
 GLboolean brw_miptree_layout(struct intel_context *intel,
 			     struct intel_mipmap_tree *mt,
@@ -49,32 +80,8 @@ GLboolean brw_miptree_layout(struct intel_context *intel,
    switch (mt->target) {
    case GL_TEXTURE_CUBE_MAP:
       if (intel->gen == 5) {
-          GLuint align_h = 2;
-          GLuint level;
-          GLuint qpitch = 0;
-	  int h0, h1, q;
-
-	  /* On Ironlake, cube maps are finally represented as just a series
-	   * of MIPLAYOUT_BELOW 2D textures (like 2D texture arrays), separated
-	   * by a pitch of qpitch rows, where qpitch is defined by the equation
-	   * given in Volume 1 of the BSpec.
-	   */
-	  h0 = ALIGN(mt->height0, align_h);
-	  h1 = ALIGN(minify(h0), align_h);
-	  qpitch = (h0 + h1 + 11 * align_h);
-          if (mt->compressed)
-	     qpitch /= 4;
-
-	  i945_miptree_layout_2d(intel, mt, tiling, 6);
-
-          for (level = mt->first_level; level <= mt->last_level; level++) {
-	     for (q = 0; q < 6; q++) {
-		intel_miptree_set_image_offset(mt, level, q, 0, q * qpitch);
-	     }
-          }
-	  mt->total_height = qpitch * 6;
-
-          break;
+	 brw_miptree_layout_texture_array(intel, mt, tiling, 6);
+	 break;
       }
 
    case GL_TEXTURE_3D: {
@@ -160,6 +167,11 @@ GLboolean brw_miptree_layout(struct intel_context *intel,
 	 mt->total_height += 2;
       break;
    }
+
+   case GL_TEXTURE_2D_ARRAY:
+   case GL_TEXTURE_1D_ARRAY:
+      brw_miptree_layout_texture_array(intel, mt, tiling, mt->depth0);
+      break;
 
    default:
       i945_miptree_layout_2d(intel, mt, tiling, 1);

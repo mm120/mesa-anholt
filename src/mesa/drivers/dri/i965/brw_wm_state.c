@@ -183,7 +183,7 @@ wm_unit_create_from_key(struct brw_context *brw, struct brw_wm_unit_key *key,
    wm.wm5.legacy_line_rast = 0;
    wm.wm5.legacy_global_depth_bias = 0;
    wm.wm5.early_depth_test = 1;	        /* never need to disable */
-   wm.wm5.line_aa_region_width = 0;
+   wm.wm5.line_aa_region_width = 2;
    wm.wm5.line_endcap_aa_region_width = 1;
 
    wm.wm5.polygon_stipple = key->polygon_stipple;

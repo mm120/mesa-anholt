@@ -177,9 +177,12 @@ sf_unit_create_from_key(struct brw_context *brw, struct brw_sf_unit_key *key,
 			drm_intel_bo **reloc_bufs)
 {
    struct intel_context *intel = &brw->intel;
+   GLcontext *ctx = &intel->ctx;
    struct brw_sf_unit_state sf;
    drm_intel_bo *bo;
    int chipset_max_threads;
+   int line_width;
+
    memset(&sf, 0, sizeof(sf));
 
    sf.thread0.grf_reg_count = ALIGN(key->total_grf, 16) / 16 - 1;
@@ -254,8 +257,26 @@ sf_unit_create_from_key(struct brw_context *brw, struct brw_sf_unit_key *key,
    }
 
    /* _NEW_LINE */
-   /* XXX use ctx->Const.Min/MaxLineWidth here */
-   sf.sf6.line_width = CLAMP(key->line_width, 1.0, 5.0) * (1<<1);
+   line_width = key->line_width;
+
+   /* The lovely line antialiasing algorithm doesn't actually compute
+    * the coverage of the pixel by the line.  Instead, it computes a
+    * distance from the pixel to the line. (Manhattan on original
+    * Gen4, "something better" on g45+).  If the distance is >
+    * line_width/2, no fragment is produced.  If distance >
+    * (line_width-line_aa_region)/2, then a fractional alpha value is
+    * produced.
+    *
+    * So, to approximate expected results, we increase the antialiased
+    * line width by 1, so that, for example, a width 1.0 line gets a
+    * visually consistent thickness.
+    */
+   if (key->line_smooth)
+      line_width++;
+
+   sf.sf6.line_width = CLAMP(line_width,
+			     ctx->Const.MinLineWidth,
+			     ctx->Const.MaxLineWidth) * (1<<1);
 
    sf.sf6.line_endcap_aa_region_width = 1;
 

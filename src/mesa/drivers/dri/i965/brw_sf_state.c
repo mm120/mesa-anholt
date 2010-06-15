@@ -258,6 +258,7 @@ sf_unit_create_from_key(struct brw_context *brw, struct brw_sf_unit_key *key,
    sf.sf6.line_width = CLAMP(key->line_width, 1.0, 5.0) * (1<<1);
 
    sf.sf6.line_endcap_aa_region_width = 1;
+
    if (key->line_smooth)
       sf.sf6.aa_enable = 1;
    else if (sf.sf6.line_width <= 0x2)
@@ -297,7 +298,12 @@ sf_unit_create_from_key(struct brw_context *brw, struct brw_sf_unit_key *key,
    sf.sf7.sprite_point = key->point_sprite;
    sf.sf7.point_size = CLAMP(rint(key->point_size), 1, 255) * (1<<3);
    sf.sf7.use_point_size_state = !key->point_attenuated;
-   sf.sf7.aa_line_distance_mode = 0;
+
+   /* Use the better distance approximation when available. (It used
+    * to be manhattan, which was rather ugly.
+    */
+   if (intel->is_g4x || intel->gen >= 5)
+      sf.sf7.aa_line_distance_mode = 1;
 
    /* might be BRW_NEW_PRIMITIVE if we have to adjust pv for polygons:
     */

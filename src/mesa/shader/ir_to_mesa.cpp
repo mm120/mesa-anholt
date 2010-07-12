@@ -1932,6 +1932,14 @@ _mesa_glsl_compile_shader(GLcontext *ctx, struct gl_shader *shader)
    if (!state->error && !state->translation_unit.is_empty())
       _mesa_ast_to_hir(shader->ir, state);
 
+   /* Hack for performance until we get intra-stage linking working:
+    * Assume that this is the only shader in this stage, and thus any
+    * functions not called in this shader can be removed from the
+    * shader.  This clears out all teh builtins, so we don't do
+    * optimization on them.
+    */
+   do_dead_functions(shader->ir);
+
    /* Lowering */
    do_mat_op_to_vec(shader->ir);
    do_mod_to_fract(shader->ir);

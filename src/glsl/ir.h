@@ -327,9 +327,10 @@ public:
    /** Body of instructions in the function. */
    struct exec_list body;
 
-private:
    /** Function of which this signature is one overload. */
    class ir_function *_function;
+
+private:
 
    friend class ir_function;
 };
@@ -389,7 +390,6 @@ public:
     */
    const char *name;
 
-private:
    /**
     * List of ir_function_signature for each overloaded function with this name.
     */

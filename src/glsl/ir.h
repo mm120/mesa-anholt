@@ -376,7 +376,7 @@ public:
     * Find a signature that matches a set of actual parameters, taking implicit
     * conversions into account.
     */
-   const ir_function_signature *matching_signature(exec_list *actual_param);
+   ir_function_signature *matching_signature(exec_list *actual_param);
 
    /**
     * Find a signature that exactly matches a set of actual parameters without
@@ -661,7 +661,7 @@ public:
  */
 class ir_call : public ir_rvalue {
 public:
-   ir_call(const ir_function_signature *callee, exec_list *actual_parameters)
+   ir_call(ir_function_signature *callee, exec_list *actual_parameters)
       : callee(callee)
    {
       assert(callee->return_type != NULL);
@@ -706,7 +706,7 @@ public:
       return callee->function_name();
    }
 
-   const ir_function_signature *get_callee()
+   ir_function_signature *get_callee()
    {
       return callee;
    }
@@ -729,7 +729,7 @@ private:
       /* empty */
    }
 
-   const ir_function_signature *callee;
+   ir_function_signature *callee;
 
    /* List of ir_rvalue of paramaters passed in this call. */
    exec_list actual_parameters;

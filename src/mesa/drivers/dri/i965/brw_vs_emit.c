@@ -974,7 +974,6 @@ static struct brw_reg deref( struct brw_vs_compile *c,
    struct brw_reg vp_address = retype(vec1(addr_reg), BRW_REGISTER_TYPE_D);
    GLuint byte_offset = arg.nr * 32 + arg.subnr + offset * reg_size;
    struct brw_reg indirect;
-   struct brw_reg acc = retype(vec1(get_tmp(c)), BRW_REGISTER_TYPE_UW);
 
    brw_push_insn_state(p);
    brw_set_access_mode(p, BRW_ALIGN_1);
@@ -986,9 +985,11 @@ static struct brw_reg deref( struct brw_vs_compile *c,
       indirect = brw_vec4_indirect(0, byte_offset);
       indirect.vstride = BRW_VERTICAL_STRIDE_ONE_DIMENSIONAL;
 
-      brw_MUL(p, brw_address_reg(0), vp_address, brw_imm_uw(reg_size));
-      brw_MUL(p, brw_address_reg(1), suboffset(vp_address, 4), brw_imm_uw(reg_size));
+      brw_MUL(p, vec2(brw_address_reg(0)), stride(vp_address, 4, 1, 0),
+	      brw_imm_uw(reg_size));
    } else {
+      struct brw_reg acc = retype(vec1(get_tmp(c)), BRW_REGISTER_TYPE_UW);
+
       indirect = brw_vec4_indirect(0, 0);
       indirect.vstride = BRW_VERTICAL_STRIDE_ONE_DIMENSIONAL;
 
@@ -997,6 +998,8 @@ static struct brw_reg deref( struct brw_vs_compile *c,
 
       brw_MUL(p, acc, suboffset(vp_address, 4), brw_imm_uw(reg_size));
       brw_ADD(p, brw_address_reg(1), acc, brw_imm_uw(byte_offset));
+
+      release_tmp(c, acc);
    }
 
    brw_MOV(p, tmp, indirect);

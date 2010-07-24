@@ -529,6 +529,10 @@ typedef struct
    GLubyte *block[VERT_ATTRIB_MAX];
    GLuint nr_blocks;
 
+   /* Temp storage for t_loopback_sw.c: */
+   vbo_draw_func loopback_draw_prims;
+   GLuint last_render_primitive;
+   struct gl_program_cache *loopback_vp_cache;
 } TNLcontext;
 
 

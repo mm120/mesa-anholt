@@ -302,6 +302,11 @@ copy_array_to_vbo_array( struct brw_context *brw,
       dest += element->offset;
 
       for (i = 0; i < element->count; i++) {
+	 printf("%f %f %f %f\n",
+		((float *)src)[0],
+		((float *)src)[1],
+		((float *)src)[2],
+		((float *)src)[3]);
 	 memcpy(dest, src, dst_stride);
 	 src += element->glarray->StrideB;
 	 dest += dst_stride;

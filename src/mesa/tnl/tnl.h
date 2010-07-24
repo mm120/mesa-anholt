@@ -29,7 +29,7 @@
 #define _TNL_H
 
 #include "main/mtypes.h"
-
+#include "vbo/vbo.h"
 
 
 /* These are the public-access functions exported from tnl.  (A few
@@ -90,6 +90,17 @@ _tnl_vbo_draw_prims( GLcontext *ctx,
 		     GLboolean index_bounds_valid,
 		     GLuint min_index,
 		     GLuint max_index);
+
+void
+_tnl_loopback_sw_draw_prims(GLcontext *ctx,
+			    const struct gl_client_array *arrays[],
+			    const struct _mesa_prim *prim,
+			    GLuint nr_prims,
+			    const struct _mesa_index_buffer *ib,
+			    GLboolean index_bounds_valid,
+			    GLuint min_index,
+			    GLuint max_index,
+			    vbo_draw_func draw_prims);
 
 extern void
 _mesa_load_tracked_matrices(GLcontext *ctx);

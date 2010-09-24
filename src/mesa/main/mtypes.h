@@ -40,6 +40,7 @@
 #include "glapi/glapi.h"
 #include "math/m_matrix.h"	/* GLmatrix */
 #include "main/simple_list.h"	/* struct simple_node */
+#include "main/formats.h"       /* MESA_FORMAT_COUNT */
 
 /* Shader stages. Note that these will become 5 with tessellation.
  * These MUST have the same values as PIPE_SHADER_*
@@ -3172,6 +3173,8 @@ struct __GLcontextRec
 
    /** software compression/decompression supported or not */
    GLboolean Mesa_DXTn;
+
+   GLboolean texture_format_supported[MESA_FORMAT_COUNT];
 
    /** 
     * Use dp4 (rather than mul/mad) instructions for position

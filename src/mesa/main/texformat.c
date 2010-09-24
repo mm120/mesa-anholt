@@ -68,14 +68,25 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
       /* shallow RGBA formats */
       case 4:
       case GL_RGBA:
+	 if (type == GL_UNSIGNED_SHORT_4_4_4_4_REV) {
+	    RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
+	 } else if (type == GL_UNSIGNED_SHORT_1_5_5_5_REV) {
+	    RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB1555);
+	 }
+	 RETURN_IF_SUPPORTED(MESA_FORMAT_RGBA8888);
+	 RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
+	 break;
+
       case GL_RGBA8:
 	 RETURN_IF_SUPPORTED(MESA_FORMAT_RGBA8888);
+	 RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
       case GL_RGB5_A1:
 	 RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB1555);
 	 break;
       case GL_RGBA2:
          RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444_REV); /* just to test another format*/
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
 	 break;
       case GL_RGBA4:
          RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
@@ -86,6 +97,8 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
       case GL_RGBA12:
       case GL_RGBA16:
          RETURN_IF_SUPPORTED(MESA_FORMAT_RGBA_16);
+	 RETURN_IF_SUPPORTED(MESA_FORMAT_RGBA8888);
+	 RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
 
       /* shallow RGB formats */
@@ -93,9 +106,14 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
       case GL_RGB:
       case GL_RGB8:
          RETURN_IF_SUPPORTED(MESA_FORMAT_RGB888);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_XRGB8888);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
       case GL_R3_G3_B2:
          RETURN_IF_SUPPORTED(MESA_FORMAT_RGB332);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_RGB888);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_XRGB8888);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
       case GL_RGB4:
          RETURN_IF_SUPPORTED(MESA_FORMAT_RGB565_REV); /* just to test another format */
@@ -109,6 +127,8 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
       case GL_RGB12:
       case GL_RGB16:
          RETURN_IF_SUPPORTED(MESA_FORMAT_RGBA_16);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_XRGB8888);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
 
       /* Alpha formats */
@@ -143,6 +163,7 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
       case GL_LUMINANCE12_ALPHA12:
       case GL_LUMINANCE16_ALPHA16:
          RETURN_IF_SUPPORTED(MESA_FORMAT_AL1616);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
 	 break;
 
       case GL_INTENSITY:
@@ -173,9 +194,11 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
          case GL_DEPTH_COMPONENT24:
          case GL_DEPTH_COMPONENT32:
             RETURN_IF_SUPPORTED(MESA_FORMAT_Z32);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_S8_Z24);
 	    break;
          case GL_DEPTH_COMPONENT16:
             RETURN_IF_SUPPORTED(MESA_FORMAT_Z16);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_S8_Z24);
 	    break;
          default:
             ; /* fallthrough */
@@ -202,6 +225,8 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
          if (ctx->Extensions.TDFX_texture_compression_FXT1)
             RETURN_IF_SUPPORTED(MESA_FORMAT_RGB_FXT1);
          RETURN_IF_SUPPORTED(MESA_FORMAT_RGB888);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_XRGB8888);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
       case GL_COMPRESSED_RGBA_ARB:
          if (ctx->Extensions.EXT_texture_compression_s3tc ||
@@ -210,6 +235,7 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
          if (ctx->Extensions.TDFX_texture_compression_FXT1)
             RETURN_IF_SUPPORTED(MESA_FORMAT_RGBA_FXT1);
          RETURN_IF_SUPPORTED(MESA_FORMAT_RGBA8888);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
       default:
          ; /* fallthrough */
@@ -323,6 +349,7 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
          case GL_DEPTH_STENCIL_EXT:
          case GL_DEPTH24_STENCIL8_EXT:
             RETURN_IF_SUPPORTED(MESA_FORMAT_Z24_S8);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_S8_Z24);
 	    break;
          default:
             ; /* fallthrough */
@@ -345,6 +372,7 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
          case GL_RGBA_SNORM:
          case GL_RGBA8_SNORM:
             RETURN_IF_SUPPORTED(MESA_FORMAT_SIGNED_RGBA8888);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SIGNED_RGBA8888_REV);
 	    break;
          default:
             ; /* fallthrough */
@@ -392,24 +420,30 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
          case GL_SRGB_EXT:
          case GL_SRGB8_EXT:
             RETURN_IF_SUPPORTED(MESA_FORMAT_SRGB8);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
 	    break;
          case GL_SRGB_ALPHA_EXT:
          case GL_SRGB8_ALPHA8_EXT:
             RETURN_IF_SUPPORTED(MESA_FORMAT_SRGBA8);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
 	    break;
          case GL_SLUMINANCE_EXT:
          case GL_SLUMINANCE8_EXT:
             RETURN_IF_SUPPORTED(MESA_FORMAT_SL8);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
 	    break;
          case GL_SLUMINANCE_ALPHA_EXT:
          case GL_SLUMINANCE8_ALPHA8_EXT:
             RETURN_IF_SUPPORTED(MESA_FORMAT_SLA8);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
 	    break;
          case GL_COMPRESSED_SLUMINANCE_EXT:
             RETURN_IF_SUPPORTED(MESA_FORMAT_SL8);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
 	    break;
          case GL_COMPRESSED_SLUMINANCE_ALPHA_EXT:
             RETURN_IF_SUPPORTED(MESA_FORMAT_SLA8);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
 	    break;
          case GL_COMPRESSED_SRGB_EXT:
 #if FEATURE_texture_s3tc
@@ -417,6 +451,7 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
                RETURN_IF_SUPPORTED(MESA_FORMAT_SRGB_DXT1);
 #endif
             RETURN_IF_SUPPORTED(MESA_FORMAT_SRGB8);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
 	    break;
          case GL_COMPRESSED_SRGB_ALPHA_EXT:
 #if FEATURE_texture_s3tc
@@ -424,23 +459,28 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
                RETURN_IF_SUPPORTED(MESA_FORMAT_SRGBA_DXT3); /* Not srgba_dxt1, see spec */
 #endif
             RETURN_IF_SUPPORTED(MESA_FORMAT_SRGBA8);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
 	    break;
 #if FEATURE_texture_s3tc
          case GL_COMPRESSED_SRGB_S3TC_DXT1_EXT:
             if (ctx->Extensions.EXT_texture_compression_s3tc)
                RETURN_IF_SUPPORTED(MESA_FORMAT_SRGB_DXT1);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
             break;
          case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT:
             if (ctx->Extensions.EXT_texture_compression_s3tc)
                RETURN_IF_SUPPORTED(MESA_FORMAT_SRGBA_DXT1);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
             break;
          case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT:
             if (ctx->Extensions.EXT_texture_compression_s3tc)
                RETURN_IF_SUPPORTED(MESA_FORMAT_SRGBA_DXT3);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
             break;
          case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
             if (ctx->Extensions.EXT_texture_compression_s3tc)
                RETURN_IF_SUPPORTED(MESA_FORMAT_SRGBA_DXT5);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_SARGB8);
             break;
 #endif
          default:

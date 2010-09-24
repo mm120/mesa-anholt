@@ -249,6 +249,22 @@ sisCreateContext( gl_api api,
    ctx->Const.MaxTextureImageUnits = ctx->Const.MaxTextureUnits;
    ctx->Const.MaxTextureCoordUnits = ctx->Const.MaxTextureUnits;
 
+   memset(&ctx->texture_format_supported, 0,
+	  sizeof(ctx->texture_format_supported));
+   ctx->texture_format_supported[MESA_FORMAT_ARGB8888] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_ARGB4444] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_ARGB1555] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_RGB565] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_RGB332] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_L8] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_A8] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_I8] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_AL88] = GL_TRUE;
+
+   /* ctx->Extensions.MESA_ycbcr_texture */
+   ctx->texture_format_supported[MESA_FORMAT_YCBCR] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_YCBCR_REV] = GL_TRUE;
+
    /* Parse configuration files */
    driParseConfigFiles (&smesa->optionCache, &sisScreen->optionCache,
 			sisScreen->driScreen->myNum, "sis");

@@ -51,15 +51,12 @@ DRI_CONF_OPT_END
 
 PUBLIC const char __driConfigOptions[] =
 DRI_CONF_BEGIN
-	DRI_CONF_SECTION_QUALITY
-		DRI_CONF_TEXTURE_DEPTH(DRI_CONF_TEXTURE_DEPTH_FB)
-	DRI_CONF_SECTION_END
 	DRI_CONF_SECTION_DEBUG
 		SIS_AGP_DISABLE(true)
 		DRI_CONF_NO_RAST(false)
 	DRI_CONF_SECTION_END
 DRI_CONF_END;
-static const GLuint __driNConfigOptions = 3;
+static const GLuint __driNConfigOptions = 2;
 
 extern const struct dri_extension card_extensions[];
 

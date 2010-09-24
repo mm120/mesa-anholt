@@ -70,6 +70,8 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
       case GL_RGBA:
 	 if (type == GL_UNSIGNED_SHORT_4_4_4_4_REV) {
 	    RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
+	 } else if (type == GL_UNSIGNED_SHORT_4_4_4_4) {
+	    RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
 	 } else if (type == GL_UNSIGNED_SHORT_1_5_5_5_REV) {
 	    RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB1555);
 	 }
@@ -133,30 +135,45 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
 
       /* Alpha formats */
       case GL_ALPHA:
-      case GL_ALPHA4:
       case GL_ALPHA12:
       case GL_ALPHA16:
       case GL_ALPHA8:
          RETURN_IF_SUPPORTED(MESA_FORMAT_A8);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
+	 break;
+      case GL_ALPHA4:
+         RETURN_IF_SUPPORTED(MESA_FORMAT_A8);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
 	 break;
 
       /* Luminance formats */
       case 1:
       case GL_LUMINANCE:
-      case GL_LUMINANCE4:
       case GL_LUMINANCE12:
       case GL_LUMINANCE16:
       case GL_LUMINANCE8:
          RETURN_IF_SUPPORTED(MESA_FORMAT_L8);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
+	 break;
+      case GL_LUMINANCE4:
+         RETURN_IF_SUPPORTED(MESA_FORMAT_L8);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
 	 break;
 
       /* Luminance/Alpha formats */
       case 2:
       case GL_LUMINANCE_ALPHA:
-      case GL_LUMINANCE4_ALPHA4:
-      case GL_LUMINANCE6_ALPHA2:
       case GL_LUMINANCE8_ALPHA8:
          RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
+	 break;
+      case GL_LUMINANCE4_ALPHA4:
+      case GL_LUMINANCE6_ALPHA2:
+         RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
 
       case GL_LUMINANCE12_ALPHA4:
@@ -164,14 +181,20 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
       case GL_LUMINANCE16_ALPHA16:
          RETURN_IF_SUPPORTED(MESA_FORMAT_AL1616);
          RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
 
       case GL_INTENSITY:
-      case GL_INTENSITY4:
       case GL_INTENSITY12:
       case GL_INTENSITY16:
       case GL_INTENSITY8:
          RETURN_IF_SUPPORTED(MESA_FORMAT_I8);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
+	 break;
+      case GL_INTENSITY4:
+         RETURN_IF_SUPPORTED(MESA_FORMAT_I8);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
 
       case GL_COLOR_INDEX:

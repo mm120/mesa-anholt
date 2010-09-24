@@ -88,7 +88,6 @@ DRI_CONF_BEGIN
         DRI_CONF_VBLANK_MODE(DRI_CONF_VBLANK_DEF_INTERVAL_0)
     DRI_CONF_SECTION_END
     DRI_CONF_SECTION_QUALITY
-        DRI_CONF_TEXTURE_DEPTH(DRI_CONF_TEXTURE_DEPTH_FB)
         DRI_CONF_COLOR_REDUCTION(DRI_CONF_COLOR_REDUCTION_DITHER)
     DRI_CONF_SECTION_END
     DRI_CONF_SECTION_SOFTWARE
@@ -99,7 +98,7 @@ DRI_CONF_BEGIN
         DRI_CONF_NO_RAST(false)
     DRI_CONF_SECTION_END
 DRI_CONF_END;
-static const GLuint __driNConfigOptions = 6;
+static const GLuint __driNConfigOptions = 5;
 
 #ifndef MGA_DEBUG
 int MGA_DEBUG = 0;
@@ -527,6 +526,22 @@ mgaCreateContext( gl_api api,
 				 GL_FALSE,
 				 0 );
 
+   memset(&ctx->texture_format_supported, 0,
+	  sizeof(ctx->texture_format_supported));
+   ctx->texture_format_supported[MESA_FORMAT_ARGB8888] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_ARGB4444] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_ARGB1555] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_RGB565] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_CI8] = GL_TRUE;
+   if (MGA_IS_G400(mmesa)) {
+      ctx->texture_format_supported[MESA_FORMAT_I8] = GL_TRUE;
+      ctx->texture_format_supported[MESA_FORMAT_AL88] = GL_TRUE;
+
+      /* ctx->Extensions.MESA_ycbcr_texture */
+      ctx->texture_format_supported[MESA_FORMAT_YCBCR] = GL_TRUE;
+      ctx->texture_format_supported[MESA_FORMAT_YCBCR_REV] = GL_TRUE;
+   }
+
    ctx->Const.MinLineWidth = 1.0;
    ctx->Const.MinLineWidthAA = 1.0;
    ctx->Const.MaxLineWidth = 10.0;
@@ -535,11 +550,6 @@ mgaCreateContext( gl_api api,
 
    ctx->Const.MaxDrawBuffers = 1;
 
-   mmesa->texture_depth = driQueryOptioni (&mmesa->optionCache,
-					   "texture_depth");
-   if (mmesa->texture_depth == DRI_CONF_TEXTURE_DEPTH_FB)
-      mmesa->texture_depth = ( mesaVis->rgbBits >= 24 ) ?
-	 DRI_CONF_TEXTURE_DEPTH_32 : DRI_CONF_TEXTURE_DEPTH_16;
    mmesa->hw_stencil = mesaVis->stencilBits && mesaVis->depthBits == 24;
 
    switch (mesaVis->depthBits) {

@@ -199,8 +199,6 @@ struct mga_context_t {
    /* Map GL texture units onto hardware.
     */
    GLuint tmu_source[2];
-   
-   int texture_depth;
 
    /* Manage fallbacks
     */

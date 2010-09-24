@@ -57,9 +57,6 @@ DRI_CONF_BEGIN
     DRI_CONF_SECTION_PERFORMANCE
         DRI_CONF_VBLANK_MODE(DRI_CONF_VBLANK_DEF_INTERVAL_0)
     DRI_CONF_SECTION_END
-    DRI_CONF_SECTION_QUALITY
-        DRI_CONF_TEXTURE_DEPTH(DRI_CONF_TEXTURE_DEPTH_FB)
-    DRI_CONF_SECTION_END
     DRI_CONF_SECTION_DEBUG
         DRI_CONF_NO_RAST(false)
 #if ENABLE_PERF_BOXES
@@ -68,9 +65,9 @@ DRI_CONF_BEGIN
     DRI_CONF_SECTION_END
 DRI_CONF_END;
 #if ENABLE_PERF_BOXES
-static const GLuint __driNConfigOptions = 4;
-#else
 static const GLuint __driNConfigOptions = 3;
+#else
+static const GLuint __driNConfigOptions = 2;
 #endif
 
 #if 1

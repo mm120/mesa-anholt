@@ -119,6 +119,7 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
 	 break;
       case GL_RGB4:
          RETURN_IF_SUPPORTED(MESA_FORMAT_RGB565_REV); /* just to test another format */
+         RETURN_IF_SUPPORTED(MESA_FORMAT_RGB565);
 	 break;
       case GL_RGB5:
          RETURN_IF_SUPPORTED(MESA_FORMAT_RGB565);
@@ -140,11 +141,13 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
       case GL_ALPHA8:
          RETURN_IF_SUPPORTED(MESA_FORMAT_A8);
          RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
       case GL_ALPHA4:
          RETURN_IF_SUPPORTED(MESA_FORMAT_A8);
          RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
          RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
 
       /* Luminance formats */
@@ -155,11 +158,14 @@ _mesa_choose_tex_format( GLcontext *ctx, GLint internalFormat,
       case GL_LUMINANCE8:
          RETURN_IF_SUPPORTED(MESA_FORMAT_L8);
          RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
       case GL_LUMINANCE4:
          RETURN_IF_SUPPORTED(MESA_FORMAT_L8);
          RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB4444);
          RETURN_IF_SUPPORTED(MESA_FORMAT_AL88);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_RGB565);
+         RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB8888);
 	 break;
 
       /* Luminance/Alpha formats */

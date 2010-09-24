@@ -157,8 +157,6 @@ struct r128_context {
 
    r128TexObjPtr CurrentTexObj[2];
 
-   int texture_depth;
- 
    /* Fallback rasterization functions 
     */
    r128_point_func draw_point;

@@ -175,12 +175,6 @@ GLboolean r128CreateContext( gl_api api,
       driSetTextureSwapCounterLocation( rmesa->texture_heaps[i],
 					& rmesa->c_textureSwaps );
    }
-   rmesa->texture_depth = driQueryOptioni (&rmesa->optionCache,
-					   "texture_depth");
-   if (rmesa->texture_depth == DRI_CONF_TEXTURE_DEPTH_FB)
-      rmesa->texture_depth = ( r128scrn->cpp == 4 ) ?
-	 DRI_CONF_TEXTURE_DEPTH_32 : DRI_CONF_TEXTURE_DEPTH_16;
-
 
    rmesa->RenderIndex = -1;		/* Impossible value */
    rmesa->vert_buf = NULL;
@@ -207,6 +201,17 @@ GLboolean r128CreateContext( gl_api api,
 				 11,
 				 GL_FALSE,
 				 0 );
+
+   memset(&ctx->texture_format_supported, 0,
+	  sizeof(ctx->texture_format_supported));
+   ctx->texture_format_supported[MESA_FORMAT_ARGB8888] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_ARGB4444] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_RGB565] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_CI8] = GL_TRUE;
+
+   /* ctx->Extensions.MESA_ycbcr_texture */
+   ctx->texture_format_supported[MESA_FORMAT_YCBCR] = GL_TRUE;
+   ctx->texture_format_supported[MESA_FORMAT_YCBCR_REV] = GL_TRUE;
 
    /* No wide points.
     */

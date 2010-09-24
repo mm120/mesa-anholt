@@ -583,6 +583,32 @@ viaCreateContext(gl_api api,
     ctx->DriverCtx = (void *)vmesa;
     vmesa->glCtx = ctx;
 
+    memset(&ctx->texture_format_supported, 0,
+	   sizeof(ctx->texture_format_supported));
+    ctx->texture_format_supported[MESA_FORMAT_ARGB8888] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_ARGB4444] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_ARGB1555] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_RGB565] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_CI8] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_L8] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_A8] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_I8] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_AL88] = GL_TRUE;
+
+    /* ctx->Extensions.MESA_ycbcr_texture */
+    ctx->texture_format_supported[MESA_FORMAT_YCBCR] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_YCBCR_REV] = GL_TRUE;
+
+    /* GL_3DFX_texture_compression_FXT1 */
+    ctx->texture_format_supported[MESA_FORMAT_RGB_FXT1] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_RGBA_FXT1] = GL_TRUE;
+
+    /* GL_EXT_texture_compression_s3tc */
+    ctx->texture_format_supported[MESA_FORMAT_RGB_DXT1] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_RGBA_DXT1] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_RGBA_DXT3] = GL_TRUE;
+    ctx->texture_format_supported[MESA_FORMAT_RGBA_DXT5] = GL_TRUE;
+
     /* Initialize the software rasterizer and helper modules.
      */
     _swrast_CreateContext(ctx);

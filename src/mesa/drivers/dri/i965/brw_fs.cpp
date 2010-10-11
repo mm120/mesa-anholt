@@ -141,9 +141,6 @@ brw_link_shader(GLcontext *ctx, struct gl_shader_program *prog)
 						   GL_TRUE, /* temp */
 						   GL_TRUE /* uniform */
 						   ) || progress;
-	    if (intel->gen == 6) {
-	       progress = do_if_to_cond_assign(shader->ir) || progress;
-	    }
 	 } while (progress);
 
 	 validate_ir_tree(shader->ir);

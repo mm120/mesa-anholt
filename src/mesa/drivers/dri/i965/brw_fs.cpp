@@ -495,10 +495,6 @@ fs_visitor::emit_frontfacing_interpolation(ir_variable *ir)
       emit(fs_inst(BRW_OPCODE_NOT,
 		   *reg,
 		   *reg));
-      emit(fs_inst(BRW_OPCODE_AND,
-		   *reg,
-		   *reg,
-		   fs_reg(1)));
    } else {
       fs_reg *reg = new(this->mem_ctx) fs_reg(this, ir->type);
       struct brw_reg r1_6ud = retype(brw_vec1_grf(1, 6), BRW_REGISTER_TYPE_UD);
@@ -510,7 +506,6 @@ fs_visitor::emit_frontfacing_interpolation(ir_variable *ir)
 				   fs_reg(r1_6ud),
 				   fs_reg(1u << 31)));
       inst->conditional_mod = BRW_CONDITIONAL_L;
-      emit(fs_inst(BRW_OPCODE_AND, *reg, *reg, fs_reg(1u)));
    }
 
    return reg;
@@ -788,34 +783,28 @@ fs_visitor::visit(ir_expression *ir)
    case ir_binop_less:
       inst = emit(fs_inst(BRW_OPCODE_CMP, this->result, op[0], op[1]));
       inst->conditional_mod = BRW_CONDITIONAL_L;
-      emit(fs_inst(BRW_OPCODE_AND, this->result, this->result, fs_reg(0x1)));
       break;
    case ir_binop_greater:
       inst = emit(fs_inst(BRW_OPCODE_CMP, this->result, op[0], op[1]));
       inst->conditional_mod = BRW_CONDITIONAL_G;
-      emit(fs_inst(BRW_OPCODE_AND, this->result, this->result, fs_reg(0x1)));
       break;
    case ir_binop_lequal:
       inst = emit(fs_inst(BRW_OPCODE_CMP, this->result, op[0], op[1]));
       inst->conditional_mod = BRW_CONDITIONAL_LE;
-      emit(fs_inst(BRW_OPCODE_AND, this->result, this->result, fs_reg(0x1)));
       break;
    case ir_binop_gequal:
       inst = emit(fs_inst(BRW_OPCODE_CMP, this->result, op[0], op[1]));
       inst->conditional_mod = BRW_CONDITIONAL_GE;
-      emit(fs_inst(BRW_OPCODE_AND, this->result, this->result, fs_reg(0x1)));
       break;
    case ir_binop_equal:
    case ir_binop_all_equal: /* same as nequal for scalars */
       inst = emit(fs_inst(BRW_OPCODE_CMP, this->result, op[0], op[1]));
       inst->conditional_mod = BRW_CONDITIONAL_Z;
-      emit(fs_inst(BRW_OPCODE_AND, this->result, this->result, fs_reg(0x1)));
       break;
    case ir_binop_nequal:
    case ir_binop_any_nequal: /* same as nequal for scalars */
       inst = emit(fs_inst(BRW_OPCODE_CMP, this->result, op[0], op[1]));
       inst->conditional_mod = BRW_CONDITIONAL_NZ;
-      emit(fs_inst(BRW_OPCODE_AND, this->result, this->result, fs_reg(0x1)));
       break;
 
    case ir_binop_logic_xor:
@@ -848,18 +837,44 @@ fs_visitor::visit(ir_expression *ir)
       emit_math(FS_OPCODE_RSQ, this->result, op[0]);
       break;
 
-   case ir_unop_i2f:
-   case ir_unop_b2f:
-   case ir_unop_b2i:
-      emit(fs_inst(BRW_OPCODE_MOV, this->result, op[0]));
+   case ir_unop_b2f: {
+      /* Bools are stored as signed dword integers, where only the
+       * lowest bit has meaning.  This is because they are (generally)
+       * produced by BRW_OPCODE_CMP, and pre-gen6 we want to do an
+       * operation to get their value into the predicate for use in if
+       * statements or conditional moves anyway.
+       */
+      if (intel->gen >= 6) {
+	 /* gen6 can only write a float from an int as part of a MOV,
+	  * ADD, MUL, MAC, MAD, or LINE instruction.
+	  */
+	 fs_reg int_temp = fs_reg(this, glsl_type::int_type);
+	 emit(fs_inst(BRW_OPCODE_AND, int_temp, op[0], fs_reg(1)));
+	 emit(fs_inst(BRW_OPCODE_MOV, this->result, int_temp));
+      } else {
+	 emit(fs_inst(BRW_OPCODE_AND, this->result, op[0], fs_reg(1)));
+      }
       break;
+   }
+
+   case ir_unop_b2i:
+      emit(fs_inst(BRW_OPCODE_AND, this->result, op[0], fs_reg(1)));
+      break;
+
+   case ir_unop_i2f:
    case ir_unop_f2i:
       emit(fs_inst(BRW_OPCODE_MOV, this->result, op[0]));
       break;
+
    case ir_unop_f2b:
-   case ir_unop_i2b:
       inst = emit(fs_inst(BRW_OPCODE_CMP, this->result, op[0], fs_reg(0.0f)));
       inst->conditional_mod = BRW_CONDITIONAL_NZ;
+      break;
+
+   case ir_unop_i2b:
+      inst = emit(fs_inst(BRW_OPCODE_CMP, this->result, op[0], fs_reg(0)));
+      inst->conditional_mod = BRW_CONDITIONAL_NZ;
+      break;
 
    case ir_unop_trunc:
       emit(fs_inst(BRW_OPCODE_RNDD, this->result, op[0]));
@@ -1315,7 +1330,7 @@ fs_visitor::visit(ir_if *ir)
 
    /* Generate the condition into the condition code. */
    ir->condition->accept(this);
-   inst = emit(fs_inst(BRW_OPCODE_MOV, fs_reg(brw_null_reg()), this->result));
+   inst = emit(fs_inst(BRW_OPCODE_AND, fs_reg(brw_null_reg()), this->result, fs_reg(1)));
    inst->conditional_mod = BRW_CONDITIONAL_NZ;
 
    inst = emit(fs_inst(BRW_OPCODE_IF));

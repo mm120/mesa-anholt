@@ -655,7 +655,6 @@ struct brw_instruction *brw_##OP(struct brw_compile *p,	\
 }
 
 
-ALU1(MOV)
 ALU2(SEL)
 ALU1(NOT)
 ALU2(AND)
@@ -678,6 +677,18 @@ ALU2(DP3)
 ALU2(DP2)
 ALU2(LINE)
 ALU2(PLN)
+
+struct brw_instruction *brw_MOV(struct brw_compile *p,
+				struct brw_reg dest,
+				struct brw_reg src0)
+{
+   struct intel_context *intel = &p->brw->intel;
+
+   if (intel->gen >= 6)
+      assert(p->current->header.destreg__conditionalmod == 0);
+
+   return brw_alu1(p, BRW_OPCODE_MOV, dest, src0);
+}
 
 struct brw_instruction *brw_ADD(struct brw_compile *p,
 				struct brw_reg dest,

@@ -976,8 +976,7 @@ struct brw_vs_unit_state
       GLuint pad1:1;
       GLuint urb_entry_allocation_size:5; 
       GLuint pad2:1;
-      GLuint max_threads:6; 
-      GLuint pad3:1;
+      GLuint max_threads:7;
    } thread4;   
 
    struct

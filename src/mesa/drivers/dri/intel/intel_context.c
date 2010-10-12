@@ -474,6 +474,14 @@ intel_prepare_render(struct intel_context *intel)
       drm_intel_bo_unreference(intel->first_post_swapbuffers_batch);
       intel->first_post_swapbuffers_batch = NULL;
       intel->need_throttle = GL_FALSE;
+
+      /* Emit a minimal batchbuffer, so that the next frame can
+       * throttle on the earliest moment after the last swap.
+       */
+      BEGIN_BATCH(1);
+      OUT_BATCH(MI_NOOP);
+      ADVANCE_BATCH();
+      intel_batchbuffer_flush(intel->batch);
    }
 }
 

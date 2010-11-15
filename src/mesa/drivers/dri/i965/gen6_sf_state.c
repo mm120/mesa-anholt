@@ -68,7 +68,7 @@ upload_sf_state(struct brw_context *brw)
    /* CACHE_NEW_VS_PROG */
    uint32_t num_inputs = brw_count_bits(brw->vs.prog_data->outputs_written);
    uint32_t num_outputs = brw_count_bits(brw->fragment_program->Base.InputsRead);
-   uint32_t dw1, dw2, dw3, dw4, dw16;
+   uint32_t dw1, dw2, dw3, dw4, dw16, dw18;
    int i;
    /* _NEW_BUFFER */
    GLboolean render_to_fbo = brw->intel.ctx.DrawBuffer->Name != 0;
@@ -91,6 +91,7 @@ upload_sf_state(struct brw_context *brw)
    dw3 = 0;
    dw4 = 0;
    dw16 = 0;
+   dw18 = 0;
 
    /* _NEW_POLYGON */
    if ((ctx->Polygon.FrontFace == GL_CCW) ^ render_to_fbo)
@@ -153,6 +154,19 @@ upload_sf_state(struct brw_context *brw)
 	 (1 << GEN6_SF_TRIFAN_PROVOKE_SHIFT);
    }
 
+   if (ctx->Light.ShadeModel == GL_FLAT) {
+      int attr;
+      int enabled_bit = 0;
+
+      for (attr = 0; attr < FRAG_BIT_COL1; attr++) {
+	 if (brw->fragment_program->Base.InputsRead & BITFIELD64_BIT(attr)) {
+	    if (attr == FRAG_BIT_COL0 || attr == FRAG_BIT_COL1)
+	       dw18 |= (1 << enabled_bit);
+	    enabled_bit++;
+	 }
+      }
+   }
+
    if (ctx->Point.PointSprite) {
        for (i = 0; i < 8; i++) { 
 	   if (ctx->Point.CoordReplace[i])
@@ -190,7 +204,7 @@ upload_sf_state(struct brw_context *brw)
       OUT_BATCH(attr_overrides);
    }
    OUT_BATCH(dw16); /* point sprite texcoord bitmask */
-   OUT_BATCH(0); /* constant interp bitmask */
+   OUT_BATCH(dw18); /* constant interp bitmask */
    OUT_BATCH(0); /* wrapshortest enables 0-7 */
    OUT_BATCH(0); /* wrapshortest enables 8-15 */
    ADVANCE_BATCH();

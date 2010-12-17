@@ -73,7 +73,7 @@ static void compile_clip_prog( struct brw_context *brw,
    c.header_position_offset = ATTR_SIZE;
 
    if (intel->gen == 5)
-      header_regs = 3;
+      header_regs = 2;
    else
       header_regs = 1;
 

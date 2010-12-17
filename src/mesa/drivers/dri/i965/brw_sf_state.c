@@ -191,7 +191,7 @@ sf_unit_create_from_key(struct brw_context *brw, struct brw_sf_unit_key *key,
    sf.thread3.dispatch_grf_start_reg = 3;
 
    if (intel->gen == 5)
-       sf.thread3.urb_entry_read_offset = 3;
+       sf.thread3.urb_entry_read_offset = 2;
    else
        sf.thread3.urb_entry_read_offset = 1;
 

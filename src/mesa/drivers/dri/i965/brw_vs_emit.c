@@ -288,7 +288,7 @@ static void brw_vs_alloc_regs( struct brw_vs_compile *c )
       if (c->key.nr_userclip)
 	 mrf += 2;
    } else if (intel->gen == 5)
-      mrf = 8;
+      mrf = 6;
    else
       mrf = 4;
 
@@ -439,7 +439,7 @@ static void brw_vs_alloc_regs( struct brw_vs_compile *c )
 
       c->prog_data.urb_entry_size = (attributes_in_vue + header_regs + 7) / 8;
    } else if (intel->gen == 5)
-      c->prog_data.urb_entry_size = (attributes_in_vue + 6 + 3) / 4;
+      c->prog_data.urb_entry_size = (attributes_in_vue + 4 + 3) / 4;
    else
       c->prog_data.urb_entry_size = (attributes_in_vue + 2 + 3) / 4;
 
@@ -1686,14 +1686,15 @@ static void emit_vertex_write( struct brw_vs_compile *c)
        * dword 0-3 (m1) of the header is indices, point width, clip flags.
        * dword 4-7 (m2) is the ndc position (set above)
        * dword 8-11 (m3) of the vertex header is the 4D space position
-       * dword 12-19 (m4,m5) of the vertex header is the user clip distance.
-       * m6 is a pad so that the vertex element data is aligned
-       * m7 is the first vertex data we fill, which is the vertex position.
+       * dword 12-19 (m4,m5) of the vertex header is the user clip distance
+       * if present, but we don't use it.
+       * m4 is a pad so that the vertex element data is aligned
+       * m5 is the first vertex data we fill, which is the vertex position.
        */
       brw_MOV(p, brw_message_reg(2), ndc);
       brw_MOV(p, brw_message_reg(3), pos);
-      brw_MOV(p, brw_message_reg(7), pos);
-      len_vertex_header = 6;
+      brw_MOV(p, brw_message_reg(5), pos);
+      len_vertex_header = 4;
    } else {
       /* There are 8 dwords in VUE header pre-Ironlake:
        * dword 0-3 (m1) is indices, point width, clip flags.

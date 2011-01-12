@@ -874,6 +874,12 @@ use_shader_program(struct gl_context *ctx, GLenum type,
 	  || (shProg->_LinkedShaders[MESA_SHADER_FRAGMENT] == NULL)) {
 	 shProg = NULL;
       }
+
+      /* When potentially reducing usage of an fp to 0, we have to clear this
+       * derived state so that a deleted program gets freed immediately.
+       */
+      _mesa_reference_shader_program(ctx, &ctx->Shader._CurrentFragmentProgram,
+				     NULL);
       break;
 #endif
    default:

@@ -64,6 +64,7 @@ public:
       this->progress = false;
       this->graft_assign = graft_assign;
       this->graft_var = graft_var;
+      this->expression_depth = 0;
    }
 
    virtual ir_visitor_status visit_leave(class ir_assignment *);
@@ -81,6 +82,7 @@ public:
    bool progress;
    ir_variable *graft_var;
    ir_assignment *graft_assign;
+   int expression_depth;
 };
 
 struct find_deref_info {
@@ -211,10 +213,24 @@ ir_tree_grafting_visitor::visit_enter(ir_call *ir)
 ir_visitor_status
 ir_tree_grafting_visitor::visit_enter(ir_expression *ir)
 {
-   for (unsigned int i = 0; i < ir->get_num_operands(); i++) {
-      if (do_graft(&ir->operands[i]))
-	 return visit_stop;
+   /* We apply a heuristic limit here to prevent the accumulation of
+    * excessively large trees. The risk is that in the presence of an
+    * unrolled, channel-wise convolution kernel (for example), we'll
+    * pull all the operations to produce .x into one big tree, then
+    * all the operations to produce .y in another big tree, etc., with
+    * the result that all of the sampled texture values are live from
+    * the first sample that occurs to the computation of the .w
+    * result, causing massive register spilling in between.  See
+    * glsl-fs-convolution-1 for a test that triggered it on 965.
+    */
+   this->expression_depth++;
+   if (this->expression_depth < 8) {
+      for (unsigned int i = 0; i < ir->get_num_operands(); i++) {
+	 if (do_graft(&ir->operands[i]))
+	    return visit_stop;
+      }
    }
+   this->expression_depth--;
 
    return visit_continue;
 }

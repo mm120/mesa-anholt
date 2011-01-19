@@ -732,7 +732,6 @@ do_common_optimization(exec_list *ir, bool linked, unsigned max_unroll_iteration
    else
       progress = do_dead_code_unlinked(ir) || progress;
    progress = do_dead_code_local(ir) || progress;
-   progress = do_tree_grafting(ir) || progress;
    progress = do_constant_propagation(ir) || progress;
    if (linked)
       progress = do_constant_variable(ir) || progress;

@@ -198,8 +198,9 @@ static void prepare_constant_buffer(struct brw_context *brw)
    /* fragment shader constants */
    if (brw->curbe.wm_size) {
       assert(brw->curbe.wm_start == 0);
-      /* copy float constants */
+      /* CACHE_NEW_WM_PROG: copy float constants */
       for (i = 0; i < brw->wm.prog_data->nr_params; i++) {
+	 /* _NEW_PROGRAM_CONSTANTS: param[i] is a pointer to them. */
 	 buf[offset++] = convert_param(brw->wm.prog_data->param_convert[i],
 				       *brw->wm.prog_data->param[i]);
       }
@@ -249,9 +250,12 @@ static void prepare_constant_buffer(struct brw_context *brw)
       /* Load the subset of push constants that will get used when
        * we also have a pull constant buffer.
        */
+      /* BRW_NEW_VERTEX_PROGRAM */
       for (i = 0; i < vp->program.Base.Parameters->NumParameters; i++) {
+	 /* CACHE_NEW_VS_PROG */
 	 if (brw->vs.constant_map[i] != -1) {
 	    assert(brw->vs.constant_map[i] <= nr);
+	    /* _NEW_PROGRAM_CONSTANTS */
 	    memcpy(buf + offset + brw->vs.constant_map[i] * 4,
 		   vp->program.Base.Parameters->ParameterValues[i],
 		   4 * sizeof(float));
@@ -315,6 +319,7 @@ static void prepare_constant_buffer(struct brw_context *brw)
       memcpy(brw->curbe.curbe_bo->virtual + brw->curbe.curbe_offset,
 	     buf,
 	     bufsz);
+      brw->state.dirty.brw |= BRW_NEW_CURBE_CONSTANTS;
    }
 
    brw_add_validated_bo(brw, brw->curbe.curbe_bo);
@@ -334,9 +339,28 @@ static void prepare_constant_buffer(struct brw_context *brw)
     */
 }
 
+const struct brw_tracked_state brw_update_constant_buffer = {
+   .dirty = {
+      .mesa = _NEW_PROGRAM_CONSTANTS,
+      .brw  = (BRW_NEW_FRAGMENT_PROGRAM |
+	       BRW_NEW_VERTEX_PROGRAM |
+	       BRW_NEW_CURBE_OFFSETS),
+      .cache = (CACHE_NEW_WM_PROG |
+		CACHE_NEW_VS_PROG)
+   },
+   .prepare = prepare_constant_buffer,
+};
+
+
 static void emit_constant_buffer(struct brw_context *brw)
 {
    struct intel_context *intel = &brw->intel;
+   /* BRW_NEW_CONSTANTS.
+    *
+    * While this is set in BRW_NEW_CURBE_OFFSETS, that triggers
+    * BRW_NEW_CONSTANTS which covers the actual curbe_bo (or not) data
+    * uploaded here.
+    */
    GLuint sz = brw->curbe.total_size;
 
    BEGIN_BATCH(2);
@@ -352,16 +376,14 @@ static void emit_constant_buffer(struct brw_context *brw)
    ADVANCE_BATCH();
 }
 
-const struct brw_tracked_state brw_constant_buffer = {
+const struct brw_tracked_state brw_upload_constant_buffer = {
    .dirty = {
-      .mesa = _NEW_PROGRAM_CONSTANTS,
-      .brw  = (BRW_NEW_FRAGMENT_PROGRAM |
-	       BRW_NEW_VERTEX_PROGRAM |
-	       BRW_NEW_URB_FENCE | /* Implicit - hardware requires this, not used above */
+      .mesa = 0,
+      .brw  = (BRW_NEW_URB_FENCE | /* Implicit - hardware requires this, not used above */
 	       BRW_NEW_PSP | /* Implicit - hardware requires this, not used above */
-	       BRW_NEW_CURBE_OFFSETS |
+	       BRW_NEW_CURBE_CONSTANTS |
 	       BRW_NEW_BATCH),
-      .cache = (CACHE_NEW_WM_PROG) 
+      .cache = 0,
    },
    .prepare = prepare_constant_buffer,
    .emit = emit_constant_buffer,

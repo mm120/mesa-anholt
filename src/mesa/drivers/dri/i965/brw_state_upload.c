@@ -101,7 +101,8 @@ static const struct brw_tracked_state *gen4_atoms[] =
    &brw_index_buffer,
    &brw_vertices,
 
-   &brw_constant_buffer
+   &brw_update_constant_buffer,
+   &brw_upload_constant_buffer,
 };
 
 const struct brw_tracked_state *gen6_atoms[] =
@@ -279,6 +280,9 @@ static struct dirty_bit_map brw_bits[] = {
    DEFINE_BIT(BRW_NEW_VERTICES),
    DEFINE_BIT(BRW_NEW_BATCH),
    DEFINE_BIT(BRW_NEW_DEPTH_BUFFER),
+   DEFINE_BIT(BRW_NEW_VS_CONSTBUF),
+   DEFINE_BIT(BRW_NEW_WM_CONSTBUF),
+   DEFINE_BIT(BRW_NEW_CURBE_CONSTANTS),
    {0, 0, 0}
 };
 

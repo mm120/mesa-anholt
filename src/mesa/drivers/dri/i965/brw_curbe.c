@@ -58,8 +58,7 @@ static void calculate_curbe_offsets( struct brw_context *brw )
    struct gl_context *ctx = &brw->intel.ctx;
    /* CACHE_NEW_WM_PROG */
    const GLuint nr_fp_regs = (brw->wm.prog_data->nr_params + 15) / 16;
-   
-   /* BRW_NEW_VERTEX_PROGRAM */
+   /* CACHE_NEW_VS_PROG */
    const GLuint nr_vp_regs = (brw->vs.prog_data->nr_params + 15) / 16;
    GLuint nr_clip_regs = 0;
    GLuint total_regs;
@@ -130,8 +129,9 @@ static void calculate_curbe_offsets( struct brw_context *brw )
 const struct brw_tracked_state brw_curbe_offsets = {
    .dirty = {
       .mesa = _NEW_TRANSFORM,
-      .brw  = BRW_NEW_VERTEX_PROGRAM | BRW_NEW_CONTEXT,
-      .cache = CACHE_NEW_WM_PROG
+      .brw  = BRW_NEW_CONTEXT,
+      .cache = (CACHE_NEW_WM_PROG |
+		CACHE_NEW_VS_PROG)
    },
    .prepare = calculate_curbe_offsets
 };

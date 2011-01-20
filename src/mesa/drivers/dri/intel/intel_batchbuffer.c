@@ -87,6 +87,15 @@ do_flush_locked(struct intel_batchbuffer *batch, GLuint used)
    struct intel_context *intel = batch->intel;
    int ret = 0;
    int x_off = 0, y_off = 0;
+   static drm_intel_bo *first_batch_buf = NULL;
+   int first_batch_used;
+
+   if (!first_batch_buf) {
+      first_batch_buf = batch->buf;
+      drm_intel_bo_reference(batch->buf);
+
+      first_batch_used = used;
+   }
 
    drm_intel_gem_bo_unmap_gtt(batch->buf);
 
@@ -101,8 +110,9 @@ do_flush_locked(struct intel_batchbuffer *batch, GLuint used)
 	 ring = I915_EXEC_BLT;
       }
 
-      drm_intel_bo_mrb_exec(batch->buf, used, NULL, 0,
+      drm_intel_bo_mrb_exec(first_batch_buf, first_batch_used, NULL, 0,
 			    (x_off & 0xffff) | (y_off << 16), ring);
+      printf("first_batch_used->offset = %p\n", first_batch_buf->offset);
    }
 
    if (unlikely(INTEL_DEBUG & DEBUG_BATCH)) {

@@ -225,6 +225,7 @@ const struct brw_tracked_state brw_recalculate_urb_fence = {
 
 void brw_upload_urb_fence(struct brw_context *brw)
 {
+   struct intel_context *intel = &brw->intel;
    struct brw_urb_fence uf;
    memset(&uf, 0, sizeof(uf));
 
@@ -247,6 +248,15 @@ void brw_upload_urb_fence(struct brw_context *brw)
    uf.bits0.clp_fence = brw->urb.sf_start; 
    uf.bits1.sf_fence  = brw->urb.cs_start; 
    uf.bits1.cs_fence  = brw->urb.size;
+
+   /* There is an errata (section vol1a, section 4.4, "URB Allocation".)
+    * stating that this packet must not cross a cacheline boundary.
+    */
+   while ((intel->batch->ptr - intel->batch->map) % 64 > 52) {
+      BEGIN_BATCH(1);
+      OUT_BATCH(MI_NOOP);
+      ADVANCE_BATCH();
+   }
 
    BRW_BATCH_STRUCT(brw, &uf);
 }

@@ -186,6 +186,7 @@ static void prepare_constant_buffer(struct brw_context *brw)
    const GLuint bufsz = sz * 16 * sizeof(GLfloat);
    GLfloat *buf;
    GLuint i;
+   unsigned int offset = 0;
 
    if (sz == 0) {
       brw->curbe.last_bufsz  = 0;
@@ -196,12 +197,11 @@ static void prepare_constant_buffer(struct brw_context *brw)
 
    /* fragment shader constants */
    if (brw->curbe.wm_size) {
-      GLuint offset = brw->curbe.wm_start * 16;
-
+      assert(brw->curbe.wm_start == 0);
       /* copy float constants */
       for (i = 0; i < brw->wm.prog_data->nr_params; i++) {
-	 buf[offset + i] = convert_param(brw->wm.prog_data->param_convert[i],
-					 *brw->wm.prog_data->param[i]);
+	 buf[offset++] = convert_param(brw->wm.prog_data->param_convert[i],
+				       *brw->wm.prog_data->param[i]);
       }
    }
 
@@ -210,16 +210,18 @@ static void prepare_constant_buffer(struct brw_context *brw)
     * VS uses them to calculate the outcode bitmasks.
     */
    if (brw->curbe.clip_size) {
-      GLuint offset = brw->curbe.clip_start * 16;
       GLuint j;
+
+      while (offset < brw->curbe.clip_start * 16)
+	 buf[offset++] = 0.0;
 
       /* If any planes are going this way, send them all this way:
        */
       for (i = 0; i < 6; i++) {
-	 buf[offset + i * 4 + 0] = fixed_plane[i][0];
-	 buf[offset + i * 4 + 1] = fixed_plane[i][1];
-	 buf[offset + i * 4 + 2] = fixed_plane[i][2];
-	 buf[offset + i * 4 + 3] = fixed_plane[i][3];
+	 buf[offset++] = fixed_plane[i][0];
+	 buf[offset++] = fixed_plane[i][1];
+	 buf[offset++] = fixed_plane[i][2];
+	 buf[offset++] = fixed_plane[i][3];
       }
 
       /* Clip planes: _NEW_TRANSFORM plus _NEW_PROJECTION to get to
@@ -228,19 +230,21 @@ static void prepare_constant_buffer(struct brw_context *brw)
       assert(MAX_CLIP_PLANES == 6);
       for (j = 0; j < MAX_CLIP_PLANES; j++) {
 	 if (ctx->Transform.ClipPlanesEnabled & (1<<j)) {
-	    buf[offset + i * 4 + 0] = ctx->Transform._ClipUserPlane[j][0];
-	    buf[offset + i * 4 + 1] = ctx->Transform._ClipUserPlane[j][1];
-	    buf[offset + i * 4 + 2] = ctx->Transform._ClipUserPlane[j][2];
-	    buf[offset + i * 4 + 3] = ctx->Transform._ClipUserPlane[j][3];
-	    i++;
+	    buf[offset++] = ctx->Transform._ClipUserPlane[j][0];
+	    buf[offset++] = ctx->Transform._ClipUserPlane[j][1];
+	    buf[offset++] = ctx->Transform._ClipUserPlane[j][2];
+	    buf[offset++] = ctx->Transform._ClipUserPlane[j][3];
 	 }
       }
    }
 
    /* vertex shader constants */
    if (brw->curbe.vs_size) {
-      GLuint offset = brw->curbe.vs_start * 16;
       GLuint nr = brw->vs.prog_data->nr_params / 4;
+      unsigned int count = 0;
+
+      while (offset < brw->curbe.vs_start * 16)
+	 buf[offset++] = 0.0;
 
       /* Load the subset of push constants that will get used when
        * we also have a pull constant buffer.
@@ -251,9 +255,14 @@ static void prepare_constant_buffer(struct brw_context *brw)
 	    memcpy(buf + offset + brw->vs.constant_map[i] * 4,
 		   vp->program.Base.Parameters->ParameterValues[i],
 		   4 * sizeof(float));
+	    count++;
 	 }
       }
+      offset += count * 4;
    }
+
+   while (offset < sz * 16)
+      buf[offset++] = 0.0;
 
    if (0) {
       for (i = 0; i < sz*16; i+=4) 

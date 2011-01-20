@@ -171,8 +171,8 @@ static void prepare_psp_urb_cbs(struct brw_context *brw)
 static void upload_psp_urb_cbs(struct brw_context *brw )
 {
    upload_pipelined_state_pointers(brw);
-   brw_upload_urb_fence(brw);
    brw_upload_cs_urb_state(brw);
+   brw_upload_urb_fence(brw);
 }
 
 const struct brw_tracked_state brw_psp_urb_cbs = {

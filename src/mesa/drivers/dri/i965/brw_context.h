@@ -163,7 +163,6 @@ struct brw_state_flags {
 struct brw_vertex_program {
    struct gl_vertex_program program;
    GLuint id;
-   GLboolean use_const_buffer;
 };
 
 
@@ -251,6 +250,7 @@ struct brw_vs_prog_data {
    GLuint urb_read_length;
    GLuint total_grf;
    GLbitfield64 outputs_written;
+   GLboolean use_const_buffer;
    GLuint nr_params;       /**< number of float params/constants */
 
    GLuint inputs_read;

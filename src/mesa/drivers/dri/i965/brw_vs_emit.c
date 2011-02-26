@@ -125,7 +125,7 @@ clear_current_const(struct brw_vs_compile *c)
 {
    unsigned int i;
 
-   if (c->vp->use_const_buffer) {
+   if (c->prog_data.use_const_buffer) {
       for (i = 0; i < 3; i++) {
          c->current_const[i].index = -1;
       }
@@ -155,9 +155,9 @@ static void brw_vs_alloc_regs( struct brw_vs_compile *c )
     */
    if (c->vp->program.Base.Parameters->NumParameters +
        c->vp->program.Base.NumTemporaries + 20 > BRW_MAX_GRF)
-      c->vp->use_const_buffer = GL_TRUE;
+      c->prog_data.use_const_buffer = GL_TRUE;
    else
-      c->vp->use_const_buffer = GL_FALSE;
+      c->prog_data.use_const_buffer = GL_FALSE;
 
    /*printf("use_const_buffer = %d\n", c->vp->use_const_buffer);*/
 
@@ -231,7 +231,7 @@ static void brw_vs_alloc_regs( struct brw_vs_compile *c )
 	 }
 
 	 if (inst->SrcReg[arg].RelAddr) {
-	    c->vp->use_const_buffer = GL_TRUE;
+	    c->prog_data.use_const_buffer = GL_TRUE;
 	    continue;
 	 }
 
@@ -247,7 +247,7 @@ static void brw_vs_alloc_regs( struct brw_vs_compile *c )
     * case) we need them all in place anyway.
     */
    if (constant == max_constant)
-      c->vp->use_const_buffer = GL_TRUE;
+      c->prog_data.use_const_buffer = GL_TRUE;
 
    for (i = 0; i < constant; i++) {
       c->regs[PROGRAM_STATE_VAR][i] = stride(brw_vec4_grf(reg + i / 2,
@@ -387,7 +387,7 @@ static void brw_vs_alloc_regs( struct brw_vs_compile *c )
       reg++;
    }
 
-   if (c->vp->use_const_buffer) {
+   if (c->prog_data.use_const_buffer) {
       for (i = 0; i < 3; i++) {
          c->current_const[i].reg = brw_vec8_grf(reg, 0);
          reg++;
@@ -1380,7 +1380,7 @@ get_src_reg( struct brw_vs_compile *c,
 	 return c->regs[PROGRAM_STATE_VAR][c->constant_map[index]];
       } else {
 	 /* Must be in the pull constant buffer then .*/
-	 assert(c->vp->use_const_buffer);
+	 assert(c->prog_data.use_const_buffer);
 	 if (relAddr)
 	    return get_reladdr_constant(c, inst, argIndex);
 	 else

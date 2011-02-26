@@ -62,7 +62,7 @@ prepare_vs_constants(struct brw_context *brw)
    _mesa_load_state_parameters(&brw->intel.ctx, vp->program.Base.Parameters);
 
    /* BRW_NEW_VERTEX_PROGRAM */
-   if (!vp->use_const_buffer) {
+   if (!brw->vs.prog_data->use_const_buffer) {
       if (brw->vs.const_bo) {
 	 drm_intel_bo_unreference(brw->vs.const_bo);
 	 brw->vs.const_bo = NULL;

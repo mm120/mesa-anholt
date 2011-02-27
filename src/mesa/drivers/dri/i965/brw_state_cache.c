@@ -201,6 +201,11 @@ brw_search_cache(struct brw_cache *cache,
    return item->bo;
 }
 
+static void *
+get_item_auxdata(struct brw_cache_item *item)
+{
+   return ((char *)item->key + item->key_size);
+}
 
 drm_intel_bo *
 brw_upload_cache_with_auxdata(struct brw_cache *cache,
@@ -219,7 +224,6 @@ brw_upload_cache_with_auxdata(struct brw_cache *cache,
    GLuint hash;
    GLuint relocs_size = nr_reloc_bufs * sizeof(drm_intel_bo *);
    void *tmp;
-   drm_intel_bo *bo;
    int i;
 
    item->cache_id = cache_id;
@@ -229,11 +233,6 @@ brw_upload_cache_with_auxdata(struct brw_cache *cache,
    item->nr_reloc_bufs = nr_reloc_bufs;
    hash = hash_key(item);
    item->hash = hash;
-
-   /* Create the buffer object to contain the data */
-   bo = drm_intel_bo_alloc(cache->brw->intel.bufmgr,
-			   cache->name[cache_id], data_size, 1 << 6);
-
 
    /* Set up the memory containing the key, aux_data, and reloc_bufs */
    tmp = malloc(key_size + aux_size + relocs_size);
@@ -249,8 +248,69 @@ brw_upload_cache_with_auxdata(struct brw_cache *cache,
    item->key = tmp;
    item->reloc_bufs = tmp + key_size + aux_size;
 
-   item->bo = bo;
-   drm_intel_bo_reference(bo);
+   if (aux_size && !nr_reloc_bufs) {
+      /* We're uploading a program (since that's all that uses
+       * aux_size), which was already an expensive process.  Spend a
+       * little extra time looking through the cache to see if we can
+       * find an existing copy of this compiled program (perhaps
+       * because the user linked the same VS into multiple shader
+       * programs, for example, each of which would have a different
+       * name and get compiled independently).  If we can share the bo
+       * for the program (and its auxdata matches), then switching
+       * between the two equivalent compiles of the program will not
+       * trigger state change at update_cache_last(), and avoid
+       * changing state in the hardware.
+       */
+      int bucket;
+      struct brw_cache_item *scan_item;
+
+      for (bucket = 0; bucket < cache->size; bucket++) {
+	 for (scan_item = cache->items[bucket];
+	      scan_item;
+	      scan_item = scan_item->next) {
+	    void *scan_aux = get_item_auxdata(scan_item);
+	    int ret;
+
+	    /* Note tht bo->size is rounded to page size, but it's the
+	     * only storage of the data size of the cached item.
+	     * aux_size is always the same for the same cache_id.
+	     */
+	    if (scan_item->cache_id != cache_id ||
+		scan_item->bo->size < data_size ||
+		memcmp(scan_aux, aux, aux_size)) {
+	       continue;
+	    }
+
+	    ret = drm_intel_bo_map(scan_item->bo, GL_FALSE);
+	    if (ret)
+	       continue;
+	    if (memcmp(data, scan_item->bo->virtual, data_size)) {
+	       drm_intel_bo_unmap(scan_item->bo);
+	       continue;
+	    }
+	    drm_intel_bo_unmap(scan_item->bo);
+
+	    /* success! */
+	    drm_intel_bo_reference(scan_item->bo);
+	    item->bo = scan_item->bo;
+	    break;
+	 }
+	 if (item->bo)
+	    break;
+      }
+   }
+
+   if (!item->bo) {
+      /* Create the buffer object to contain the data */
+      item->bo = drm_intel_bo_alloc(cache->brw->intel.bufmgr,
+				    cache->name[cache_id], data_size, 1 << 6);
+      /* Copy data to the buffer */
+      drm_intel_bo_subdata(item->bo, 0, data_size, data);
+
+      DBG("upload %s: %d bytes to cache id %d\n",
+	  cache->name[cache_id],
+	  data_size, cache_id);
+   }
 
    if (cache->n_items > cache->size * 1.5)
       rehash(cache);
@@ -261,19 +321,13 @@ brw_upload_cache_with_auxdata(struct brw_cache *cache,
    cache->n_items++;
 
    if (aux_return) {
-      *(void **)aux_return = (void *)((char *)item->key + item->key_size);
+      *(void **)aux_return = get_item_auxdata(item);
    }
 
-   DBG("upload %s: %d bytes to cache id %d\n",
-       cache->name[cache_id],
-       data_size, cache_id);
+   update_cache_last(cache, cache_id, item->bo);
 
-   /* Copy data to the buffer */
-   drm_intel_bo_subdata(bo, 0, data_size, data);
-
-   update_cache_last(cache, cache_id, bo);
-
-   return bo;
+   drm_intel_bo_reference(item->bo);
+   return item->bo;
 }
 
 drm_intel_bo *

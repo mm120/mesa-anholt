@@ -193,10 +193,14 @@ enum param_conversion {
    PARAM_CONVERT_F2B,
 };
 
-/* Data about a particular attempt to compile a program.  Note that
- * there can be many of these, each in a different GL state
- * corresponding to a different brw_wm_prog_key struct, with different
- * compiled programs:
+/* *_prog_data are a particular attempt to compile a linked shader or
+ * ARB_fp/vp program based on other state that impacts the native
+ * program (number of payload registers, number of render targets,
+ * texturing state, etc.).  In brw_state_cache.c, the prog_data
+ * structs are also used along with the data in the BO as a key to
+ * determine when to share the BO for a program's data, which means
+ * avoiding state changes in the hardware when switching between
+ * equivalent programs.
  */
 struct brw_wm_prog_data {
    GLuint curb_read_length;

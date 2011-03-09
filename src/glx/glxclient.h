@@ -54,9 +54,7 @@
 #include "glapi/glapitable.h"
 #include "glxconfig.h"
 #include "glxhash.h"
-#if defined( PTHREADS )
-# include <pthread.h>
-#endif
+#include <pthread.h>
 
 #include "glxextensions.h"
 
@@ -612,8 +610,6 @@ extern void __glXPreferEGL(int state);
 extern int __glXDebug;
 
 /* This is per-thread storage in an MT environment */
-#if defined( PTHREADS )
-
 extern void __glXSetCurrentContext(struct glx_context * c);
 
 # if defined( GLX_USE_TLS )
@@ -629,14 +625,6 @@ extern struct glx_context *__glXGetCurrentContext(void);
 
 # endif /* defined( GLX_USE_TLS ) */
 
-#else
-
-extern struct glx_context *__glXcurrentContext;
-#define __glXGetCurrentContext() __glXcurrentContext
-#define __glXSetCurrentContext(gc) __glXcurrentContext = gc
-
-#endif /* defined( PTHREADS ) */
-
 extern void __glXSetCurrentContextNull(void);
 
 
@@ -644,14 +632,9 @@ extern void __glXSetCurrentContextNull(void);
 ** Global lock for all threads in this address space using the GLX
 ** extension
 */
-#if defined( PTHREADS )
 extern pthread_mutex_t __glXmutex;
 #define __glXLock()    pthread_mutex_lock(&__glXmutex)
 #define __glXUnlock()  pthread_mutex_unlock(&__glXmutex)
-#else
-#define __glXLock()
-#define __glXUnlock()
-#endif
 
 /*
 ** Setup for a command.  Initialize the extension for dpy if necessary.

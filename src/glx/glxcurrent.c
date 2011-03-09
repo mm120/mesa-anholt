@@ -33,9 +33,7 @@
  * Client-side GLX interface for current context management.
  */
 
-#ifdef PTHREADS
 #include <pthread.h>
-#endif
 
 #include "glxclient.h"
 #ifdef GLX_USE_APPLEGL
@@ -72,8 +70,6 @@ struct glx_context dummyContext = {
 /*
  * Current context management and locking
  */
-
-#if defined( PTHREADS )
 
 _X_HIDDEN pthread_mutex_t __glXmutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -143,17 +139,6 @@ __glXGetCurrentContext(void)
 }
 
 # endif /* defined( GLX_USE_TLS ) */
-
-#elif defined( THREADS )
-
-#error Unknown threading method specified.
-
-#else
-
-/* not thread safe */
-_X_HIDDEN struct glx_context *__glXcurrentContext = &dummyContext;
-
-#endif
 
 
 _X_HIDDEN void

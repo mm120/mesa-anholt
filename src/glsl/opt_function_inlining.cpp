@@ -45,6 +45,7 @@ public:
    ir_function_inlining_visitor()
    {
       progress = false;
+      seen_another_function_signature = false;
    }
 
    virtual ~ir_function_inlining_visitor()
@@ -58,7 +59,9 @@ public:
    virtual ir_visitor_status visit_enter(ir_return *);
    virtual ir_visitor_status visit_enter(ir_texture *);
    virtual ir_visitor_status visit_enter(ir_swizzle *);
+   virtual ir_visitor_status visit_enter(ir_function_signature *);
 
+   bool seen_another_function_signature;
    bool progress;
 };
 
@@ -78,8 +81,6 @@ bool
 do_function_inlining(exec_list *instructions)
 {
    ir_function_inlining_visitor v;
-
-   do_expression_flattening(instructions, automatic_inlining_predicate);
 
    v.run(instructions);
 
@@ -246,6 +247,24 @@ ir_call::generate_inline(ir_instruction *next_ir)
       return NULL;
 }
 
+/* Since a function call can only appear to an already-prototyped (at
+ * least) function signature, we can skip all the work of inlining
+ * detection on the first function signature present.  Usually shaders
+ * end up with a single function call, so this almost entirely removes
+ * this pass from profiles.
+ */
+ir_visitor_status
+ir_function_inlining_visitor::visit_enter(ir_function_signature *ir)
+{
+   if (!this->seen_another_function_signature) {
+      this->seen_another_function_signature = true;
+      return visit_continue_with_parent;
+   } else {
+      do_expression_flattening(&ir->body, automatic_inlining_predicate);
+
+      return visit_continue;
+   }
+}
 
 ir_visitor_status
 ir_function_inlining_visitor::visit_enter(ir_expression *ir)

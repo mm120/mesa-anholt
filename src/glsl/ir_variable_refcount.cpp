@@ -49,16 +49,23 @@ variable_entry::variable_entry(ir_variable *var)
 variable_entry *
 ir_variable_refcount_visitor::get_variable_entry(ir_variable *var)
 {
+   variable_entry *entry;
+
    assert(var);
-   foreach_iter(exec_list_iterator, iter, this->variable_list) {
-      variable_entry *entry = (variable_entry *)iter.get();
-      if (entry->var == var)
-	 return entry;
+
+   if (!this->ht) {
+      this->ht = hash_table_ctor(0, hash_table_pointer_hash,
+				 hash_table_pointer_compare);
    }
 
-   variable_entry *entry = new(mem_ctx) variable_entry(var);
-   assert(entry->referenced_count == 0);
+   entry = (variable_entry *)hash_table_find(this->ht, var);
+   if (entry)
+      return entry;
+
+   entry = new(mem_ctx) variable_entry(var);
+   hash_table_insert(this->ht, entry, var);
    this->variable_list.push_tail(entry);
+
    return entry;
 }
 

@@ -32,6 +32,7 @@
 #include "ir.h"
 #include "ir_visitor.h"
 #include "glsl_types.h"
+#include "program/hash_table.h"
 
 class variable_entry : public exec_node
 {
@@ -55,11 +56,15 @@ public:
    ir_variable_refcount_visitor(void)
    {
       this->mem_ctx = ralloc_context(NULL);
+      this->ht = NULL;
       this->variable_list.make_empty();
    }
 
    ~ir_variable_refcount_visitor(void)
    {
+      if (this->ht)
+	 hash_table_dtor(this->ht);
+
       ralloc_free(this->mem_ctx);
    }
 
@@ -71,8 +76,8 @@ public:
 
    variable_entry *get_variable_entry(ir_variable *var);
 
-   /* List of variable_entry */
-   exec_list variable_list;
+   exec_list variable_list; /* List of variable_entry */
+   struct hash_table *ht; /* Mapping of ir_variable to variable_entry */
 
    void *mem_ctx;
 };

@@ -39,6 +39,7 @@
 #define need_GL_ARB_map_buffer_range
 #define need_GL_ARB_occlusion_query
 #define need_GL_ARB_point_parameters
+#define need_GL_ARB_sampler_objects
 #define need_GL_ARB_shader_objects
 #define need_GL_ARB_sync
 #define need_GL_ARB_vertex_array_object
@@ -91,6 +92,7 @@ static const struct dri_extension card_extensions[] = {
    { "GL_ARB_pixel_buffer_object",      NULL },
    { "GL_ARB_point_parameters",           GL_ARB_point_parameters_functions },
    { "GL_ARB_point_sprite",               NULL },
+   { "GL_ARB_sampler_objects",            GL_ARB_sampler_objects_functions },
    { "GL_ARB_shader_objects",             GL_ARB_shader_objects_functions },
    { "GL_ARB_shading_language_100",       GL_VERSION_2_0_functions },
    { "GL_ARB_sync",                       GL_ARB_sync_functions },

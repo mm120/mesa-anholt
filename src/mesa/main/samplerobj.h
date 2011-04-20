@@ -28,6 +28,8 @@
 
 struct dd_function_table;
 
+struct gl_sampler_object *
+_mesa_get_samplerobj(struct gl_context *ctx, GLuint unit);
 
 extern void
 _mesa_reference_sampler_object(struct gl_context *ctx,

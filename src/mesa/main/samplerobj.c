@@ -39,6 +39,14 @@
 #include "main/mtypes.h"
 #include "main/samplerobj.h"
 
+struct gl_sampler_object *
+_mesa_get_samplerobj(struct gl_context *ctx, GLuint unit)
+{
+   if (ctx->Texture.Unit[unit].Sampler)
+      return ctx->Texture.Unit[unit].Sampler;
+   else
+      return &ctx->Texture.Unit[unit]._Current->Sampler;
+}
 
 static struct gl_sampler_object *
 _mesa_lookup_samplerobj(struct gl_context *ctx, GLuint name)

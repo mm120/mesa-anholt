@@ -28,6 +28,7 @@
 #include "main/enums.h"
 #include "main/state.h"
 #include "main/bufferobj.h"
+#include "main/condrender.h"
 #include "main/context.h"
 #include "swrast/swrast.h"
 
@@ -154,10 +155,19 @@ intel_check_blit_format(struct intel_region * region,
    return GL_FALSE;
 }
 
+static void
+intel_accum(struct gl_context *ctx, GLenum op, GLfloat value)
+{
+   if (!_mesa_check_conditional_render(ctx))
+      return;
+
+   _swrast_Accum(ctx, op, value);
+}
+
 void
 intelInitPixelFuncs(struct dd_function_table *functions)
 {
-   functions->Accum = _swrast_Accum;
+   functions->Accum = intel_accum;
    if (!getenv("INTEL_NO_BLIT")) {
       functions->Bitmap = intelBitmap;
       functions->CopyPixels = intelCopyPixels;

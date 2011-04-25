@@ -102,12 +102,11 @@ static void do_vs_prog( struct brw_context *brw,
    /* constant_map */
    aux_size += c.vp->program.Base.Parameters->NumParameters;
 
-   drm_intel_bo_unreference(brw->vs.prog_bo);
-   brw->vs.prog_bo = brw_upload_cache(&brw->cache, BRW_VS_PROG,
-				      &c.key, sizeof(c.key),
-				      program, program_size,
-				      &c.prog_data, aux_size,
-				      &brw->vs.prog_data);
+   brw_upload_cache(&brw->cache, &brw->vs.prog_bo, BRW_VS_PROG,
+		    &c.key, sizeof(c.key),
+		    program, program_size,
+		    &c.prog_data, aux_size,
+		    &brw->vs.prog_data);
 }
 
 
@@ -141,12 +140,9 @@ static void brw_upload_vs_prog(struct brw_context *brw)
       }
    }
 
-   /* Make an early check for the key.
-    */
-   drm_intel_bo_unreference(brw->vs.prog_bo);
-   brw->vs.prog_bo = brw_search_cache(&brw->cache, BRW_VS_PROG,
-				      &key, sizeof(key),
-				      &brw->vs.prog_data);
+   brw_search_cache(&brw->cache, &brw->vs.prog_bo, BRW_VS_PROG,
+		    &key, sizeof(key),
+		    &brw->vs.prog_data);
    if (brw->vs.prog_bo == NULL)
       do_vs_prog(brw, vp, &key);
    brw->vs.constant_map = ((int8_t *)brw->vs.prog_data +

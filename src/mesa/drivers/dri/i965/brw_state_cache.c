@@ -72,16 +72,17 @@ hash_key(struct brw_cache_item *item)
  * Marks a new buffer as being chosen for the given cache id.
  */
 static void
-update_cache_last(struct brw_cache *cache, enum brw_cache_id cache_id,
-		  drm_intel_bo *bo)
+set_bo(struct brw_context *brw, drm_intel_bo **return_bo, drm_intel_bo *bo,
+       enum brw_cache_id cache_id)
 {
-   if (bo == cache->last_bo[cache_id])
+   if (*return_bo == bo)
       return; /* no change */
 
-   drm_intel_bo_unreference(cache->last_bo[cache_id]);
-   cache->last_bo[cache_id] = bo;
-   drm_intel_bo_reference(cache->last_bo[cache_id]);
-   cache->brw->state.dirty.cache |= 1 << cache_id;
+   drm_intel_bo_unreference(*return_bo);
+   *return_bo = bo;
+   if (bo)
+      drm_intel_bo_reference(bo);
+   brw->state.dirty.cache |= 1 << cache_id;
 }
 
 static int
@@ -145,9 +146,10 @@ rehash(struct brw_cache *cache)
 /**
  * Returns the buffer object matching cache_id and key, or NULL.
  */
-drm_intel_bo *
+void
 brw_search_cache(struct brw_cache *cache,
-                 enum brw_cache_id cache_id,
+		 drm_intel_bo **return_bo,
+		 enum brw_cache_id cache_id,
                  const void *key, GLuint key_size,
                  void *aux_return)
 {
@@ -163,21 +165,20 @@ brw_search_cache(struct brw_cache *cache,
 
    item = search_cache(cache, hash, &lookup);
 
-   if (item == NULL)
-      return NULL;
+   if (item == NULL) {
+      set_bo(cache->brw, return_bo, NULL, cache_id);
+      return;
+   }
 
    if (aux_return)
       *(void **)aux_return = (void *)((char *)item->key + item->key_size);
 
-   update_cache_last(cache, cache_id, item->bo);
-
-   drm_intel_bo_reference(item->bo);
-   return item->bo;
+   set_bo(cache->brw, return_bo, item->bo, cache_id);
 }
 
-
-drm_intel_bo *
+void
 brw_upload_cache(struct brw_cache *cache,
+		 drm_intel_bo **return_bo,
 		 enum brw_cache_id cache_id,
 		 const void *key,
 		 GLuint key_size,
@@ -233,9 +234,7 @@ brw_upload_cache(struct brw_cache *cache,
    /* Copy data to the buffer */
    drm_intel_bo_subdata(bo, 0, data_size, data);
 
-   update_cache_last(cache, cache_id, bo);
-
-   return bo;
+   set_bo(cache->brw, return_bo, bo, cache_id);
 }
 
 static void
@@ -331,7 +330,6 @@ brw_destroy_cache(struct brw_context *brw, struct brw_cache *cache)
 
    brw_clear_cache(brw, cache);
    for (i = 0; i < BRW_MAX_CACHE; i++) {
-      drm_intel_bo_unreference(cache->last_bo[i]);
       free(cache->name[i]);
    }
    free(cache->items);

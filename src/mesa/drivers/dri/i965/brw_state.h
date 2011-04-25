@@ -125,21 +125,23 @@ void brw_clear_validated_bos(struct brw_context *brw);
  * brw_state_cache.c
  */
 
-drm_intel_bo *brw_upload_cache(struct brw_cache *cache,
-			       enum brw_cache_id cache_id,
-			       const void *key,
-			       GLuint key_sz,
-			       const void *data,
-			       GLuint data_sz,
-			       const void *aux,
-			       GLuint aux_sz,
-			       void *aux_return);
+void brw_upload_cache(struct brw_cache *cache,
+		      drm_intel_bo **return_bo,
+		      enum brw_cache_id cache_id,
+		      const void *key,
+		      GLuint key_sz,
+		      const void *data,
+		      GLuint data_sz,
+		      const void *aux,
+		      GLuint aux_sz,
+		      void *aux_return);
 
-drm_intel_bo *brw_search_cache( struct brw_cache *cache,
-			  enum brw_cache_id cache_id,
-			  const void *key,
-			  GLuint key_size,
-			  void *aux_return);
+void brw_search_cache(struct brw_cache *cache,
+		      drm_intel_bo **return_bo,
+		      enum brw_cache_id cache_id,
+		      const void *key,
+		      GLuint key_size,
+		      void *aux_return);
 void brw_state_cache_check_size( struct brw_context *brw );
 
 void brw_init_caches( struct brw_context *brw );

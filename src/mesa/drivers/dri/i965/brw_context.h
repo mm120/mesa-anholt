@@ -353,11 +353,6 @@ struct brw_cache {
    GLuint size, n_items;
 
    char *name[BRW_MAX_CACHE];
-
-   /* Record of the last BOs chosen for each cache_id.  Used to set
-    * brw->state.dirty.cache when a new cache item is chosen.
-    */
-   drm_intel_bo *last_bo[BRW_MAX_CACHE];
 };
 
 

@@ -116,14 +116,11 @@ static void compile_sf_prog( struct brw_context *brw,
       printf("\n");
    }
 
-   /* Upload
-    */
-   drm_intel_bo_unreference(brw->sf.prog_bo);
-   brw->sf.prog_bo = brw_upload_cache(&brw->cache, BRW_SF_PROG,
-				      &c.key, sizeof(c.key),
-				      program, program_size,
-				      &c.prog_data, sizeof(c.prog_data),
-				      &brw->sf.prog_data);
+   brw_upload_cache(&brw->cache, &brw->sf.prog_bo, BRW_SF_PROG,
+		    &c.key, sizeof(c.key),
+		    program, program_size,
+		    &c.prog_data, sizeof(c.prog_data),
+		    &brw->sf.prog_data);
 }
 
 /* Calculate interpolants for triangle and line rasterization.
@@ -189,10 +186,9 @@ static void upload_sf_prog(struct brw_context *brw)
       key.frontface_ccw = (ctx->Polygon.FrontFace == GL_CCW) ^ (ctx->DrawBuffer->Name != 0);
    }
 
-   drm_intel_bo_unreference(brw->sf.prog_bo);
-   brw->sf.prog_bo = brw_search_cache(&brw->cache, BRW_SF_PROG,
-				      &key, sizeof(key),
-				      &brw->sf.prog_data);
+   brw_search_cache(&brw->cache, &brw->sf.prog_bo, BRW_SF_PROG,
+		    &key, sizeof(key),
+		    &brw->sf.prog_data);
    if (brw->sf.prog_bo == NULL)
       compile_sf_prog( brw, &key );
 }

@@ -118,14 +118,11 @@ static void compile_gs_prog( struct brw_context *brw,
       printf("\n");
     }
 
-   /* Upload
-    */
-   drm_intel_bo_unreference(brw->gs.prog_bo);
-   brw->gs.prog_bo = brw_upload_cache(&brw->cache, BRW_GS_PROG,
-				      &c.key, sizeof(c.key),
-				      program, program_size,
-				      &c.prog_data, sizeof(c.prog_data),
-				      &brw->gs.prog_data);
+   brw_upload_cache(&brw->cache, &brw->gs.prog_bo, BRW_GS_PROG,
+		    &c.key, sizeof(c.key),
+		    program, program_size,
+		    &c.prog_data, sizeof(c.prog_data),
+		    &brw->gs.prog_data);
 }
 
 static const GLenum gs_prim[GL_POLYGON+1] = {  
@@ -185,15 +182,15 @@ static void prepare_gs_prog(struct brw_context *brw)
       brw->gs.prog_active = key.need_gs_prog;
    }
 
-   drm_intel_bo_unreference(brw->gs.prog_bo);
-   brw->gs.prog_bo = NULL;
-
    if (brw->gs.prog_active) {
-      brw->gs.prog_bo = brw_search_cache(&brw->cache, BRW_GS_PROG,
-					 &key, sizeof(key),
-					 &brw->gs.prog_data);
+      brw_search_cache(&brw->cache, &brw->gs.prog_bo, BRW_GS_PROG,
+		       &key, sizeof(key),
+		       &brw->gs.prog_data);
       if (brw->gs.prog_bo == NULL)
 	 compile_gs_prog( brw, &key );
+   } else {
+      drm_intel_bo_unreference(brw->gs.prog_bo);
+      brw->gs.prog_bo = NULL;
    }
 }
 

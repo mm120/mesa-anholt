@@ -820,6 +820,7 @@ fs_visitor::try_emit_saturate(ir_expression *ir)
    if (!sat_val)
       return false;
 
+   this->result = reg_undef;
    sat_val->accept(this);
    fs_reg src = this->result;
 
@@ -866,7 +867,11 @@ fs_visitor::visit(ir_expression *ir)
    if (try_emit_saturate(ir))
       return;
 
+   /* This is where our caller would like us to put the result, if possible. */
+   fs_reg saved_result_storage = this->result;
+
    for (operand = 0; operand < ir->get_num_operands(); operand++) {
+      this->result = reg_undef;
       ir->operands[operand]->accept(this);
       if (this->result.file == BAD_FILE) {
 	 ir_print_visitor v;
@@ -884,10 +889,14 @@ fs_visitor::visit(ir_expression *ir)
       assert(!ir->operands[operand]->type->is_vector());
    }
 
-   /* Storage for our result.  If our result goes into an assignment, it will
-    * just get copy-propagated out, so no worries.
+   /* Inherit storage from our parent if possible, and otherwise we
+    * alloc a temporary.
     */
-   this->result = fs_reg(this, ir->type);
+   if (saved_result_storage.file == BAD_FILE) {
+      this->result = fs_reg(this, ir->type);
+   } else {
+      this->result = saved_result_storage;
+   }
 
    switch (ir->operation) {
    case ir_unop_logic_not:
@@ -907,6 +916,9 @@ fs_visitor::visit(ir_expression *ir)
       break;
    case ir_unop_sign:
       temp = fs_reg(this, ir->type);
+
+      /* Unalias the destination.  (imagine a = sign(a)) */
+      this->result = fs_reg(this, ir->type);
 
       emit(BRW_OPCODE_MOV, this->result, fs_reg(0.0f));
 
@@ -1056,6 +1068,9 @@ fs_visitor::visit(ir_expression *ir)
       break;
 
    case ir_binop_min:
+      /* Unalias the destination */
+      this->result = fs_reg(this, ir->type);
+
       inst = emit(BRW_OPCODE_CMP, this->result, op[0], op[1]);
       inst->conditional_mod = BRW_CONDITIONAL_L;
 
@@ -1063,6 +1078,9 @@ fs_visitor::visit(ir_expression *ir)
       inst->predicated = true;
       break;
    case ir_binop_max:
+      /* Unalias the destination */
+      this->result = fs_reg(this, ir->type);
+
       inst = emit(BRW_OPCODE_CMP, this->result, op[0], op[1]);
       inst->conditional_mod = BRW_CONDITIONAL_G;
 
@@ -1108,8 +1126,10 @@ fs_visitor::emit_assignment_writes(fs_reg &l, fs_reg &r,
 	 l.type = brw_type_for_base_type(type);
 	 r.type = brw_type_for_base_type(type);
 
-	 fs_inst *inst = emit(BRW_OPCODE_MOV, l, r);
-	 inst->predicated = predicated;
+	 if (predicated || !l.equals(&r)) {
+	    fs_inst *inst = emit(BRW_OPCODE_MOV, l, r);
+	    inst->predicated = predicated;
+	 }
 
 	 l.reg_offset++;
 	 r.reg_offset++;
@@ -1144,8 +1164,19 @@ fs_visitor::visit(ir_assignment *ir)
    fs_inst *inst;
 
    /* FINISHME: arrays on the lhs */
+   this->result = reg_undef;
    ir->lhs->accept(this);
    l = this->result;
+
+   /* If we're doing a straight assignment, an RHS expression could
+    * drop its result right into our destination.  Otherwise, tell it
+    * not to.
+    */
+   if (!(ir->lhs->type->is_scalar() ||
+	 (ir->lhs->type->is_vector() &&
+	  ir->write_mask == (1 << ir->lhs->type->vector_elements) - 1))) {
+      this->result = reg_undef;
+   }
 
    ir->rhs->accept(this);
    r = this->result;
@@ -1161,9 +1192,13 @@ fs_visitor::visit(ir_assignment *ir)
        ir->lhs->type->is_vector()) {
       for (int i = 0; i < ir->lhs->type->vector_elements; i++) {
 	 if (ir->write_mask & (1 << i)) {
-	    inst = emit(BRW_OPCODE_MOV, l, r);
-	    if (ir->condition)
+	    if (ir->condition) {
+	       inst = emit(BRW_OPCODE_MOV, l, r);
 	       inst->predicated = true;
+	    } else if (!l.equals(&r)) {
+	       inst = emit(BRW_OPCODE_MOV, l, r);
+	    }
+
 	    r.reg_offset++;
 	 }
 	 l.reg_offset++;
@@ -1199,16 +1234,19 @@ fs_visitor::emit_texture_gen4(ir_texture *ir, fs_reg dst, fs_reg coordinate)
 	 emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), fs_reg(0.0f));
 	 mlen++;
       } else if (ir->op == ir_txb) {
+	 this->result = reg_undef;
 	 ir->lod_info.bias->accept(this);
 	 emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), this->result);
 	 mlen++;
       } else {
 	 assert(ir->op == ir_txl);
+	 this->result = reg_undef;
 	 ir->lod_info.lod->accept(this);
 	 emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), this->result);
 	 mlen++;
       }
 
+      this->result = reg_undef;
       ir->shadow_comparitor->accept(this);
       emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), this->result);
       mlen++;
@@ -1236,10 +1274,12 @@ fs_visitor::emit_texture_gen4(ir_texture *ir, fs_reg dst, fs_reg coordinate)
       mlen += 6;
 
       if (ir->op == ir_txb) {
+	 this->result = reg_undef;
 	 ir->lod_info.bias->accept(this);
 	 emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), this->result);
 	 mlen++;
       } else {
+	 this->result = reg_undef;
 	 ir->lod_info.lod->accept(this);
 	 emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), this->result);
 	 mlen++;
@@ -1316,6 +1356,7 @@ fs_visitor::emit_texture_gen5(ir_texture *ir, fs_reg dst, fs_reg coordinate)
    if (ir->shadow_comparitor) {
       mlen = MAX2(mlen, 1 + 4 * reg_width);
 
+      this->result = reg_undef;
       ir->shadow_comparitor->accept(this);
       emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), this->result);
       mlen += reg_width;
@@ -1327,6 +1368,7 @@ fs_visitor::emit_texture_gen5(ir_texture *ir, fs_reg dst, fs_reg coordinate)
       inst = emit(FS_OPCODE_TEX, dst);
       break;
    case ir_txb:
+      this->result = reg_undef;
       ir->lod_info.bias->accept(this);
       mlen = MAX2(mlen, 1 + 4 * reg_width);
       emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), this->result);
@@ -1336,6 +1378,7 @@ fs_visitor::emit_texture_gen5(ir_texture *ir, fs_reg dst, fs_reg coordinate)
 
       break;
    case ir_txl:
+      this->result = reg_undef;
       ir->lod_info.lod->accept(this);
       mlen = MAX2(mlen, 1 + 4 * reg_width);
       emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), this->result);
@@ -1364,6 +1407,7 @@ fs_visitor::visit(ir_texture *ir)
    int sampler;
    fs_inst *inst = NULL;
 
+   this->result = reg_undef;
    ir->coordinate->accept(this);
    fs_reg coordinate = this->result;
 
@@ -1507,6 +1551,7 @@ fs_visitor::visit(ir_texture *ir)
 void
 fs_visitor::visit(ir_swizzle *ir)
 {
+   this->result = reg_undef;
    ir->val->accept(this);
    fs_reg val = this->result;
 
@@ -1572,6 +1617,7 @@ fs_visitor::visit(ir_constant *ir)
       const unsigned size = type_size(ir->type->fields.array);
 
       for (unsigned i = 0; i < ir->type->length; i++) {
+	 this->result = reg_undef;
 	 ir->array_elements[i]->accept(this);
 	 fs_reg src_reg = this->result;
 
@@ -1587,6 +1633,7 @@ fs_visitor::visit(ir_constant *ir)
 	 ir_instruction *const field = (ir_instruction *) node;
 	 const unsigned size = type_size(field->type);
 
+	 this->result = reg_undef;
 	 field->accept(this);
 	 fs_reg src_reg = this->result;
 
@@ -1637,6 +1684,7 @@ fs_visitor::emit_bool_to_cond_code(ir_rvalue *ir)
       for (unsigned int i = 0; i < expr->get_num_operands(); i++) {
 	 assert(expr->operands[i]->type->is_scalar());
 
+	 this->result = reg_undef;
 	 expr->operands[i]->accept(this);
 	 op[i] = this->result;
       }
@@ -1701,6 +1749,7 @@ fs_visitor::emit_bool_to_cond_code(ir_rvalue *ir)
       return;
    }
 
+   this->result = reg_undef;
    ir->accept(this);
 
    if (intel->gen >= 6) {
@@ -1730,6 +1779,7 @@ fs_visitor::emit_if_gen6(ir_if *ir)
       for (unsigned int i = 0; i < expr->get_num_operands(); i++) {
 	 assert(expr->operands[i]->type->is_scalar());
 
+	 this->result = reg_undef;
 	 expr->operands[i]->accept(this);
 	 op[i] = this->result;
       }
@@ -1791,6 +1841,7 @@ fs_visitor::emit_if_gen6(ir_if *ir)
       return;
    }
 
+   this->result = reg_undef;
    ir->condition->accept(this);
 
    fs_inst *inst = emit(BRW_OPCODE_IF, reg_null_d, this->result, fs_reg(0));
@@ -1823,7 +1874,7 @@ fs_visitor::visit(ir_if *ir)
    foreach_iter(exec_list_iterator, iter, ir->then_instructions) {
       ir_instruction *ir = (ir_instruction *)iter.get();
       this->base_ir = ir;
-
+      this->result = reg_undef;
       ir->accept(this);
    }
 
@@ -1833,7 +1884,7 @@ fs_visitor::visit(ir_if *ir)
       foreach_iter(exec_list_iterator, iter, ir->else_instructions) {
 	 ir_instruction *ir = (ir_instruction *)iter.get();
 	 this->base_ir = ir;
-
+	 this->result = reg_undef;
 	 ir->accept(this);
       }
    }
@@ -1856,17 +1907,24 @@ fs_visitor::visit(ir_loop *ir)
       counter = *(variable_storage(ir->counter));
 
       if (ir->from) {
+	 this->result = counter;
+
 	 this->base_ir = ir->from;
+	 this->result = counter;
 	 ir->from->accept(this);
 
-	 emit(BRW_OPCODE_MOV, counter, this->result);
+	 if (!this->result.equals(&counter))
+	    emit(BRW_OPCODE_MOV, counter, this->result);
       }
    }
 
    emit(BRW_OPCODE_DO);
 
    if (ir->to) {
+      this->result = reg_undef;
+
       this->base_ir = ir->to;
+      this->result = reg_undef;
       ir->to->accept(this);
 
       fs_inst *inst = emit(BRW_OPCODE_CMP, reg_null_cmp, counter, this->result);
@@ -1880,11 +1938,13 @@ fs_visitor::visit(ir_loop *ir)
       ir_instruction *ir = (ir_instruction *)iter.get();
 
       this->base_ir = ir;
+      this->result = reg_undef;
       ir->accept(this);
    }
 
    if (ir->increment) {
       this->base_ir = ir->increment;
+      this->result = reg_undef;
       ir->increment->accept(this);
       emit(BRW_OPCODE_ADD, counter, counter, this->result);
    }
@@ -1934,7 +1994,7 @@ fs_visitor::visit(ir_function *ir)
       foreach_iter(exec_list_iterator, iter, sig->body) {
 	 ir_instruction *ir = (ir_instruction *)iter.get();
 	 this->base_ir = ir;
-
+	 this->result = reg_undef;
 	 ir->accept(this);
       }
    }
@@ -4053,6 +4113,7 @@ fs_visitor::run()
       foreach_iter(exec_list_iterator, iter, *shader->ir) {
 	 ir_instruction *ir = (ir_instruction *)iter.get();
 	 base_ir = ir;
+	 this->result = reg_undef;
 	 ir->accept(this);
       }
 

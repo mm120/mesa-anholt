@@ -359,12 +359,14 @@ class fs_visitor : public ir_visitor
 {
 public:
 
-   fs_visitor(struct brw_wm_compile *c, struct brw_shader *shader)
+   fs_visitor(struct brw_wm_compile *c, struct gl_shader_program *prog,
+	      struct brw_shader *shader)
    {
       this->c = c;
       this->p = &c->func;
       this->brw = p->brw;
-      this->fp = brw->fragment_program;
+      this->fp = prog->FragmentProgram;
+      this->prog = prog;
       this->intel = &brw->intel;
       this->ctx = &intel->ctx;
       this->mem_ctx = ralloc_context(NULL);
@@ -542,6 +544,7 @@ public:
    struct brw_wm_compile *c;
    struct brw_compile *p;
    struct brw_shader *shader;
+   struct gl_shader_program *prog;
    void *mem_ctx;
    exec_list instructions;
 
@@ -570,6 +573,7 @@ public:
    /** @} */
 
    bool failed;
+   char *fail_msg;
 
    /* Result of last visit() method. */
    fs_reg result;

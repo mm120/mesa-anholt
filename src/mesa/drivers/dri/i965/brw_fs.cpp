@@ -77,6 +77,92 @@ brw_new_shader_program(struct gl_context *ctx, GLuint name)
    return &prog->base;
 }
 
+bool
+brw_wm_precompile(struct gl_context *ctx, struct gl_shader_program *prog)
+{
+   struct brw_context *brw = brw_context(ctx);
+   struct brw_wm_prog_key key;
+   struct gl_fragment_program *fp = prog->FragmentProgram;
+   struct brw_fragment_program *bfp = brw_fragment_program(fp);
+
+   if (!fp)
+      return true;
+
+   memset(&key, 0, sizeof(key));
+
+   if (fp->UsesKill)
+      key.iz_lookup |= IZ_PS_KILL_ALPHATEST_BIT;
+
+   if (fp->Base.OutputsWritten & BITFIELD64_BIT(FRAG_RESULT_DEPTH))
+      key.iz_lookup |= IZ_PS_COMPUTES_DEPTH_BIT;
+
+   /* Just assume depth testing. */
+   key.iz_lookup |= IZ_DEPTH_TEST_ENABLE_BIT;
+   key.iz_lookup |= IZ_DEPTH_WRITE_ENABLE_BIT;
+
+   key.vp_outputs_written |= BITFIELD64_BIT(FRAG_ATTRIB_WPOS);
+   for (int i = 0; i < FRAG_ATTRIB_MAX; i++) {
+      int vp_index = -1;
+
+      if (!(fp->Base.InputsRead & BITFIELD64_BIT(i)))
+	 continue;
+
+      key.proj_attrib_mask |= 1 << i;
+
+      if (i <= FRAG_ATTRIB_TEX7)
+	 vp_index = i;
+      else if (i >= FRAG_ATTRIB_VAR0)
+	 vp_index = i - FRAG_ATTRIB_VAR0 + VERT_RESULT_VAR0;
+
+      if (vp_index >= 0)
+	 key.vp_outputs_written |= BITFIELD64_BIT(vp_index);
+   }
+
+   key.clamp_fragment_color = true;
+
+   for (int i = 0; i < BRW_MAX_TEX_UNIT; i++) {
+      /* FINISHME: depth compares might use (0,0,0,W) for example */
+      key.tex_swizzles[i] = SWIZZLE_XYZW;
+   }
+
+   key.shadowtex_mask = fp->Base.ShadowSamplers;
+
+   if (fp->Base.InputsRead & FRAG_BIT_WPOS) {
+      key.drawable_height = ctx->DrawBuffer->Height;
+      key.render_to_fbo = ctx->DrawBuffer->Name != 0;
+   }
+
+   key.nr_color_regions = 1;
+
+   key.program_string_id = bfp->id;
+
+   drm_intel_bo *old_prog_bo = brw->wm.prog_bo;
+   struct brw_wm_prog_data *old_prog_data = brw->wm.prog_data;
+   brw->wm.prog_bo = NULL;
+
+   bool success = do_wm_prog(brw, prog, bfp, &key);
+
+   drm_intel_bo_unreference(brw->wm.prog_bo);
+   brw->wm.prog_bo = old_prog_bo;
+   brw->wm.prog_data = old_prog_data;
+
+   return success;
+}
+
+/**
+ * Performs a compile of the shader stages even when we don't know
+ * what non-orthogonal state will be set, in the hope that it reflects
+ * the eventual NOS used, and thus allows us to produce link failures.
+ */
+bool
+brw_shader_precompile(struct gl_context *ctx, struct gl_shader_program *prog)
+{
+   if (!brw_wm_precompile(ctx, prog))
+      return false;
+
+   return true;
+}
+
 GLboolean
 brw_link_shader(struct gl_context *ctx, struct gl_shader_program *prog)
 {
@@ -144,6 +230,9 @@ brw_link_shader(struct gl_context *ctx, struct gl_shader_program *prog)
    if (!_mesa_ir_link_shader(ctx, prog))
       return GL_FALSE;
 
+   if (!brw_shader_precompile(ctx, prog))
+      return GL_FALSE;
+
    return GL_TRUE;
 }
 
@@ -181,15 +270,20 @@ void
 fs_visitor::fail(const char *format, ...)
 {
    if (!failed) {
+      va_list va;
+      char *msg;
+
       failed = true;
 
-      if (INTEL_DEBUG & DEBUG_WM) {
-	 fprintf(stderr, "FS compile failed: ");
+      va_start(va, format);
+      msg = ralloc_vasprintf(mem_ctx, format, va);
+      va_end(va);
+      msg = ralloc_asprintf(mem_ctx, "FS compile failed: %s\n", msg);
 
-	 va_list va;
-	 va_start(va, format);
-	 vfprintf(stderr, format, va);
-	 va_end(va);
+      this->fail_msg = msg;
+
+      if (INTEL_DEBUG & DEBUG_WM) {
+	 fprintf(stderr, msg);
       }
    }
 }
@@ -1491,9 +1585,9 @@ fs_visitor::visit(ir_texture *ir)
    assert(!ir->projector);
 
    sampler = _mesa_get_sampler_uniform_value(ir->sampler,
-					     ctx->Shader.CurrentFragmentProgram,
-					     &brw->fragment_program->Base);
-   sampler = c->fp->program.Base.SamplerUnits[sampler];
+					     prog,
+					     &fp->Base);
+   sampler = fp->Base.SamplerUnits[sampler];
 
    /* The 965 requires the EU to do the normalization of GL rectangle
     * texture coordinates.  We use the program parameter state
@@ -2881,7 +2975,7 @@ fs_visitor::calculate_urb_setup()
    /* Figure out where each of the incoming setup attributes lands. */
    if (intel->gen >= 6) {
       for (unsigned int i = 0; i < FRAG_ATTRIB_MAX; i++) {
-	 if (brw->fragment_program->Base.InputsRead & BITFIELD64_BIT(i)) {
+	 if (fp->Base.InputsRead & BITFIELD64_BIT(i)) {
 	    urb_setup[i] = urb_next++;
 	 }
       }
@@ -3800,7 +3894,7 @@ fs_visitor::generate_code()
 
    if (unlikely(INTEL_DEBUG & DEBUG_WM)) {
       printf("Native code for fragment shader %d (%d-wide dispatch):\n",
-	     ctx->Shader.CurrentFragmentProgram->Name, c->dispatch_width);
+	     prog->Name, c->dispatch_width);
    }
 
    foreach_iter(exec_list_iterator, iter, this->instructions) {
@@ -4174,11 +4268,10 @@ fs_visitor::run()
 }
 
 bool
-brw_wm_fs_emit(struct brw_context *brw, struct brw_wm_compile *c)
+brw_wm_fs_emit(struct brw_context *brw, struct brw_wm_compile *c,
+	       struct gl_shader_program *prog)
 {
    struct intel_context *intel = &brw->intel;
-   struct gl_context *ctx = &intel->ctx;
-   struct gl_shader_program *prog = ctx->Shader.CurrentFragmentProgram;
 
    if (!prog)
       return false;
@@ -4198,16 +4291,17 @@ brw_wm_fs_emit(struct brw_context *brw, struct brw_wm_compile *c)
     */
    c->dispatch_width = 8;
 
-   fs_visitor v(c, shader);
+   fs_visitor v(c, prog, shader);
    if (!v.run()) {
-      /* FINISHME: Cleanly fail, test at link time, etc. */
-      assert(!"not reached");
+      prog->LinkStatus = GL_FALSE;
+      prog->InfoLog = ralloc_strdup(prog, v.fail_msg);
+
       return false;
    }
 
    if (intel->gen >= 5 && c->prog_data.nr_pull_params == 0) {
       c->dispatch_width = 16;
-      fs_visitor v2(c, shader);
+      fs_visitor v2(c, prog, shader);
       v2.import_uniforms(v.variable_ht);
       v2.run();
    }

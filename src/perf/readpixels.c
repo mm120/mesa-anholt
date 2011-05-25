@@ -65,8 +65,8 @@ PerfInit(void)
    HaveDepthStencil = PerfExtensionSupported("GL_EXT_packed_depth_stencil");
 
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-   glEnable(GL_DEPTH_TEST);
-   glEnable(GL_STENCIL_TEST);
+   //glEnable(GL_DEPTH_TEST);
+   //glEnable(GL_STENCIL_TEST);
 }
 
 
@@ -86,7 +86,7 @@ ReadPixels(unsigned count)
          y = rand() % y;
 
       if (DrawPoint)
-         glDrawArrays(GL_POINTS, 0, 1);
+	      glCopyPixels(2, 2, 1, 1, GL_COLOR);
 
       glReadPixels(x, y, ReadWidth, ReadHeight,
                    ReadFormat, ReadType, ReadBuffer);
@@ -96,10 +96,7 @@ ReadPixels(unsigned count)
 
 
 static const GLsizei Sizes[] = {
-   10,
-   100,
-   500,
-   1000,
+   1,
    0
 };
 

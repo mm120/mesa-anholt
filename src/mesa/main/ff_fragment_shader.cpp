@@ -527,6 +527,8 @@ struct texenv_fragment_program {
     * needed for bump mapping, else undef.
     */
 
+   ir_variable *frag_color;
+
    ir_rvalue *src_previous;	/**< Reg containing color from previous
 				 * stage.  May need to be decl'd.
 				 */
@@ -854,10 +856,26 @@ emit_texenv(struct texenv_fragment_program *p, GLuint unit)
    else
       alpha_saturate = GL_FALSE;
 
-   ir_variable *temp_var = new(p->mem_ctx) ir_variable(glsl_type::vec4_type,
-						       "texenv_combine",
-						       ir_var_temporary);
-   p->instructions->push_tail(temp_var);
+   ir_variable *out_var;
+
+   /* Typically, we calculate each unit into a temporary variable,
+    * because RGB and A of the next unit may need to reference
+    * arbitrary parts of this unit.
+    *
+    * However, because we don't have a general register-coalescing
+    * type path to rewrite this temporary variable to be gl_FragColor
+    * when the gl_FragColor assignment is the only thing that reads
+    * this variable, we try to emit our unit directly into
+    * gl_FragColor if this is the last unit.
+    */
+   if (unit == p->last_tex_stage) {
+      out_var = p->frag_color;
+   } else {
+      out_var = new(p->mem_ctx) ir_variable(glsl_type::vec4_type,
+					    "texenv_combine",
+					    ir_var_temporary);
+      p->instructions->push_tail(out_var);
+   }
 
    ir_dereference *deref;
    ir_assignment *assign;
@@ -875,7 +893,7 @@ emit_texenv(struct texenv_fragment_program *p, GLuint unit)
       if (rgb_saturate)
 	 val = saturate(p, val);
 
-      deref = new(p->mem_ctx) ir_dereference_variable(temp_var);
+      deref = new(p->mem_ctx) ir_dereference_variable(out_var);
       assign = new(p->mem_ctx) ir_assignment(deref, val);
       p->instructions->push_tail(assign);
    }
@@ -888,7 +906,7 @@ emit_texenv(struct texenv_fragment_program *p, GLuint unit)
       val = smear(p, val);
       if (rgb_saturate)
 	 val = saturate(p, val);
-      deref = new(p->mem_ctx) ir_dereference_variable(temp_var);
+      deref = new(p->mem_ctx) ir_dereference_variable(out_var);
       assign = new(p->mem_ctx) ir_assignment(deref, val);
       p->instructions->push_tail(assign);
    }
@@ -904,7 +922,7 @@ emit_texenv(struct texenv_fragment_program *p, GLuint unit)
       val = new(p->mem_ctx) ir_swizzle(val, 0, 1, 2, 3, 3);
       if (rgb_saturate)
 	 val = saturate(p, val);
-      deref = new(p->mem_ctx) ir_dereference_variable(temp_var);
+      deref = new(p->mem_ctx) ir_dereference_variable(out_var);
       assign = new(p->mem_ctx) ir_assignment(deref, val, NULL, WRITEMASK_XYZ);
       p->instructions->push_tail(assign);
 
@@ -916,12 +934,12 @@ emit_texenv(struct texenv_fragment_program *p, GLuint unit)
       val = new(p->mem_ctx) ir_swizzle(val, 3, 3, 3, 3, 1);
       if (alpha_saturate)
 	 val = saturate(p, val);
-      deref = new(p->mem_ctx) ir_dereference_variable(temp_var);
+      deref = new(p->mem_ctx) ir_dereference_variable(out_var);
       assign = new(p->mem_ctx) ir_assignment(deref, val, NULL, WRITEMASK_W);
       p->instructions->push_tail(assign);
    }
 
-   deref = new(p->mem_ctx) ir_dereference_variable(temp_var);
+   deref = new(p->mem_ctx) ir_dereference_variable(out_var);
 
    /* Deal with the final shift:
     */
@@ -1398,11 +1416,12 @@ emit_instructions(struct texenv_fragment_program *p)
       cf = emit_fog_instructions(p, cf);
    }
 
-   ir_variable *frag_color = p->shader->symbols->get_variable("gl_FragColor");
-   assert(frag_color);
-   deref = new(p->mem_ctx) ir_dereference_variable(frag_color);
-   assign = new(p->mem_ctx) ir_assignment(deref, cf);
-   p->instructions->push_tail(assign);
+   deref = cf->as_dereference_variable();
+   if (!deref || deref->var != p->frag_color) {
+      deref = new(p->mem_ctx) ir_dereference_variable(p->frag_color);
+      assign = new(p->mem_ctx) ir_assignment(deref, cf);
+      p->instructions->push_tail(assign);
+   }
 }
 
 /**
@@ -1445,6 +1464,7 @@ create_new_program(struct gl_context *ctx, struct state_key *key)
       p.texcoord_tex[unit] = NULL;
    }
 
+   p.frag_color = p.shader->symbols->get_variable("gl_FragColor");
    p.src_previous = NULL;
 
    p.last_tex_stage = 0;

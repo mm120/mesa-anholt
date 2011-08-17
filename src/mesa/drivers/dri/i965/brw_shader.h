@@ -34,6 +34,7 @@ extern "C" {
 
 #include "../glsl/glsl_types.h"
 #include "../glsl/list.h"
+#include "../glsl/ir.h"
 #include "../glsl/ir_visitor.h"
 
 namespace brw {
@@ -47,6 +48,66 @@ enum register_file {
    ATTR,
    UNIFORM, /* prog_data->params[reg] */
    BAD_FILE
+};
+
+struct reg
+{
+public:
+   enum register_file file;
+
+   /**
+    * Register number.
+    *
+    * For GRF, this is an index into virtual_grf_*[] until register
+    * allocation.  After register allocation, it becomes the hardware
+    * GRF number.  For MRF, this is the MRF number.  For IMM and
+    * BRW_REG, this is unused.
+    */
+   int reg;
+
+   /**
+    * For virtual GRF registers, this is a hardware register offset
+    * from the start of the register block (for example, a constant
+    * index in an array access).
+    */
+   int reg_offset;
+
+   /** Register type.  BRW_REGISTER_TYPE_* */
+   int type;
+
+   bool sechalf;
+   struct brw_reg fixed_hw_reg;
+   int smear; /* -1, or a channel of the reg to smear to all channels. */
+
+   /** Value for file == BRW_IMMMEDIATE_FILE */
+   union {
+      int32_t i;
+      uint32_t u;
+      float f;
+   } imm;
+};
+
+struct instruction : public exec_node
+{
+public:
+   enum opcode opcode;
+
+   bool saturate;
+   int conditional_mod; /**< BRW_CONDITIONAL_* */
+   int mlen; /**< SEND message length */
+   int base_mrf; /**< First MRF in the SEND message, if mlen is nonzero. */
+   int sampler;
+   bool shadow_compare;
+   bool eot;
+   bool header_present;
+   bool predicate_inverse;
+
+   /** @{
+    * Annotation for the generated IR.  One of the two can be set.
+    */
+   ir_instruction *ir;
+   const char *annotation;
+   /** @} */
 };
 
 class compiler : public ir_visitor

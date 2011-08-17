@@ -48,7 +48,7 @@ extern "C" {
 #include "../glsl/glsl_types.h"
 #include "../glsl/ir.h"
 
-class fs_reg {
+class fs_reg : public reg {
 public:
    /* Callers of this ralloc-based new need not call delete. It's
     * easier to just ralloc_free 'ctx' (or any of its ancestors). */
@@ -129,40 +129,17 @@ public:
 	      imm.u == r->imm.u);
    }
 
-   /** Register file: ARF, GRF, MRF, IMM. */
-   enum register_file file;
-   /**
-    * Register number.  For ARF/MRF, it's the hardware register.  For
-    * GRF, it's a virtual register number until register allocation
-    */
-   int reg;
-   /**
-    * For virtual registers, this is a hardware register offset from
-    * the start of the register block (for example, a constant index
-    * in an array access).
-    */
-   int reg_offset;
-   /** Register type.  BRW_REGISTER_TYPE_* */
-   int type;
    bool negate;
    bool abs;
    bool sechalf;
-   struct brw_reg fixed_hw_reg;
    int smear; /* -1, or a channel of the reg to smear to all channels. */
-
-   /** Value for file == BRW_IMMMEDIATE_FILE */
-   union {
-      int32_t i;
-      uint32_t u;
-      float f;
-   } imm;
 };
 
 static const fs_reg reg_undef;
 static const fs_reg reg_null_f(ARF, BRW_ARF_NULL, BRW_REGISTER_TYPE_F);
 static const fs_reg reg_null_d(ARF, BRW_ARF_NULL, BRW_REGISTER_TYPE_D);
 
-class fs_inst : public exec_node {
+class fs_inst : public instruction {
 public:
    /* Callers of this ralloc-based new need not call delete. It's
     * easier to just ralloc_free 'ctx' (or any of its ancestors). */
@@ -297,31 +274,14 @@ public:
 	      opcode == SHADER_OPCODE_POW);
    }
 
-   enum opcode opcode; /* BRW_OPCODE_* or FS_OPCODE_* */
    fs_reg dst;
    fs_reg src[3];
-   bool saturate;
    bool predicated;
-   bool predicate_inverse;
-   int conditional_mod; /**< BRW_CONDITIONAL_* */
 
-   int mlen; /**< SEND message length */
-   int base_mrf; /**< First MRF in the SEND message, if mlen is nonzero. */
-   int sampler;
    int target; /**< MRT target. */
-   bool eot;
-   bool header_present;
-   bool shadow_compare;
    bool force_uncompressed;
    bool force_sechalf;
    uint32_t offset; /* spill/unspill offset */
-
-   /** @{
-    * Annotation for the generated IR.  One of the two can be set.
-    */
-   ir_instruction *ir;
-   const char *annotation;
-   /** @} */
 };
 
 class fs_visitor : public brw::compiler

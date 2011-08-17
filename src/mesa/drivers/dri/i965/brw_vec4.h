@@ -61,29 +61,6 @@ swizzle_for_size(int size)
    return size_swizzles[size - 1];
 }
 
-class reg
-{
-public:
-   /** Register file: ARF, GRF, MRF, IMM. */
-   enum register_file file;
-   /** virtual register number.  0 = fixed hw reg */
-   int reg;
-   /** Offset within the virtual register. */
-   int reg_offset;
-   /** Register type.  BRW_REGISTER_TYPE_* */
-   int type;
-   bool sechalf;
-   struct brw_reg fixed_hw_reg;
-   int smear; /* -1, or a channel of the reg to smear to all channels. */
-
-   /** Value for file == BRW_IMMMEDIATE_FILE */
-   union {
-      int32_t i;
-      uint32_t u;
-      float f;
-   } imm;
-};
-
 class src_reg : public reg
 {
 public:
@@ -214,7 +191,7 @@ public:
    src_reg *reladdr;
 };
 
-class vec4_instruction : public exec_node {
+class vec4_instruction : public instruction {
 public:
    /* Callers of this ralloc-based new need not call delete. It's
     * easier to just ralloc_free 'ctx' (or any of its ancestors). */
@@ -231,31 +208,12 @@ public:
    struct brw_reg get_dst(void);
    struct brw_reg get_src(int i);
 
-   enum opcode opcode; /* BRW_OPCODE_* or FS_OPCODE_* */
    dst_reg dst;
    src_reg src[3];
 
-   bool saturate;
-   bool predicate_inverse;
    uint32_t predicate;
 
-   int conditional_mod; /**< BRW_CONDITIONAL_* */
-
-   int sampler;
-   int target; /**< MRT target. */
-   bool shadow_compare;
-
-   bool eot;
-   bool header_present;
-   int mlen; /**< SEND message length */
-   int base_mrf; /**< First MRF in the SEND message, if mlen is nonzero. */
-
    uint32_t offset; /* spill/unspill offset */
-   /** @{
-    * Annotation for the generated IR.  One of the two can be set.
-    */
-   ir_instruction *ir;
-   const char *annotation;
 };
 
 class vec4_visitor : public compiler

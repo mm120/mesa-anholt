@@ -61,17 +61,6 @@ swizzle_for_size(int size)
    return size_swizzles[size - 1];
 }
 
-enum register_file {
-   ARF = BRW_ARCHITECTURE_REGISTER_FILE,
-   GRF = BRW_GENERAL_REGISTER_FILE,
-   MRF = BRW_MESSAGE_REGISTER_FILE,
-   IMM = BRW_IMMEDIATE_VALUE,
-   HW_REG, /* a struct brw_reg */
-   ATTR,
-   UNIFORM, /* prog_data->params[hw_reg] */
-   BAD_FILE
-};
-
 class reg
 {
 public:
@@ -212,7 +201,7 @@ public:
    {
       init();
 
-      this->file = HW_REG;
+      this->file = BRW_REG;
       this->fixed_hw_reg = reg;
    }
 

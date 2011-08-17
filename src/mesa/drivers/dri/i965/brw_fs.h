@@ -48,16 +48,6 @@ extern "C" {
 #include "../glsl/glsl_types.h"
 #include "../glsl/ir.h"
 
-enum register_file {
-   ARF = BRW_ARCHITECTURE_REGISTER_FILE,
-   GRF = BRW_GENERAL_REGISTER_FILE,
-   MRF = BRW_MESSAGE_REGISTER_FILE,
-   IMM = BRW_IMMEDIATE_VALUE,
-   FIXED_HW_REG, /* a struct brw_reg */
-   UNIFORM, /* prog_data->params[reg] */
-   BAD_FILE
-};
-
 class fs_reg {
 public:
    /* Callers of this ralloc-based new need not call delete. It's
@@ -116,7 +106,7 @@ public:
    fs_reg(struct brw_reg fixed_hw_reg)
    {
       init();
-      this->file = FIXED_HW_REG;
+      this->file = BRW_REG;
       this->fixed_hw_reg = fixed_hw_reg;
       this->type = fixed_hw_reg.type;
    }

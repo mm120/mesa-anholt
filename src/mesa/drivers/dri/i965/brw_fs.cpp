@@ -643,7 +643,7 @@ fs_visitor::assign_curb_setup()
 						  constant_nr / 8,
 						  constant_nr % 8);
 
-	    inst->src[i].file = FIXED_HW_REG;
+	    inst->src[i].file = BRW_REG;
 	    inst->src[i].fixed_hw_reg = retype(brw_reg, inst->src[i].type);
 	 }
       }
@@ -700,12 +700,12 @@ fs_visitor::assign_urb_setup()
       fs_inst *inst = (fs_inst *)node;
 
       if (inst->opcode == FS_OPCODE_LINTERP) {
-	 assert(inst->src[2].file == FIXED_HW_REG);
+	 assert(inst->src[2].file == BRW_REG);
 	 inst->src[2].fixed_hw_reg.nr += urb_start;
       }
 
       if (inst->opcode == FS_OPCODE_CINTERP) {
-	 assert(inst->src[0].file == FIXED_HW_REG);
+	 assert(inst->src[0].file == BRW_REG);
 	 inst->src[0].fixed_hw_reg.nr += urb_start;
       }
    }

@@ -73,7 +73,7 @@ vec4_visitor::setup_attributes(int payload_reg)
 	 if (inst->src[i].negate)
 	    reg = negate(reg);
 
-	 inst->src[i].file = HW_REG;
+	 inst->src[i].file = BRW_REG;
 	 inst->src[i].fixed_hw_reg = reg;
       }
    }
@@ -170,7 +170,7 @@ vec4_instruction::get_dst(void)
       brw_reg.dw1.bits.writemask = dst.writemask;
       break;
 
-   case HW_REG:
+   case BRW_REG:
       brw_reg = dst.fixed_hw_reg;
       break;
 
@@ -232,7 +232,7 @@ vec4_instruction::get_src(int i)
 	 brw_reg = negate(brw_reg);
       break;
 
-   case HW_REG:
+   case BRW_REG:
       brw_reg = src[i].fixed_hw_reg;
       break;
 

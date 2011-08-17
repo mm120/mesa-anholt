@@ -38,6 +38,17 @@ extern "C" {
 
 namespace brw {
 
+enum register_file {
+   ARF = BRW_ARCHITECTURE_REGISTER_FILE,
+   GRF = BRW_GENERAL_REGISTER_FILE,
+   MRF = BRW_MESSAGE_REGISTER_FILE,
+   IMM = BRW_IMMEDIATE_VALUE,
+   BRW_REG,
+   ATTR,
+   UNIFORM, /* prog_data->params[reg] */
+   BAD_FILE
+};
+
 class compiler : public ir_visitor
 {
 public:

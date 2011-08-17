@@ -44,6 +44,7 @@ extern "C" {
 #include "brw_eu.h"
 #include "brw_wm.h"
 }
+#include "brw_shader.h"
 #include "../glsl/glsl_types.h"
 #include "../glsl/ir.h"
 
@@ -333,21 +334,17 @@ public:
    /** @} */
 };
 
-class fs_visitor : public ir_visitor
+class fs_visitor : public brw::compiler
 {
 public:
 
    fs_visitor(struct brw_wm_compile *c, struct gl_shader_program *prog,
 	      struct brw_shader *shader)
    {
+      init(&c->func, prog, shader);
+
       this->c = c;
-      this->p = &c->func;
-      this->brw = p->brw;
       this->fp = prog->FragmentProgram;
-      this->prog = prog;
-      this->intel = &brw->intel;
-      this->ctx = &intel->ctx;
-      this->mem_ctx = ralloc_context(NULL);
       this->shader = shader;
       this->failed = false;
       this->variable_ht = hash_table_ctor(0,
@@ -393,7 +390,6 @@ public:
 
    ~fs_visitor()
    {
-      ralloc_free(this->mem_ctx);
       hash_table_dtor(this->variable_ht);
    }
 
@@ -522,16 +518,7 @@ public:
    void setup_builtin_uniform_values(ir_variable *ir);
    int implied_mrf_writes(fs_inst *inst);
 
-   struct brw_context *brw;
-   const struct gl_fragment_program *fp;
-   struct intel_context *intel;
-   struct gl_context *ctx;
    struct brw_wm_compile *c;
-   struct brw_compile *p;
-   struct brw_shader *shader;
-   struct gl_shader_program *prog;
-   void *mem_ctx;
-   exec_list instructions;
 
    /* Delayed setup of c->prog_data.params[] due to realloc of
     * ParamValues[] during compile.

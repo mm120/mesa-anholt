@@ -854,6 +854,8 @@ void brw_debug_batch(struct intel_context *intel);
  */
 void brw_validate_textures( struct brw_context *brw );
 
+/* brw_shader.c */
+void brw_init_shader_functions(struct dd_function_table *functions);
 
 /*======================================================================
  * brw_program.c

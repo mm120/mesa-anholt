@@ -2087,21 +2087,15 @@ vec4_visitor::vec4_visitor(struct brw_vs_compile *c,
 			   struct gl_shader_program *prog,
 			   struct brw_shader *shader)
 {
-   this->c = c;
-   this->p = &c->func;
-   this->brw = p->brw;
-   this->intel = &brw->intel;
-   this->ctx = &intel->ctx;
-   this->prog = prog;
-   this->shader = shader;
+   init(&c->func, prog, shader);
 
-   this->mem_ctx = ralloc_context(NULL);
+   this->c = c;
+
    this->failed = false;
 
    this->base_ir = NULL;
    this->current_annotation = NULL;
 
-   this->c = c;
    this->vp = prog->VertexProgram;
    this->prog_data = &c->prog_data;
 
@@ -2122,7 +2116,6 @@ vec4_visitor::vec4_visitor(struct brw_vs_compile *c,
 
 vec4_visitor::~vec4_visitor()
 {
-   ralloc_free(this->mem_ctx);
    hash_table_dtor(this->variable_ht);
 }
 

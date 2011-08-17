@@ -21,11 +21,45 @@
  * IN THE SOFTWARE.
  */
 
-#include <stdint.h>
-#include "brw_defines.h"
-
 #pragma once
+
+extern "C" {
+#include <stdint.h>
+#include "main/macros.h"
+#include "main/mtypes.h"
+#include "brw_defines.h"
+#include "brw_eu.h"
+#include "brw_context.h"
+}
+
+#include "../glsl/glsl_types.h"
+#include "../glsl/list.h"
+#include "../glsl/ir_visitor.h"
+
+namespace brw {
+
+class compiler : public ir_visitor
+{
+public:
+   ~compiler();
+   struct intel_context *intel;
+   struct brw_context *brw;
+   struct brw_compile *p;
+   const struct gl_fragment_program *fp;
+   struct gl_context *ctx;
+   struct brw_shader *shader;
+   struct gl_shader_program *prog;
+   exec_list instructions;
+   void *mem_ctx;
+
+   void init(struct brw_compile *p, struct gl_shader_program *prog,
+	     struct brw_shader *shader);
+};
 
 int brw_type_for_base_type(const struct glsl_type *type);
 uint32_t brw_conditional_for_comparison(unsigned int op);
 uint32_t brw_math_function(enum opcode op);
+
+} /* namespace brw */
+
+using namespace brw;

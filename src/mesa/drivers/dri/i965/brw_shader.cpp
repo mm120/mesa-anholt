@@ -30,7 +30,11 @@ extern "C" {
 #include "../glsl/ir_optimization.h"
 #include "../glsl/ir_print_visitor.h"
 
-struct gl_shader *
+using namespace brw;
+
+namespace brw {
+
+static struct gl_shader *
 brw_new_shader(struct gl_context *ctx, GLuint name, GLuint type)
 {
    struct brw_shader *shader;
@@ -45,7 +49,7 @@ brw_new_shader(struct gl_context *ctx, GLuint name, GLuint type)
    return &shader->base;
 }
 
-struct gl_shader_program *
+static struct gl_shader_program *
 brw_new_shader_program(struct gl_context *ctx, GLuint name)
 {
    struct brw_shader_program *prog;
@@ -230,4 +234,35 @@ brw_math_function(enum opcode op)
       assert(!"not reached: unknown math function");
       return 0;
    }
+}
+
+void
+compiler::init(struct brw_compile *p, struct gl_shader_program *prog,
+	       struct brw_shader *shader)
+{
+   this->p = p;
+   this->brw = p->brw;
+   this->prog = prog;
+   this->shader = shader;
+   this->intel = &brw->intel;
+   this->ctx = &intel->ctx;
+   this->mem_ctx = ralloc_context(NULL);
+}
+
+compiler::~compiler()
+{
+   ralloc_free(mem_ctx);
+}
+
+} /* namespace brw */
+
+extern "C" {
+void
+brw_init_shader_functions(struct dd_function_table *functions)
+{
+   functions->NewShader = brw_new_shader;
+   functions->NewShaderProgram = brw_new_shader_program;
+   functions->LinkShader = brw_link_shader;
+}
+
 }

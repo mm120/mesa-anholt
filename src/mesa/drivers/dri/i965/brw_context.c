@@ -51,6 +51,7 @@ static void brwInitDriverFunctions( struct dd_function_table *functions )
    intelInitDriverFunctions( functions );
 
    brwInitFragProgFuncs( functions );
+   brw_init_shader_functions(functions);
    brw_init_queryobj_functions(functions);
 }
 

@@ -51,6 +51,8 @@ extern "C" {
 
 #define MAX_INSTRUCTION (1 << 30)
 
+using namespace brw;
+
 int
 fs_visitor::type_size(const struct glsl_type *type)
 {

@@ -269,7 +269,7 @@ public:
    const char *annotation;
 };
 
-class vec4_visitor : public ir_visitor
+class vec4_visitor : public compiler
 {
 public:
    vec4_visitor(struct brw_vs_compile *c,
@@ -294,17 +294,9 @@ public:
 	 return dst_null_f();
    }
 
-   struct brw_context *brw;
    const struct gl_vertex_program *vp;
-   struct intel_context *intel;
-   struct gl_context *ctx;
    struct brw_vs_compile *c;
    struct brw_vs_prog_data *prog_data;
-   struct brw_compile *p;
-   struct brw_shader *shader;
-   struct gl_shader_program *prog;
-   void *mem_ctx;
-   exec_list instructions;
 
    char *fail_msg;
    bool failed;

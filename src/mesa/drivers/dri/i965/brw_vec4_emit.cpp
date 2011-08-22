@@ -114,7 +114,7 @@ vec4_visitor::setup_uniforms(int reg)
     * matter what, or the GPU would hang.
     */
    if (intel->gen < 6 && this->uniforms == 0) {
-      this->uniform_size[this->uniforms] = 1;
+      this->uniform_vector_size[this->uniforms] = 1;
 
       for (unsigned int i = 0; i < 4; i++) {
 	 unsigned int slot = this->uniforms * 4 + i;
@@ -229,6 +229,9 @@ vec4_instruction::get_src(int i)
 	 brw_reg = brw_abs(brw_reg);
       if (src[i].negate)
 	 brw_reg = negate(brw_reg);
+
+      /* This should have been moved to pull constants. */
+      assert(!src[i].reladdr);
       break;
 
    case HW_REG:
@@ -488,6 +491,47 @@ vec4_visitor::generate_scratch_write(vec4_instruction *inst,
 }
 
 void
+vec4_visitor::generate_pull_constant_load(vec4_instruction *inst,
+					  struct brw_reg dst,
+					  struct brw_reg index)
+{
+   if (intel->gen >= 6) {
+      brw_push_insn_state(p);
+      brw_set_mask_control(p, BRW_MASK_DISABLE);
+      brw_MOV(p,
+	      retype(brw_message_reg(inst->base_mrf), BRW_REGISTER_TYPE_D),
+	      retype(brw_vec8_grf(0, 0), BRW_REGISTER_TYPE_D));
+      brw_pop_insn_state(p);
+   }
+
+   brw_MOV(p, retype(brw_message_reg(inst->base_mrf + 1), BRW_REGISTER_TYPE_D),
+	   index);
+
+   uint32_t msg_type;
+
+   if (intel->gen >= 6)
+      msg_type = GEN6_DATAPORT_READ_MESSAGE_OWORD_DUAL_BLOCK_READ;
+   else if (intel->gen == 5 || intel->is_g4x)
+      msg_type = G45_DATAPORT_READ_MESSAGE_OWORD_DUAL_BLOCK_READ;
+   else
+      msg_type = BRW_DATAPORT_READ_MESSAGE_OWORD_DUAL_BLOCK_READ;
+
+   /* Each of the 8 channel enables is considered for whether each
+    * dword is written.
+    */
+   struct brw_instruction *send = brw_next_insn(p, BRW_OPCODE_SEND);
+   brw_set_dest(p, send, dst);
+   brw_set_src0(p, send, brw_message_reg(inst->base_mrf));
+   brw_set_dp_read_message(p, send,
+			   SURF_INDEX_VERT_CONST_BUFFER,
+			   BRW_DATAPORT_OWORD_DUAL_BLOCK_1OWORD,
+			   msg_type,
+			   BRW_DATAPORT_READ_TARGET_DATA_CACHE,
+			   2, /* mlen */
+			   1 /* rlen */);
+}
+
+void
 vec4_visitor::generate_vs_instruction(vec4_instruction *instruction,
 				      struct brw_reg dst,
 				      struct brw_reg *src)
@@ -529,6 +573,10 @@ vec4_visitor::generate_vs_instruction(vec4_instruction *instruction,
       generate_scratch_write(inst, dst, src[0], src[1]);
       break;
 
+   case VS_OPCODE_PULL_CONSTANT_LOAD:
+      generate_pull_constant_load(inst, dst, src[0]);
+      break;
+
    default:
       if (inst->opcode < (int)ARRAY_SIZE(brw_opcodes)) {
 	 fail("unsupported opcode in `%s' in VS\n",
@@ -556,6 +604,7 @@ vec4_visitor::run()
     * often do repeated subexpressions for those.
     */
    move_grf_array_access_to_scratch();
+   move_uniform_array_access_to_pull_constants();
 
    bool progress;
    do {

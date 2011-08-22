@@ -364,6 +364,7 @@ public:
     */
    dst_reg output_reg[VERT_RESULT_MAX];
    int uniform_size[MAX_UNIFORMS];
+   int uniform_vector_size[MAX_UNIFORMS];
    int uniforms;
 
    struct hash_table *variable_ht;
@@ -380,6 +381,7 @@ public:
    void reg_allocate_trivial();
    void reg_allocate();
    void move_grf_array_access_to_scratch();
+   void move_uniform_array_access_to_pull_constants();
    void calculate_live_intervals();
    bool dead_code_eliminate();
    bool virtual_grf_interferes(int a, int b);
@@ -439,6 +441,8 @@ public:
 
    src_reg get_scratch_offset(vec4_instruction *inst,
 			      src_reg *reladdr, int reg_offset);
+   src_reg get_pull_constant_offset(vec4_instruction *inst,
+				    src_reg *reladdr, int reg_offset);
    void emit_scratch_read(vec4_instruction *inst,
 			  dst_reg dst,
 			  src_reg orig_src,
@@ -447,6 +451,10 @@ public:
 			   src_reg temp,
 			   dst_reg orig_dst,
 			   int base_offset);
+   void emit_pull_constant_load(vec4_instruction *inst,
+				dst_reg dst,
+				src_reg orig_src,
+				int base_offset);
 
    GLboolean try_emit_sat(ir_expression *ir);
 
@@ -482,6 +490,9 @@ public:
    void generate_scratch_read(vec4_instruction *inst,
 			      struct brw_reg dst,
 			      struct brw_reg index);
+   void generate_pull_constant_load(vec4_instruction *inst,
+				    struct brw_reg dst,
+				    struct brw_reg index);
 };
 
 } /* namespace brw */

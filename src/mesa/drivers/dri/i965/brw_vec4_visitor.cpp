@@ -372,7 +372,10 @@ vec4_visitor::setup_uniform_values(int loc, const glsl_type *type)
 	 c->prog_data.param[this->uniforms * 4 + i] = &zero;
       }
 
-      this->uniform_size[this->uniforms] = type->vector_elements;
+      /* Track the size of this uniform vector, for future packing of
+       * uniforms.
+       */
+      this->uniform_vector_size[this->uniforms] = type->vector_elements;
       this->uniforms++;
 
       return 1;
@@ -420,7 +423,7 @@ vec4_visitor::setup_builtin_uniform_values(ir_variable *ir)
 					    (gl_state_index *)slots[i].tokens);
       float *values = &this->vp->Base.Parameters->ParameterValues[index][0].f;
 
-      this->uniform_size[this->uniforms] = 0;
+      this->uniform_vector_size[this->uniforms] = 0;
       /* Add each of the unique swizzled channels of the element.
        * This will end up matching the size of the glsl_type of this field.
        */
@@ -431,7 +434,7 @@ vec4_visitor::setup_builtin_uniform_values(ir_variable *ir)
 
 	 c->prog_data.param[this->uniforms * 4 + j] = &values[swiz];
 	 if (swiz <= last_swiz)
-	    this->uniform_size[this->uniforms]++;
+	    this->uniform_vector_size[this->uniforms]++;
       }
       this->uniforms++;
    }
@@ -667,6 +670,11 @@ vec4_visitor::visit(ir_variable *ir)
 
    case ir_var_uniform:
       reg = new(this->mem_ctx) dst_reg(UNIFORM, this->uniforms);
+
+      /* Track how big the whole uniform variable is, in case we need to put a
+       * copy of its data into pull constants for array access.
+       */
+      this->uniform_size[this->uniforms] = type_size(ir->type);
 
       if (!strncmp(ir->name, "gl_", 3)) {
 	 setup_builtin_uniform_values(ir);
@@ -1938,6 +1946,38 @@ vec4_visitor::get_scratch_offset(vec4_instruction *inst,
    }
 }
 
+src_reg
+vec4_visitor::get_pull_constant_offset(vec4_instruction *inst,
+				       src_reg *reladdr, int reg_offset)
+{
+   if (reladdr) {
+      src_reg index = src_reg(this, glsl_type::int_type);
+
+      vec4_instruction *add = emit(BRW_OPCODE_ADD,
+				   dst_reg(index),
+				   *reladdr,
+				   src_reg(reg_offset));
+      /* Move our new instruction from the tail to its correct place. */
+      add->remove();
+      inst->insert_before(add);
+
+      /* Pre-gen6, the message header uses byte offsets instead of vec4
+       * (16-byte) offset units.
+       */
+      if (intel->gen < 6) {
+	 vec4_instruction *mul = emit(BRW_OPCODE_MUL, dst_reg(index),
+				      index, src_reg(16));
+	 mul->remove();
+	 inst->insert_before(mul);
+      }
+
+      return index;
+   } else {
+      int message_header_scale = intel->gen < 6 ? 16 : 1;
+      return src_reg(reg_offset * message_header_scale);
+   }
+}
+
 /**
  * Emits an instruction before @inst to load the value named by @orig_src
  * from scratch space at @base_offset to @temp.
@@ -2063,6 +2103,93 @@ vec4_visitor::move_grf_array_access_to_scratch()
    }
 }
 
+/**
+ * Emits an instruction before @inst to load the value named by @orig_src
+ * from the pull constant buffer (surface) at @base_offset to @temp.
+ */
+void
+vec4_visitor::emit_pull_constant_load(vec4_instruction *inst,
+				      dst_reg temp, src_reg orig_src,
+				      int base_offset)
+{
+   int reg_offset = base_offset + orig_src.reg_offset;
+   src_reg index = get_pull_constant_offset(inst, orig_src.reladdr, reg_offset);
+
+   vec4_instruction *const_load_inst = emit(VS_OPCODE_PULL_CONSTANT_LOAD,
+					    temp, index);
+
+   const_load_inst->base_mrf = 14;
+   const_load_inst->mlen = 1;
+   /* Move our instruction from the tail to its correct place. */
+   const_load_inst->remove();
+   inst->insert_before(const_load_inst);
+}
+
+/**
+ * Implements array access of uniforms by inserting a
+ * PULL_CONSTANT_LOAD instruction.
+ *
+ * Unlike temporary GRF array access (where we don't support it due to
+ * the difficulty of doing relative addressing on instruction
+ * destinations), we could potentially do array access of uniforms
+ * that were loaded in GRF space as push constants.  In real-world
+ * usage we've seen, though, the arrays being used are always larger
+ * than we could load as push constants, so just always move all
+ * uniform array access out to a pull constant buffer.
+ */
+void
+vec4_visitor::move_uniform_array_access_to_pull_constants()
+{
+   int pull_constant_loc[this->uniforms];
+
+   for (int i = 0; i < this->uniforms; i++) {
+      pull_constant_loc[i] = -1;
+   }
+
+   /* Walk through and find array access of uniforms.  Put a copy of that
+    * uniform in the pull constant buffer.
+    *
+    * Note that we don't move constant-indexed accesses to arrays.  No
+    * testing has been done of the performance impact of this choice.
+    */
+   foreach_list_safe(node, &this->instructions) {
+      vec4_instruction *inst = (vec4_instruction *)node;
+
+      for (int i = 0 ; i < 3; i++) {
+	 if (inst->src[i].file != UNIFORM || !inst->src[i].reladdr)
+	    continue;
+
+	 int uniform = inst->src[i].reg;
+
+	 /* If this array isn't already present in the pull constant buffer,
+	  * add it.
+	  */
+	 if (pull_constant_loc[uniform] == -1) {
+	    const float **values = &prog_data->param[uniform * 4];
+
+	    pull_constant_loc[uniform] = prog_data->nr_pull_params;
+
+	    for (int j = 0; j < uniform_size[uniform] * 4; j++) {
+	       prog_data->pull_param[prog_data->nr_pull_params++] = values[j];
+	    }
+	 }
+
+	 /* Set up the annotation tracking for new generated instructions. */
+	 base_ir = inst->ir;
+	 current_annotation = inst->annotation;
+
+	 dst_reg temp = dst_reg(this, glsl_type::vec4_type);
+
+	 emit_pull_constant_load(inst, temp, inst->src[i],
+				 pull_constant_loc[uniform]);
+
+	 inst->src[i].file = temp.file;
+	 inst->src[i].reg = temp.reg;
+	 inst->src[i].reg_offset = temp.reg_offset;
+	 inst->src[i].reladdr = NULL;
+      }
+   }
+}
 
 vec4_visitor::vec4_visitor(struct brw_vs_compile *c,
 			   struct gl_shader_program *prog,

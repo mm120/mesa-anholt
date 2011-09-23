@@ -137,23 +137,29 @@ upload_wm_state(struct brw_context *brw)
    /* BRW_NEW_NR_WM_SURFACES */
    dw2 |= brw->wm.nr_surfaces << GEN6_WM_BINDING_TABLE_ENTRY_COUNT_SHIFT;
 
-   /* CACHE_NEW_SAMPLER */
-   dw2 |= (ALIGN(brw->wm.sampler_count, 4) / 4) << GEN6_WM_SAMPLER_COUNT_SHIFT;
-   dw4 |= (brw->wm.prog_data->first_curbe_grf <<
-	   GEN6_WM_DISPATCH_START_GRF_SHIFT_0);
-   dw4 |= (brw->wm.prog_data->first_curbe_grf_16 <<
-	   GEN6_WM_DISPATCH_START_GRF_SHIFT_2);
-
-   dw5 |= (brw->wm_max_threads - 1) << GEN6_WM_MAX_THREADS_SHIFT;
+   uint32_t kernel_pointer;
 
    /* CACHE_NEW_WM_PROG */
-   if (brw->wm.prog_data->dispatch_width == 8) {
-      dw5 |= GEN6_WM_8_DISPATCH_ENABLE;
-      if (brw->wm.prog_data->prog_offset_16)
-	 dw5 |= GEN6_WM_16_DISPATCH_ENABLE;
-   } else {
+   if (brw->wm.prog_data->dispatch_width == 8 &&
+       brw->wm.prog_data->prog_offset_16) {
       dw5 |= GEN6_WM_16_DISPATCH_ENABLE;
+      dw4 |= (brw->wm.prog_data->first_curbe_grf_16 <<
+	      GEN6_WM_DISPATCH_START_GRF_SHIFT_0);
+      kernel_pointer = brw->wm.prog_offset + brw->wm.prog_data->prog_offset_16;
+   } else {
+      if (brw->wm.prog_data->dispatch_width == 8)
+	 dw5 |= GEN6_WM_8_DISPATCH_ENABLE;
+      else
+	 dw5 |= GEN6_WM_16_DISPATCH_ENABLE;
+      dw4 |= (brw->wm.prog_data->first_curbe_grf <<
+	      GEN6_WM_DISPATCH_START_GRF_SHIFT_0);
+      kernel_pointer = brw->wm.prog_offset;
    }
+
+   /* CACHE_NEW_SAMPLER */
+   dw2 |= (ALIGN(brw->wm.sampler_count, 4) / 4) << GEN6_WM_SAMPLER_COUNT_SHIFT;
+
+   dw5 |= (brw->wm_max_threads - 1) << GEN6_WM_MAX_THREADS_SHIFT;
 
    /* _NEW_LINE */
    if (ctx->Line.StippleFlag)
@@ -185,7 +191,7 @@ upload_wm_state(struct brw_context *brw)
 
    BEGIN_BATCH(9);
    OUT_BATCH(_3DSTATE_WM << 16 | (9 - 2));
-   OUT_BATCH(brw->wm.prog_offset);
+   OUT_BATCH(kernel_pointer);
    OUT_BATCH(dw2);
    if (brw->wm.prog_data->total_scratch) {
       OUT_RELOC(brw->wm.scratch_bo, I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER,
@@ -197,8 +203,7 @@ upload_wm_state(struct brw_context *brw)
    OUT_BATCH(dw5);
    OUT_BATCH(dw6);
    OUT_BATCH(0); /* kernel 1 pointer */
-   /* kernel 2 pointer */
-   OUT_BATCH(brw->wm.prog_offset + brw->wm.prog_data->prog_offset_16);
+   OUT_BATCH(0); /* kernel 2 pointer */
    ADVANCE_BATCH();
 }
 

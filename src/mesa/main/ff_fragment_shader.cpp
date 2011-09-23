@@ -341,8 +341,7 @@ static GLbitfield get_fp_input_mask( struct gl_context *ctx )
        */
       /* _NEW_POINT */
       if (ctx->Point.PointSprite)
-         varying_inputs |= FRAG_BITS_TEX_ANY;
-      printf("0x%08x 0x%08x\n", FRAG_BITS_TEX_ANY, VERT_BIT_TEX_ANY);
+         fp_inputs |= FRAG_BITS_TEX_ANY;
 
       /* First look at what values may be computed by the generated
        * vertex program:
@@ -1126,7 +1125,7 @@ load_texenv_source(struct texenv_fragment_program *p,
 /**
  * Generate instructions for loading all texture source terms.
  */
-static GLboolean
+static void
 load_texunit_sources( struct texenv_fragment_program *p, GLuint unit )
 {
    const struct state_key *key = p->state;
@@ -1139,8 +1138,6 @@ load_texunit_sources( struct texenv_fragment_program *p, GLuint unit )
    for (i = 0; i < key->unit[unit].NumArgsA; i++) {
       load_texenv_source( p, key->unit[unit].OptA[i].Source, unit );
    }
-
-   return GL_TRUE;
 }
 
 /**

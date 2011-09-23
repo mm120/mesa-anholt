@@ -342,6 +342,7 @@ static GLbitfield get_fp_input_mask( struct gl_context *ctx )
       /* _NEW_POINT */
       if (ctx->Point.PointSprite)
          varying_inputs |= FRAG_BITS_TEX_ANY;
+      printf("0x%08x 0x%08x\n", FRAG_BITS_TEX_ANY, VERT_BIT_TEX_ANY);
 
       /* First look at what values may be computed by the generated
        * vertex program:

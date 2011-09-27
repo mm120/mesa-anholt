@@ -196,6 +196,13 @@ ir_expression::constant_expression_value()
       }
       break;
 
+   case ir_unop_round_even:
+      assert(op[0]->type->base_type == GLSL_TYPE_FLOAT);
+      for (unsigned c = 0; c < op[0]->type->components(); c++) {
+	 data.f[c] = nearbyint(op[0]->value.f[c]);
+      }
+      break;
+
    case ir_unop_ceil:
       assert(op[0]->type->base_type == GLSL_TYPE_FLOAT);
       for (unsigned c = 0; c < op[0]->type->components(); c++) {
@@ -1324,6 +1331,9 @@ ir_call::constant_expression_value()
 			    * op[1]->value.f[c];
 	 }
       }
+   } else if (strcmp(callee, "round") == 0 ||
+	      strcmp(callee, "roundEven") == 0) {
+      expr = new(mem_ctx) ir_expression(ir_unop_round_even, op[0]);
    } else if (strcmp(callee, "sign") == 0) {
       expr = new(mem_ctx) ir_expression(ir_unop_sign, type, op[0], NULL);
    } else if (strcmp(callee, "sin") == 0) {

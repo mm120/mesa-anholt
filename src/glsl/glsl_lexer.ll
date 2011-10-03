@@ -22,6 +22,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include <ctype.h>
+#include <limits.h>
 #include "strtod.h"
 #include "ast.h"
 #include "glsl_parser_extras.h"
@@ -42,8 +43,6 @@ static int classify_identifier(struct _mesa_glsl_parse_state *, const char *);
    } while(0);
 
 #define YY_USER_INIT yylineno = 0; yycolumn = 0;
-
-#define IS_UINT (yytext[yyleng - 1] == 'u' || yytext[yyleng - 1] == 'U')
 
 /* A macro for handling reserved words and keywords across language versions.
  *
@@ -81,6 +80,32 @@ static int classify_identifier(struct _mesa_glsl_parse_state *, const char *);
  * ...means the word is a legal keyword in GLSL ES 1.00.
  */
 #define ES yyextra->es_shader
+
+#define LITERAL_INTEGER(base)						\
+do {									\
+   bool is_uint = (yytext[yyleng - 1] == 'u' ||				\
+		   yytext[yyleng - 1] == 'U');				\
+   const char *digits = yytext;						\
+									\
+   if (base == 16)							\
+      digits += 2;							\
+   long long value = strtoll(digits, NULL, base);			\
+									\
+   yylval->n = (int)value;						\
+									\
+   if (value > UINT_MAX) {						\
+      /* Note that signed 0xffffffff is valid, not out of range! */	\
+      if (yyextra->language_version >= 130) {				\
+	 _mesa_glsl_error(yylloc, yyextra,				\
+			  "Literal value `%s' out of range", yytext);	\
+      } else {								\
+	 _mesa_glsl_warning(yylloc, yyextra,				\
+			   "Literal value `%s' out of range", yytext);	\
+      }									\
+   }									\
+   return is_uint ? UINTCONSTANT : INTCONSTANT;				\
+} while (0)
+
 %}
 
 %option bison-bridge bison-locations reentrant noyywrap
@@ -292,16 +317,13 @@ layout		{
 -=		return SUB_ASSIGN;
 
 [1-9][0-9]*[uU]?	{
-			    yylval->n = strtol(yytext, NULL, 10);
-			    return IS_UINT ? UINTCONSTANT : INTCONSTANT;
+			    LITERAL_INTEGER(10);
 			}
 0[xX][0-9a-fA-F]+[uU]?	{
-			    yylval->n = strtol(yytext + 2, NULL, 16);
-			    return IS_UINT ? UINTCONSTANT : INTCONSTANT;
+			    LITERAL_INTEGER(16);
 			}
 0[0-7]*[uU]?		{
-			    yylval->n = strtol(yytext, NULL, 8);
-			    return IS_UINT ? UINTCONSTANT : INTCONSTANT;
+			    LITERAL_INTEGER(8);
 			}
 
 [0-9]+\.[0-9]+([eE][+-]?[0-9]+)?[fF]?	{

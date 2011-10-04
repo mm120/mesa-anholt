@@ -2071,7 +2071,9 @@ _mesa_generate_mipmap(struct gl_context *ctx, GLenum target,
 
    ASSERT(texObj);
    srcImage = _mesa_select_tex_image(ctx, texObj, target, texObj->BaseLevel);
-   ASSERT(srcImage);
+
+   if (!srcImage)
+      return;
 
    maxLevel = _mesa_max_texture_levels(ctx, texObj->Target) - 1;
    ASSERT(maxLevel >= 0);  /* bad target */

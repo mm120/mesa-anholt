@@ -884,6 +884,67 @@ _mesa_TexParameterIuiv(GLenum target, GLenum pname, const GLuint *params)
 }
 
 
+static GLboolean
+texture_base_type_allows_channel(const struct gl_texture_image *img,
+				 GLenum pname)
+{
+   switch (pname) {
+   case GL_TEXTURE_RED_SIZE:
+   case GL_TEXTURE_RED_TYPE:
+      if (img->_BaseFormat == GL_RED ||
+	  img->_BaseFormat == GL_RG ||
+	  img->_BaseFormat == GL_RGB ||
+	  img->_BaseFormat == GL_RGBA) {
+	 return GL_TRUE;
+      }
+      return GL_FALSE;
+   case GL_TEXTURE_GREEN_SIZE:
+   case GL_TEXTURE_GREEN_TYPE:
+      if (img->_BaseFormat == GL_RG ||
+	  img->_BaseFormat == GL_RGB ||
+	  img->_BaseFormat == GL_RGBA) {
+	 return GL_TRUE;
+      }
+      return GL_FALSE;
+   case GL_TEXTURE_BLUE_SIZE:
+   case GL_TEXTURE_BLUE_TYPE:
+      if (img->_BaseFormat == GL_RGB ||
+	  img->_BaseFormat == GL_RGBA) {
+	 return GL_TRUE;
+      }
+      return GL_FALSE;
+   case GL_TEXTURE_ALPHA_SIZE:
+   case GL_TEXTURE_ALPHA_TYPE:
+      if (img->_BaseFormat == GL_RGBA ||
+	  img->_BaseFormat == GL_ALPHA ||
+	  img->_BaseFormat == GL_LUMINANCE_ALPHA) {
+	 return GL_TRUE;
+      }
+      return GL_FALSE;
+   case GL_TEXTURE_LUMINANCE_SIZE:
+   case GL_TEXTURE_LUMINANCE_TYPE:
+      if (img->_BaseFormat == GL_LUMINANCE ||
+	  img->_BaseFormat == GL_LUMINANCE_ALPHA) {
+	 return GL_TRUE;
+      }
+      return GL_FALSE;
+   case GL_TEXTURE_INTENSITY_SIZE:
+   case GL_TEXTURE_INTENSITY_TYPE:
+      if (img->_BaseFormat == GL_INTENSITY) {
+	 return GL_TRUE;
+      }
+      return GL_FALSE;
+   case GL_TEXTURE_DEPTH_SIZE:
+   case GL_TEXTURE_DEPTH_TYPE:
+      if (img->_BaseFormat == GL_DEPTH_STENCIL ||
+	  img->_BaseFormat == GL_DEPTH_COMPONENT) {
+	 return GL_TRUE;
+      }
+      return GL_FALSE;
+   }
+
+   return GL_FALSE;
+}
 
 
 void GLAPIENTRY
@@ -981,27 +1042,10 @@ _mesa_GetTexLevelParameteriv( GLenum target, GLint level,
          *params = img->Border;
          break;
       case GL_TEXTURE_RED_SIZE:
-         if (img->_BaseFormat == GL_RED) {
-            *params = _mesa_get_format_bits(texFormat, pname);
-	    break;
-	 }
-	 /* FALLTHROUGH */
       case GL_TEXTURE_GREEN_SIZE:
-         if (img->_BaseFormat == GL_RG) {
-            *params = _mesa_get_format_bits(texFormat, pname);
-	    break;
-	 }
-	 /* FALLTHROUGH */
       case GL_TEXTURE_BLUE_SIZE:
-         if (img->_BaseFormat == GL_RGB || img->_BaseFormat == GL_RGBA)
-            *params = _mesa_get_format_bits(texFormat, pname);
-         else
-            *params = 0;
-         break;
       case GL_TEXTURE_ALPHA_SIZE:
-         if (img->_BaseFormat == GL_ALPHA ||
-             img->_BaseFormat == GL_LUMINANCE_ALPHA ||
-             img->_BaseFormat == GL_RGBA)
+         if (texture_base_type_allows_channel(img, pname))
             *params = _mesa_get_format_bits(texFormat, pname);
          else
             *params = 0;
@@ -1067,46 +1111,18 @@ _mesa_GetTexLevelParameteriv( GLenum target, GLint level,
 
       /* GL_ARB_texture_float */
       case GL_TEXTURE_RED_TYPE_ARB:
-         if (!ctx->Extensions.ARB_texture_float)
-            goto invalid_pname;
-         *params = _mesa_get_format_bits(texFormat, GL_TEXTURE_RED_SIZE) ?
-            _mesa_get_format_datatype(texFormat) : GL_NONE;
-         break;
       case GL_TEXTURE_GREEN_TYPE_ARB:
-         if (!ctx->Extensions.ARB_texture_float)
-            goto invalid_pname;
-         *params = _mesa_get_format_bits(texFormat, GL_TEXTURE_GREEN_SIZE) ?
-            _mesa_get_format_datatype(texFormat) : GL_NONE;
-         break;
       case GL_TEXTURE_BLUE_TYPE_ARB:
-         if (!ctx->Extensions.ARB_texture_float)
-            goto invalid_pname;
-         *params = _mesa_get_format_bits(texFormat, GL_TEXTURE_BLUE_SIZE) ?
-            _mesa_get_format_datatype(texFormat) : GL_NONE;
-         break;
       case GL_TEXTURE_ALPHA_TYPE_ARB:
-         if (!ctx->Extensions.ARB_texture_float)
-            goto invalid_pname;
-         *params = _mesa_get_format_bits(texFormat, GL_TEXTURE_ALPHA_SIZE) ?
-            _mesa_get_format_datatype(texFormat) : GL_NONE;
-         break;
       case GL_TEXTURE_LUMINANCE_TYPE_ARB:
-         if (!ctx->Extensions.ARB_texture_float)
-            goto invalid_pname;
-         *params = _mesa_get_format_bits(texFormat, GL_TEXTURE_LUMINANCE_SIZE) ?
-            _mesa_get_format_datatype(texFormat) : GL_NONE;
-         break;
       case GL_TEXTURE_INTENSITY_TYPE_ARB:
-         if (!ctx->Extensions.ARB_texture_float)
-            goto invalid_pname;
-         *params = _mesa_get_format_bits(texFormat, GL_TEXTURE_INTENSITY_SIZE) ?
-            _mesa_get_format_datatype(texFormat) : GL_NONE;
-         break;
       case GL_TEXTURE_DEPTH_TYPE_ARB:
          if (!ctx->Extensions.ARB_texture_float)
             goto invalid_pname;
-         *params = _mesa_get_format_bits(texFormat, GL_TEXTURE_DEPTH_SIZE) ?
-            _mesa_get_format_datatype(texFormat) : GL_NONE;
+	 if (texture_base_type_allows_channel(img, pname))
+	    *params = _mesa_get_format_datatype(texFormat);
+	 else
+	    *params = GL_NONE;
          break;
 
       default:

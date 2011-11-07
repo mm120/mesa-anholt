@@ -646,6 +646,10 @@ intelInitContext(struct intel_context *intel,
       ctx->TextureFormatSupported[MESA_FORMAT_I16] = true;
       ctx->TextureFormatSupported[MESA_FORMAT_AL1616] = true;
       ctx->TextureFormatSupported[MESA_FORMAT_ARGB2101010] = true;
+
+      if (intel->gen >= 5 || intel->is_g4x) {
+	 ctx->TextureFormatSupported[MESA_FORMAT_RGBA_16] = true;
+      }
    }
 
    /* Depth and stencil */
@@ -709,6 +713,9 @@ intelInitContext(struct intel_context *intel,
    if (intel->gen >= 5 || intel->is_g4x) {
       ctx->TextureFormatSupported[MESA_FORMAT_SL8] = true;
       ctx->TextureFormatSupported[MESA_FORMAT_SLA8] = true;
+   }
+   if (intel->gen >= 6) {
+      ctx->TextureFormatSupported[MESA_FORMAT_SIGNED_RGBA_16] = true;
    }
 
    if (intel->gen >= 4) {

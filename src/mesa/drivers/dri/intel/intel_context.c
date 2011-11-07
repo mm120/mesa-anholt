@@ -757,6 +757,14 @@ intelInitContext(struct intel_context *intel,
    ctx->TextureFormatSupported[MESA_FORMAT_ALPHA_FLOAT32] = true;
    ctx->TextureFormatSupported[MESA_FORMAT_LUMINANCE_ALPHA_FLOAT32] = true;
 
+   ctx->TextureFormatSupported[MESA_FORMAT_RGBA_FLOAT16] = true;
+   ctx->TextureFormatSupported[MESA_FORMAT_RG_FLOAT16] = true;
+   ctx->TextureFormatSupported[MESA_FORMAT_R_FLOAT16] = true;
+   ctx->TextureFormatSupported[MESA_FORMAT_INTENSITY_FLOAT16] = true;
+   ctx->TextureFormatSupported[MESA_FORMAT_LUMINANCE_FLOAT16] = true;
+   ctx->TextureFormatSupported[MESA_FORMAT_ALPHA_FLOAT16] = true;
+   ctx->TextureFormatSupported[MESA_FORMAT_LUMINANCE_ALPHA_FLOAT16] = true;
+
    /* GL_EXT_texture_shared_exponent */
    ctx->TextureFormatSupported[MESA_FORMAT_RGB9_E5_FLOAT] = true;
 

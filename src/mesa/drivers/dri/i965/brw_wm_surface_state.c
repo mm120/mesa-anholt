@@ -151,6 +151,8 @@ brw_format_for_mesa_format(gl_format mesa_format)
       [MESA_FORMAT_RG_INT8] = BRW_SURFACEFORMAT_R8G8_SINT,
       [MESA_FORMAT_R_UINT8] = BRW_SURFACEFORMAT_R8_UINT,
       [MESA_FORMAT_R_INT8] = BRW_SURFACEFORMAT_R8_SINT,
+
+      [MESA_FORMAT_ARGB2101010] = BRW_SURFACEFORMAT_B10G10R10A2_UNORM,
    };
    assert(mesa_format < MESA_FORMAT_COUNT);
    return table[mesa_format];

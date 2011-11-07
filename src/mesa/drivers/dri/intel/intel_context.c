@@ -645,6 +645,7 @@ intelInitContext(struct intel_context *intel,
       ctx->TextureFormatSupported[MESA_FORMAT_A16] = true;
       ctx->TextureFormatSupported[MESA_FORMAT_I16] = true;
       ctx->TextureFormatSupported[MESA_FORMAT_AL1616] = true;
+      ctx->TextureFormatSupported[MESA_FORMAT_ARGB2101010] = true;
    }
 
    /* Depth and stencil */

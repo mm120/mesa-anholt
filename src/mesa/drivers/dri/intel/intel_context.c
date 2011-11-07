@@ -653,20 +653,11 @@ intelInitContext(struct intel_context *intel,
    }
 
    /* Depth and stencil */
+   if (intel->gen >= 4)
+      ctx->TextureFormatSupported[MESA_FORMAT_Z16] = true;
    ctx->TextureFormatSupported[MESA_FORMAT_S8_Z24] = true;
    ctx->TextureFormatSupported[MESA_FORMAT_X8_Z24] = true;
    ctx->TextureFormatSupported[MESA_FORMAT_S8] = intel->has_separate_stencil;
-
-   /*
-    * This was disabled in initial FBO enabling to avoid combinations
-    * of depth+stencil that wouldn't work together.  We since decided
-    * that it was OK, since it's up to the app to come up with the
-    * combo that actually works, so this can probably be re-enabled.
-    */
-   /*
-   ctx->TextureFormatSupported[MESA_FORMAT_Z16] = true;
-   ctx->TextureFormatSupported[MESA_FORMAT_Z24] = true;
-   */
 
    /* ctx->Extensions.MESA_ycbcr_texture */
    ctx->TextureFormatSupported[MESA_FORMAT_YCBCR] = true;

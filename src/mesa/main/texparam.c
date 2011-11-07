@@ -1116,13 +1116,29 @@ _mesa_GetTexLevelParameteriv( GLenum target, GLint level,
       case GL_TEXTURE_ALPHA_TYPE_ARB:
       case GL_TEXTURE_LUMINANCE_TYPE_ARB:
       case GL_TEXTURE_INTENSITY_TYPE_ARB:
-      case GL_TEXTURE_DEPTH_TYPE_ARB:
          if (!ctx->Extensions.ARB_texture_float)
             goto invalid_pname;
 	 if (texture_base_type_allows_channel(img, pname))
 	    *params = _mesa_get_format_datatype(texFormat);
 	 else
 	    *params = GL_NONE;
+	 break;
+
+      case GL_TEXTURE_DEPTH_TYPE_ARB:
+         if (!ctx->Extensions.ARB_texture_float)
+            goto invalid_pname;
+	 if (texture_base_type_allows_channel(img, pname)) {
+	    /* Mesa's gl_format has a datatype of GL_UNSIGNED_INT for Z16/Z24,
+	     * but the only types of depth components in table 3.18 of the GL
+	     * 3.0 specification are f32 or unsigned normalized.
+	     */
+	    if (_mesa_get_format_datatype(texFormat) == GL_FLOAT)
+	       *params = GL_FLOAT;
+	    else
+	       *params = GL_UNSIGNED_NORMALIZED;
+	 } else {
+	    *params = GL_NONE;
+	 }
          break;
 
       default:

@@ -53,6 +53,8 @@
 #include "tnl/t_pipeline.h"
 #include "glsl/ralloc.h"
 
+DEFINE_GDB_SCRIPT("brw_gdb_script.py");
+
 /***************************************
  * Mesa's Driver Functions
  ***************************************/

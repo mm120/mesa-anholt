@@ -1896,15 +1896,17 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
    GLboolean newTex;
    GLenum intFormat = GL_RGBA;
 
-   if (type != GL_COLOR ||
-       ctx->_ImageTransferState ||
-       ctx->Fog.Enabled ||
-       width > tex->MaxSize ||
-       height > tex->MaxSize) {
-      /* XXX avoid this fallback */
-      _swrast_CopyPixels(ctx, srcX, srcY, width, height, dstX, dstY, type);
-      return;
-   }
+   if (type != GL_COLOR)
+      goto swrast;
+
+   if (ctx->_ImageTransferState)
+      goto swrast;
+
+   if (ctx->Fog.Enabled)
+      goto swrast;
+
+   if (width > tex->MaxSize || height > tex->MaxSize)
+      goto swrast;
 
    /* Most GL state applies to glCopyPixels, but a there's a few things
     * we need to override:
@@ -1988,6 +1990,10 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
    _mesa_set_enable(ctx, tex->Target, GL_FALSE);
 
    _mesa_meta_end(ctx);
+   return;
+
+swrast:
+   _swrast_CopyPixels(ctx, srcX, srcY, width, height, dstX, dstY, type);
 }
 
 

@@ -1888,15 +1888,66 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
                       GLint dstX, GLint dstY, GLenum type)
 {
    struct copypix_state *copypix = &ctx->Meta->CopyPix;
+   struct blit_state *blit = &ctx->Meta->Blit;
    struct temp_texture *tex = get_temp_texture(ctx);
+   struct gl_framebuffer *readfb = ctx->ReadBuffer;
+   struct gl_renderbuffer_attachment *att;
+   GLenum read_format;
    struct vertex {
       GLfloat x, y, z, s, t;
    };
    struct vertex verts[4];
    GLboolean newTex;
-   GLenum intFormat = GL_RGBA;
+   GLenum intFormat;
+   GLbitfield metaSave = (MESA_META_RASTERIZATION |
+			  MESA_META_SHADER |
+			  MESA_META_TEXTURE |
+			  MESA_META_TRANSFORM |
+			  MESA_META_CLIP |
+			  MESA_META_VERTEX |
+			  MESA_META_VIEWPORT);
 
-   if (type != GL_COLOR)
+   switch (type) {
+   case GL_COLOR:
+      intFormat = GL_RGBA;
+      break;
+   case GL_DEPTH:
+      if (!ctx->Extensions.ARB_depth_texture ||
+	  !ctx->Extensions.ARB_fragment_program) {
+	 /* We require fragment programs to draw depth. */
+	 _swrast_CopyPixels(ctx, srcX, srcY, width, height, dstX, dstY, type);
+	 return;
+      }
+
+      metaSave |= MESA_META_DEPTH_TEST;
+
+      att = &readfb->Attachment[BUFFER_DEPTH];
+      if (att->Type == GL_NONE)
+	 return;
+
+      if (att->Type == GL_RENDERBUFFER) {
+	 read_format = att->Renderbuffer->Format;
+      } else {
+	 assert(att->Type == GL_TEXTURE);
+	 read_format = _mesa_get_attachment_teximage(att)->TexFormat;
+      }
+
+      switch (read_format) {
+      case MESA_FORMAT_Z32_FLOAT:
+      case MESA_FORMAT_Z32_FLOAT_X24S8:
+	 intFormat = GL_DEPTH_COMPONENT32F;
+	 break;
+      default:
+	 intFormat = GL_DEPTH_COMPONENT;
+	 break;
+      }
+      break;
+
+   default:
+      goto swrast;
+   }
+
+   if (type != GL_COLOR && type != GL_DEPTH)
       goto swrast;
 
    if (ctx->_ImageTransferState)
@@ -1911,13 +1962,18 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
    /* Most GL state applies to glCopyPixels, but a there's a few things
     * we need to override:
     */
-   _mesa_meta_begin(ctx, (MESA_META_RASTERIZATION |
-                          MESA_META_SHADER |
-                          MESA_META_TEXTURE |
-                          MESA_META_TRANSFORM |
-                          MESA_META_CLIP |
-                          MESA_META_VERTEX |
-                          MESA_META_VIEWPORT));
+   _mesa_meta_begin(ctx, metaSave);
+
+   if (type == GL_DEPTH) {
+      if (!blit->DepthFP)
+	 init_blit_depth_pixels(ctx);
+      _mesa_BindProgram(GL_FRAGMENT_PROGRAM_ARB, blit->DepthFP);
+      _mesa_set_enable(ctx, GL_FRAGMENT_PROGRAM_ARB, GL_TRUE);
+      _mesa_ColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+      _mesa_set_enable(ctx, GL_DEPTH_TEST, GL_TRUE);
+      _mesa_DepthFunc(GL_ALWAYS);
+      _mesa_DepthMask(GL_TRUE);
+   }
 
    if (copypix->ArrayObj == 0) {
       /* one-time setup */
@@ -1980,7 +2036,7 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
 
    /* Alloc/setup texture */
    setup_copypix_texture(tex, newTex, srcX, srcY, width, height,
-                         GL_RGBA, GL_NEAREST);
+                         intFormat, GL_NEAREST);
 
    _mesa_set_enable(ctx, tex->Target, GL_TRUE);
 

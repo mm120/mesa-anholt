@@ -1981,6 +1981,20 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
       }
       break;
 
+   case GL_DEPTH_STENCIL:
+      /* Break this operation down to the two components that we do support. */
+      _mesa_meta_CopyPixels(ctx,
+			    srcX, srcY,
+			    width, height,
+			    dstX, dstY,
+			    GL_DEPTH);
+      _mesa_meta_CopyPixels(ctx,
+			    srcX, srcY,
+			    width, height,
+			    dstX, dstY,
+			    GL_STENCIL);
+      return;
+
    case GL_STENCIL:
       _mesa_meta_CopyPixels_readdraw(ctx,
 				     srcX, srcY,

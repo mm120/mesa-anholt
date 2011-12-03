@@ -1902,7 +1902,7 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
    if (ctx->_ImageTransferState)
       goto swrast;
 
-   if (ctx->Fog.Enabled)
+   if (type == GL_COLOR && ctx->Fog.Enabled)
       goto swrast;
 
    if (width > tex->MaxSize || height > tex->MaxSize)

@@ -34,6 +34,10 @@ struct _glapi_table;
 
 #if FEATURE_drawpix
 
+void GLAPIENTRY
+_mesa_DrawPixels( GLsizei width, GLsizei height,
+                  GLenum format, GLenum type, const GLvoid *pixels );
+
 extern void
 _mesa_init_drawpix_dispatch(struct _glapi_table *disp);
 

@@ -42,6 +42,7 @@
 #include "main/colortab.h"
 #include "main/condrender.h"
 #include "main/depth.h"
+#include "main/drawpix.h"
 #include "main/enable.h"
 #include "main/fbobject.h"
 #include "main/feedback.h"
@@ -1879,6 +1880,43 @@ _mesa_meta_glsl_Clear(struct gl_context *ctx, GLbitfield buffers)
 }
 
 /**
+ * While we generally try to do meta glCopyPixels by CopyTexImage2D() into a
+ * temporary texture.  However, in some cases we don't have support for
+ * texturing from it (such as stencil), so we fall back to reading and drawing.
+ * From the GL 3.0 spec:
+ *
+ *     "Values are obtained from the framebuffer, converted (if appropriate),
+ *      then subjected to the pixel transfer operations described in section
+ *      3.7.5, just as if ReadPixels were called with the corresponding
+ *      arguments...  The groups of elements so obtained are then written to the
+ *      framebuffer just as if DrawPixels had been given width and height,
+ *      beginning with final conversion of elements."
+ */
+static void
+_mesa_meta_CopyPixels_readdraw(struct gl_context *ctx, GLint srcX, GLint srcY,
+			       GLsizei width, GLsizei height,
+			       GLint dstX, GLint dstY, GLenum type)
+{
+   void *temp;
+   GLenum temp_format, temp_type;
+   GLfloat rasterpos[4] = {dstX, dstY, 0, 1};
+
+   assert(type == GL_STENCIL);
+   temp_format = GL_STENCIL_INDEX;
+   temp_type = GL_UNSIGNED_BYTE;
+
+   temp = malloc(width * height);
+   if (!temp) {
+      _mesa_error(ctx, GL_OUT_OF_MEMORY, "glCopyPixels()");
+      return;
+   }
+
+   _mesa_ReadPixels(srcX, srcY, width, height, temp_format, temp_type, temp);
+   ctx->Driver.RasterPos(ctx, rasterpos);
+   _mesa_DrawPixels(width, height, temp_format, temp_type, temp);
+}
+
+/**
  * Meta implementation of ctx->Driver.CopyPixels() in terms
  * of texture mapping and polygon rendering and GLSL shaders.
  */
@@ -1905,6 +1943,7 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
 			  MESA_META_TRANSFORM |
 			  MESA_META_CLIP |
 			  MESA_META_VERTEX |
+			  MESA_META_PIXEL_STORE |
 			  MESA_META_VIEWPORT);
 
    switch (type) {
@@ -1915,8 +1954,7 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
       if (!ctx->Extensions.ARB_depth_texture ||
 	  !ctx->Extensions.ARB_fragment_program) {
 	 /* We require fragment programs to draw depth. */
-	 _swrast_CopyPixels(ctx, srcX, srcY, width, height, dstX, dstY, type);
-	 return;
+	 goto swrast;
       }
 
       metaSave |= MESA_META_DEPTH_TEST;
@@ -1942,6 +1980,14 @@ _mesa_meta_CopyPixels(struct gl_context *ctx, GLint srcX, GLint srcY,
 	 break;
       }
       break;
+
+   case GL_STENCIL:
+      _mesa_meta_CopyPixels_readdraw(ctx,
+				     srcX, srcY,
+				     width, height,
+				     dstX, dstY,
+				     type);
+      return;
 
    default:
       goto swrast;

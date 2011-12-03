@@ -44,7 +44,7 @@
 /*
  * Execute glDrawPixels
  */
-static void GLAPIENTRY
+void GLAPIENTRY
 _mesa_DrawPixels( GLsizei width, GLsizei height,
                   GLenum format, GLenum type, const GLvoid *pixels )
 {

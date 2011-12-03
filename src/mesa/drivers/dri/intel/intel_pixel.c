@@ -31,6 +31,7 @@
 #include "main/bufferobj.h"
 #include "main/context.h"
 #include "swrast/swrast.h"
+#include "drivers/common/meta.h"
 
 #include "intel_context.h"
 #include "intel_pixel.h"
@@ -162,8 +163,8 @@ intelInitPixelFuncs(struct dd_function_table *functions)
    if (!getenv("INTEL_NO_BLIT")) {
       functions->Bitmap = intelBitmap;
       functions->CopyPixels = intelCopyPixels;
-      functions->DrawPixels = intelDrawPixels;
    }
    functions->ReadPixels = intelReadPixels;
+   functions->DrawPixels = _mesa_meta_DrawPixels;
 }
 

@@ -333,14 +333,21 @@ intel_miptree_match_image(struct intel_mipmap_tree *mt,
    GLuint level = intelImage->base.Base.Level;
    int width, height, depth;
 
+   if (target_to_target(image->TexObject->Target) != mt->target)
+      return false;
+
    if (image->TexFormat != mt->format &&
        !(image->TexFormat == MESA_FORMAT_S8_Z24 &&
 	 mt->format == MESA_FORMAT_X8_Z24 &&
 	 mt->stencil_mt)) {
+
       return false;
    }
 
    intel_miptree_get_dimensions_for_image(image, &width, &height, &depth);
+
+   if (mt->target == GL_TEXTURE_CUBE_MAP)
+      depth = 6;
 
    /* Test image dimensions against the base level image adjusted for
     * minification.  This will also catch images not present in the

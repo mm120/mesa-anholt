@@ -37,10 +37,36 @@ extern "C" {
 #include "glsl/ir_print_visitor.h"
 
 void
+fs_visitor::patch_discard_jumps_to_fb_writes()
+{
+   int ip = p->nr_insn;
+
+   foreach_list(node, &this->discard_jmpi_patches) {
+      ip_record *patch_ip = (ip_record *)node;
+      struct brw_instruction *patch = &p->store[patch_ip->ip];
+      int br = (intel->gen >= 5) ? 2 : 1;
+
+      /* JMPI takes a distance from the post-incremented IP, so '0'
+       * would be the next instruction after jmpi.
+       */
+      assert(patch->header.opcode == BRW_OPCODE_JMPI);
+      patch->bits3.ud = (ip - patch_ip->ip - 1) * br;
+   }
+
+   this->discard_jmpi_patches.make_empty();
+}
+
+void
 fs_visitor::generate_fb_write(fs_inst *inst)
 {
    bool eot = inst->eot;
    struct brw_reg implied_header;
+
+   /* Note that the jumps emitted to this point mean that the g0 ->
+    * base_mrf setup must be inside of this function, so that we jump
+    * to a point containing it.
+    */
+   patch_discard_jumps_to_fb_writes();
 
    /* Header is 2 regs, g0 and g1 are the contents. g0 will be implied
     * move, here's g1.
@@ -480,7 +506,18 @@ fs_visitor::generate_discard(fs_inst *inst)
 
       brw_push_insn_state(p);
       brw_set_mask_control(p, BRW_MASK_DISABLE);
+      brw_set_conditionalmod(p, BRW_CONDITIONAL_Z);
       brw_AND(p, g1, f0, g1);
+      brw_pop_insn_state(p);
+
+      /* Now, if just produced a 0 value in our mask, jump to the
+       * final FB writes of the program.
+       */
+      brw_push_insn_state(p);
+      brw_set_predicate_control(p, BRW_PREDICATE_NORMAL);
+      /* This jmp will be patched up at FB write time to point at it. */
+      this->discard_jmpi_patches.push_tail(new(mem_ctx) ip_record(p->nr_insn));
+      brw_JMPI(p, brw_ip_reg(), brw_ip_reg(), brw_imm_d(0));
       brw_pop_insn_state(p);
    } else {
       struct brw_reg g0 = retype(brw_vec1_grf(0, 0), BRW_REGISTER_TYPE_UW);

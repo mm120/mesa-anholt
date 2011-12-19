@@ -2118,6 +2118,15 @@ void brw_fb_WRITE(struct brw_compile *p,
    else
       dest = retype(vec8(brw_null_reg()), BRW_REGISTER_TYPE_UW);
 
+   brw_push_insn_state(p);
+
+   /* The execution mask on the render target write is ignored -- the pixels
+    * written are determined by the fields in the first message register.  Set
+    * this field for clarity in debugging, and in case some clever hardware
+    * decides to not dispatch instructions when execution mask is 0.
+    */
+   brw_set_mask_control(p, BRW_MASK_DISABLE);
+
    if (intel->gen >= 6 && binding_table_index == 0) {
       insn = next_insn(p, BRW_OPCODE_SENDC);
    } else {
@@ -2156,6 +2165,8 @@ void brw_fb_WRITE(struct brw_compile *p,
 			    response_length,
 			    eot,
 			    0 /* send_commit_msg */);
+
+   brw_pop_insn_state(p);
 }
 
 

@@ -118,6 +118,26 @@ intel_batchbuffer_free(struct intel_context *intel)
    clear_cache(intel);
 }
 
+static void
+dump_a_batch(struct intel_context *intel)
+{
+   struct intel_batchbuffer *batch = &intel->batch;
+   const int target_batch_number = 1;
+   static int batches_seen = 0;
+   FILE *out;
+
+   if (batches_seen++ != target_batch_number)
+      return;
+
+   out = fopen("batch", "w+");
+   assert(out);
+
+   drm_intel_bo_map(batch->bo, false);
+   fwrite(batch->bo->virtual, batch->used * 4, 1, out);
+   drm_intel_bo_unmap(batch->bo);
+
+   fclose(out);
+}
 
 /* TODO: Push this whole function into bufmgr.
  */
@@ -162,6 +182,8 @@ do_flush_locked(struct intel_context *intel)
       if (intel->vtbl.debug_batch != NULL)
 	 intel->vtbl.debug_batch(intel);
    }
+
+   dump_a_batch(intel);
 
    if (ret != 0) {
       fprintf(stderr, "intel_do_flush_locked failed: %s\n", strerror(-ret));

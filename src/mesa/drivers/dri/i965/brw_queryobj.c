@@ -71,8 +71,10 @@ brw_queryobj_get_results(struct gl_context *ctx,
    case GL_SAMPLES_PASSED_ARB:
       /* Map and count the pixels from the current query BO */
       for (i = query->first_index; i <= query->last_index; i++) {
+	 printf("%ld %ld\n", results[i * 2 + 1], results[i * 2]);
 	 query->Base.Result += results[i * 2 + 1] - results[i * 2];
       }
+      printf("get passed %ld\n", query->Base.Result);
       break;
 
    case GL_PRIMITIVES_GENERATED:
@@ -240,6 +242,8 @@ brw_end_query(struct gl_context *ctx, struct gl_query_object *q)
 
       brw->query.obj = NULL;
 
+      printf("end passed\n");
+
       intel->stats_wm--;
       break;
 
@@ -249,6 +253,8 @@ brw_end_query(struct gl_context *ctx, struct gl_query_object *q)
        * the query object.
        */
       query->Base.Result = brw->sol.primitives_generated;
+
+      printf("end gen %d\n", brw->sol.primitives_generated);
 
       /* And set brw->query.obj to NULL so that this query won't try to wait
        * for any rendering to complete.
@@ -262,6 +268,8 @@ brw_end_query(struct gl_context *ctx, struct gl_query_object *q)
        * the query object.
        */
       query->Base.Result = brw->sol.primitives_written;
+
+      printf("end written %d\n", brw->sol.primitives_written);
 
       /* And set brw->query.obj to NULL so that this query won't try to wait
        * for any rendering to complete.

@@ -71,23 +71,55 @@ try_constant_propagation(vec4_instruction *inst, int arg, src_reg *values[4])
 	 return false;
    }
 
-   if (value.file != IMM)
+   if (!value.is_immediate())
+      return false;
+
+   /* From the 965 PRM, Vol 4, section 11.3.5 "Immediate":
+    *
+    *     "Restriction: When an immediate vector is used in an
+    *      instruction, the destination must be 128-bit aligned with
+    *      destination horizontal stride equivalent to a word for an
+    *      immediate integer vector (v) and equivalent to a dword for
+    *      an immediate float vector (vf)."
+    *
+    * Just reject anything that might not be dwords, which are just
+    * the direct struct brw_reg references.
+    */
+   if (value.file == IMMV && inst->dst.file == HW_REG)
       return false;
 
    if (inst->src[arg].abs) {
-      if (value.type == BRW_REGISTER_TYPE_F) {
-	 value.imm.f = fabs(value.imm.f);
-      } else if (value.type == BRW_REGISTER_TYPE_D) {
-	 if (value.imm.i < 0)
-	    value.imm.i = -value.imm.i;
+      if (value.file == IMMV) {
+	 value.imm.u &= ~0x80808080;
+      } else {
+	 if (value.type == BRW_REGISTER_TYPE_F) {
+	    value.imm.f = fabs(value.imm.f);
+	 } else if (value.type == BRW_REGISTER_TYPE_D) {
+	    if (value.imm.i < 0)
+	       value.imm.i = -value.imm.i;
+	 }
       }
    }
 
    if (inst->src[arg].negate) {
-      if (value.type == BRW_REGISTER_TYPE_F)
-	 value.imm.f = -value.imm.f;
-      else
-	 value.imm.u = -value.imm.u;
+      if (value.file == IMMV) {
+	 value.imm.u |= ~0x80808080;
+      } else {
+	 if (value.type == BRW_REGISTER_TYPE_F)
+	    value.imm.f = -value.imm.f;
+	 else
+	    value.imm.u = -value.imm.u;
+      }
+   }
+
+   /* Preserve the swizzle that was used to access a register that
+    * contained a copy of an immediate vector.
+    */
+   if (value.file == IMMV) {
+      if (value.swizzle != BRW_SWIZZLE_XYZW)
+	 return false;
+
+      value.swizzle = inst->src[arg].swizzle;
    }
 
    switch (inst->opcode) {
@@ -100,7 +132,7 @@ try_constant_propagation(vec4_instruction *inst, int arg, src_reg *values[4])
       if (arg == 1) {
 	 inst->src[arg] = value;
 	 return true;
-      } else if (arg == 0 && inst->src[1].file != IMM) {
+      } else if (arg == 0 && !inst->src[1].is_immediate()) {
 	 /* Fit this constant in by commuting the operands.  Exception: we
 	  * can't do this for 32-bit integer MUL because it's asymmetric.
 	  */
@@ -118,7 +150,7 @@ try_constant_propagation(vec4_instruction *inst, int arg, src_reg *values[4])
       if (arg == 1) {
 	 inst->src[arg] = value;
 	 return true;
-      } else if (arg == 0 && inst->src[1].file != IMM) {
+      } else if (arg == 0 && !inst->src[1].is_immediate()) {
 	 uint32_t new_cmod;
 
 	 new_cmod = brw_swap_cmod(inst->conditional_mod);
@@ -138,7 +170,7 @@ try_constant_propagation(vec4_instruction *inst, int arg, src_reg *values[4])
       if (arg == 1) {
 	 inst->src[arg] = value;
 	 return true;
-      } else if (arg == 0 && inst->src[1].file != IMM) {
+      } else if (arg == 0 && !inst->src[1].is_immediate()) {
 	 inst->src[0] = inst->src[1];
 	 inst->src[1] = value;
 
@@ -252,7 +284,7 @@ vec4_visitor::opt_copy_propagation()
       }
 
       /* For each source arg, see if each component comes from a copy
-       * from the same type file (IMM, GRF, UNIFORM), and try
+       * from the same type file (IMM, IMMV, GRF, UNIFORM), and try
        * optimizing out access to the copy result
        */
       for (int i = 2; i >= 0; i--) {

@@ -97,6 +97,11 @@ public:
       uint32_t u;
       float f;
    } imm;
+
+   bool is_immediate()
+   {
+      return file == IMM || file == IMMV;
+   }
 };
 
 class src_reg : public reg

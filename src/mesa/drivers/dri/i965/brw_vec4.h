@@ -66,6 +66,7 @@ enum register_file {
    GRF = BRW_GENERAL_REGISTER_FILE,
    MRF = BRW_MESSAGE_REGISTER_FILE,
    IMM = BRW_IMMEDIATE_VALUE,
+   IMMV,
    HW_REG, /* a struct brw_reg */
    ATTR,
    UNIFORM, /* prog_data->params[hw_reg] */
@@ -85,7 +86,12 @@ public:
    int type;
    struct brw_reg fixed_hw_reg;
 
-   /** Value for file == BRW_IMMMEDIATE_FILE */
+   /**
+    * for file == BRW_IMMMEDIATE_FILE, the value.
+    *
+    * for file == IMMV, the uint32_t value is populated with the packed float
+    * value.
+    */
    union {
       int32_t i;
       uint32_t u;

@@ -55,6 +55,7 @@ i965_C_SOURCES := \
 	brw_gs_state.c \
 	brw_misc_state.c \
 	brw_optimize.c \
+	brw_packed_float.c \
 	brw_program.c \
 	brw_queryobj.c \
 	brw_sf.c \

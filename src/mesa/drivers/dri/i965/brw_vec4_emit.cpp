@@ -213,6 +213,10 @@ vec4_instruction::get_src(int i)
       }
       break;
 
+   case IMMV:
+      brw_reg = brw_imm_vf(src[i].imm.u);
+      break;
+
    case UNIFORM:
       brw_reg = stride(brw_vec4_grf(1 + (src[i].reg + src[i].reg_offset) / 2,
 				    ((src[i].reg + src[i].reg_offset) % 2) * 4),

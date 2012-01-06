@@ -1680,6 +1680,27 @@ vec4_visitor::visit(ir_assignment *ir)
    }
 }
 
+static bool
+is_scalar_vector(ir_constant *ir)
+{
+   assert(ir->type->is_vector() || ir->type->is_scalar());
+
+   for (int i = 1; i < ir->type->vector_elements; i++) {
+      if (ir->type->base_type == GLSL_TYPE_BOOL) {
+	 if (ir->value.b[0] != ir->value.b[i])
+	    return false;
+      } else {
+	 /* u, i, and f storage all line up, so no need for a
+	  * switch case for comparing each type.
+	  */
+	 if (ir->value.u[0] != ir->value.u[i])
+	    return false;
+      }
+   }
+
+   return true;
+}
+
 void
 vec4_visitor::emit_constant_values(dst_reg *dst, ir_constant *ir)
 {
@@ -1715,6 +1736,32 @@ vec4_visitor::emit_constant_values(dst_reg *dst, ir_constant *ir)
    }
 
    int remaining_writemask = (1 << ir->type->vector_elements) - 1;
+
+   /* Try to find a packed float vector representing our constant. */
+   if (!is_scalar_vector(ir) && ir->type->base_type == GLSL_TYPE_FLOAT) {
+      uint32_t packed;
+
+      if (brw_find_packed_float(ir->value.f, ir->type->vector_elements,
+				&packed)) {
+	 dst->writemask = (1 << ir->type->vector_elements) - 1;
+	 dst->type = brw_type_for_base_type(ir->type);
+
+	 src_reg src = src_reg(IMMV, 0, ir->type);
+	 /* In the hardware, packed float vectors are
+	  * BRW_IMMEDIATE_FILE and BRW_REGISTER_TYPE_VF.  But in the
+	  * compiler we treat them as IMMV file (our own creation) so
+	  * we can switch on that like we do for similar distinctions
+	  * like GRF vs ATTR, and type of BRW_REGISTER_TYPE_F so that
+	  * type compatibility checks generally see it as just another
+	  * float.
+	  */
+	 src.type = BRW_REGISTER_TYPE_F;
+	 src.imm.u = packed;
+
+	 emit(MOV(*dst, src));
+	 return;
+      }
+   }
 
    for (int i = 0; i < ir->type->vector_elements; i++) {
       if (!(remaining_writemask & (1 << i)))

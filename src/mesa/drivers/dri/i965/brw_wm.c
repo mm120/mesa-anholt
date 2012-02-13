@@ -177,6 +177,10 @@ bool do_wm_prog(struct brw_context *brw,
    if (program == NULL)
       return false;
 
+   if (brw->gen == 7) {
+      gen7_set_wm_hw_state(brw, c, !fs);
+   }
+
    /* Scratch space is used for register spilling */
    if (c->last_scratch) {
       perf_debug("Fragment shader triggered register spilling.  "

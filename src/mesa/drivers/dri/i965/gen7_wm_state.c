@@ -32,6 +32,71 @@
 #include "program/prog_statevars.h"
 #include "intel_batchbuffer.h"
 
+/**
+ * Called at shader compile time, this computes some hardware state in the
+ * brw_wm_prog_data that will be the same for every use of this fragment
+ * shader.
+ */
+void
+gen7_set_wm_hw_state(struct brw_context *brw, struct brw_wm_compile *c,
+                     bool is_arb_fp)
+{
+   struct brw_wm_prog_data *prog_data = &c->prog_data;
+   struct gen7_ps_state *ps_state = &prog_data->state.gen7.ps_state;
+
+   ps_state->dw2 |= ((prog_data->base.binding_table.size_bytes / 4) <<
+           GEN7_PS_BINDING_TABLE_ENTRY_COUNT_SHIFT);
+
+
+   if (is_arb_fp) {
+      /* Use ALT floating point mode for ARB fragment programs, because they
+       * require 0^0 == 1.
+       */
+      ps_state->dw2 |= GEN7_PS_FLOATING_POINT_MODE_ALT;
+   }
+
+   if (prog_data->total_scratch)
+      ps_state->dw3 |= ffs(prog_data->total_scratch) - 11;
+
+   if (brw->is_haswell) {
+      ps_state->dw4 |= (brw->max_wm_threads - 1) << HSW_PS_MAX_THREADS_SHIFT;
+   } else {
+      ps_state->dw4 |= (brw->max_wm_threads - 1) << IVB_PS_MAX_THREADS_SHIFT;
+   }
+
+   /* From the IVB PRM, volume 2 part 1, page 287:
+    * "This bit is inserted in the PS payload header and made available to
+    * the DataPort (either via the message header or via header bypass) to
+    * indicate that oMask data (one or two phases) is included in Render
+    * Target Write messages. If present, the oMask data is used to mask off
+    * samples."
+    */
+   if (prog_data->uses_omask)
+      ps_state->dw4 |= GEN7_PS_OMASK_TO_RENDER_TARGET;
+
+   /* From the IVB PRM, volume 2 part 1, page 287:
+    * "If the PS kernel does not need the Position XY Offsets to
+    * compute a Position Value, then this field should be programmed
+    * to POSOFFSET_NONE."
+    * "SW Recommendation: If the PS kernel needs the Position Offsets
+    * to compute a Position XY value, this field should match Position
+    * ZW Interpolation Mode to ensure a consistent position.xyzw
+    * computation."
+    * We only require XY sample offsets. So, this recommendation doesn't
+    * look useful at the moment. We might need this in future.
+    */
+   if (prog_data->uses_pos_offset)
+      ps_state->dw4 |= GEN7_PS_POSOFFSET_SAMPLE;
+   else
+      ps_state->dw4 |= GEN7_PS_POSOFFSET_NONE;
+
+   if (prog_data->nr_params > 0)
+      ps_state->dw4 |= GEN7_PS_PUSH_CONSTANT_ENABLE;
+
+   if (prog_data->num_varying_inputs != 0)
+      ps_state->dw4 |= GEN7_PS_ATTRIBUTE_ENABLE;
+}
+
 static void
 upload_wm_state(struct brw_context *brw)
 {
@@ -139,9 +204,11 @@ static void
 upload_ps_state(struct brw_context *brw)
 {
    struct gl_context *ctx = &brw->ctx;
-   uint32_t dw2, dw4, dw5;
-   const int max_threads_shift = brw->is_haswell ?
-      HSW_PS_MAX_THREADS_SHIFT : IVB_PS_MAX_THREADS_SHIFT;
+   /* CACHE_NEW_WM_PROG */
+   struct gen7_ps_state *ps_state = &brw->wm.prog_data->state.gen7.ps_state;
+   uint32_t dw2 = ps_state->dw2;
+   uint32_t dw4 = ps_state->dw4;
+   uint32_t dw5 = 0;
 
    /* BRW_NEW_PS_BINDING_TABLE */
    BEGIN_BATCH(2);
@@ -158,62 +225,15 @@ upload_ps_state(struct brw_context *brw)
    /* CACHE_NEW_WM_PROG */
    gen7_upload_constant_state(brw, &brw->wm.base, true, _3DSTATE_CONSTANT_PS);
 
-   dw2 = dw4 = dw5 = 0;
-
    /* CACHE_NEW_SAMPLER */
    dw2 |=
       (ALIGN(brw->wm.base.sampler_count, 4) / 4) << GEN7_PS_SAMPLER_COUNT_SHIFT;
-
-   /* CACHE_NEW_WM_PROG */
-   dw2 |= ((brw->wm.prog_data->base.binding_table.size_bytes / 4) <<
-           GEN7_PS_BINDING_TABLE_ENTRY_COUNT_SHIFT);
-
-   /* Use ALT floating point mode for ARB fragment programs, because they
-    * require 0^0 == 1.  Even though _CurrentFragmentProgram is used for
-    * rendering, CurrentFragmentProgram is used for this check to
-    * differentiate between the GLSL and non-GLSL cases.
-    */
-   /* BRW_NEW_FRAGMENT_PROGRAM */
-   if (ctx->Shader.CurrentFragmentProgram == NULL)
-      dw2 |= GEN7_PS_FLOATING_POINT_MODE_ALT;
 
    /* Haswell requires the sample mask to be set in this packet as well as
     * in 3DSTATE_SAMPLE_MASK; the values should match. */
    /* _NEW_BUFFERS, _NEW_MULTISAMPLE */
    if (brw->is_haswell)
       dw4 |= SET_FIELD(gen6_determine_sample_mask(brw), HSW_PS_SAMPLE_MASK);
-
-   dw4 |= (brw->max_wm_threads - 1) << max_threads_shift;
-
-   /* CACHE_NEW_WM_PROG */
-   if (brw->wm.prog_data->nr_params > 0)
-      dw4 |= GEN7_PS_PUSH_CONSTANT_ENABLE;
-
-   /* From the IVB PRM, volume 2 part 1, page 287:
-    * "This bit is inserted in the PS payload header and made available to
-    * the DataPort (either via the message header or via header bypass) to
-    * indicate that oMask data (one or two phases) is included in Render
-    * Target Write messages. If present, the oMask data is used to mask off
-    * samples."
-    */
-   if (brw->wm.prog_data->uses_omask)
-      dw4 |= GEN7_PS_OMASK_TO_RENDER_TARGET;
-
-   /* From the IVB PRM, volume 2 part 1, page 287:
-    * "If the PS kernel does not need the Position XY Offsets to
-    * compute a Position Value, then this field should be programmed
-    * to POSOFFSET_NONE."
-    * "SW Recommendation: If the PS kernel needs the Position Offsets
-    * to compute a Position XY value, this field should match Position
-    * ZW Interpolation Mode to ensure a consistent position.xyzw
-    * computation."
-    * We only require XY sample offsets. So, this recommendation doesn't
-    * look useful at the moment. We might need this in future.
-    */
-   if (brw->wm.prog_data->uses_pos_offset)
-      dw4 |= GEN7_PS_POSOFFSET_SAMPLE;
-   else
-      dw4 |= GEN7_PS_POSOFFSET_NONE;
 
    /* CACHE_NEW_WM_PROG | _NEW_COLOR
     *
@@ -226,11 +246,9 @@ upload_ps_state(struct brw_context *brw)
       dw4 |= GEN7_PS_DUAL_SOURCE_BLEND_ENABLE;
    }
 
-   /* CACHE_NEW_WM_PROG */
-   if (brw->wm.prog_data->num_varying_inputs != 0)
-      dw4 |= GEN7_PS_ATTRIBUTE_ENABLE;
-
-   /* In case of non 1x per sample shading, only one of SIMD8 and SIMD16
+   /* BRW_NEW_FRAGMENT_PROGRAM | _NEW_MULTISAMPLE | _NEW_BUFFERS
+    *
+    * In case of non 1x per sample shading, only one of SIMD8 and SIMD16
     * should be enabled. We do 'SIMD16 only' dispatch if a SIMD16 shader
     * is successfully compiled. In majority of the cases that bring us
     * better performance than 'SIMD8 only' dispatch.
@@ -267,7 +285,7 @@ upload_ps_state(struct brw_context *brw)
    if (brw->wm.prog_data->total_scratch) {
       OUT_RELOC(brw->wm.base.scratch_bo,
 		I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER,
-		ffs(brw->wm.prog_data->total_scratch) - 11);
+		ps_state->dw3);
    } else {
       OUT_BATCH(0);
    }

@@ -403,6 +403,16 @@ struct brw_wm_prog_data {
     */
    const float **param;
    const float **pull_param;
+
+   union {
+      struct {
+         struct gen7_ps_state {
+            uint32_t dw2;
+            uint32_t dw3;
+            uint32_t dw4;
+         } ps_state;
+      } gen7;
+   } state;
 };
 
 /**

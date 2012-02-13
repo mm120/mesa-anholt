@@ -123,4 +123,7 @@ void brw_wm_debug_recompile(struct brw_context *brw,
 bool brw_wm_prog_data_compare(const void *a, const void *b);
 void brw_wm_prog_data_free(const void *in_prog_data);
 
+void gen7_set_wm_hw_state(struct brw_context *brw, struct brw_wm_compile *c,
+                          bool is_arb_fp);
+
 #endif

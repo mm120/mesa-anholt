@@ -419,18 +419,33 @@ intel_prepare_render(struct intel_context *intel)
     * We're using intelDRI2Flush (called from the loader before
     * swapbuffer) and glFlush (for front buffer rendering) as the
     * indicator that a frame is done and then throttle when we get
-    * here as we prepare to render the next frame.  At this point for
+    * here as we prepare to render the next frame.  At this point our
     * round trips for swap/copy and getting new buffers are done and
-    * we'll spend less time waiting on the GPU.
+    * we'll spend less time waiting on the GPU when we throttle here.
     *
     * Unfortunately, we don't have a handle to the batch containing
     * the swap, and getting our hands on that doesn't seem worth it,
-    * so we just us the first batch we emitted after the last swap.
+    * so we just use the first batch we emitted after the last swap.
+    * To bring the point we wait on closer to the swapbuffers, we make
+    * a tiny batchbuffer containing just a noop and flush it out.  The
+    * overhead of it is worth the savings on apps that only emit one or
+    * a few batchbuffers per frame.
     */
-   if (intel->need_throttle && intel->first_post_swapbuffers_batch) {
-      drm_intel_bo_wait_rendering(intel->first_post_swapbuffers_batch);
-      drm_intel_bo_unreference(intel->first_post_swapbuffers_batch);
-      intel->first_post_swapbuffers_batch = NULL;
+   if (intel->need_throttle) {
+      if (intel->first_post_swapbuffers_batch) {
+	 drm_intel_bo_wait_rendering(intel->first_post_swapbuffers_batch);
+	 drm_intel_bo_unreference(intel->first_post_swapbuffers_batch);
+      }
+
+      BEGIN_BATCH(1);
+      OUT_BATCH(MI_NOOP);
+      ADVANCE_BATCH();
+
+      intel->first_post_swapbuffers_batch = intel->batch.bo;
+      drm_intel_bo_reference(intel->batch.bo);
+
+      intel_batchbuffer_flush(intel);
+
       intel->need_throttle = false;
    }
 }

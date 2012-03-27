@@ -328,22 +328,64 @@ brw_populate_sampler_prog_key_data(struct gl_context *ctx,
 {
    const struct gl_texture_unit *unit = &ctx->Texture.Unit[i];
 
-   if (unit->_ReallyEnabled && unit->_Current->Target != GL_TEXTURE_BUFFER) {
-      const struct gl_texture_object *t = unit->_Current;
-      const struct gl_texture_image *img = t->Image[0][t->BaseLevel];
-      struct gl_sampler_object *sampler = _mesa_get_samplerobj(ctx, i);
-      int swizzles[SWIZZLE_NIL + 1] = {
-	 SWIZZLE_X,
-	 SWIZZLE_Y,
-	 SWIZZLE_Z,
-	 SWIZZLE_W,
-	 SWIZZLE_ZERO,
-	 SWIZZLE_ONE,
-	 SWIZZLE_NIL
-      };
+   if (!unit->_ReallyEnabled) {
+      key->swizzles[i] = SWIZZLE_NOOP;
+      return;
+   }
 
-      if (img->_BaseFormat == GL_DEPTH_COMPONENT ||
-	  img->_BaseFormat == GL_DEPTH_STENCIL) {
+   const struct gl_texture_object *t = unit->_Current;
+   const struct gl_texture_image *img;
+   struct gl_sampler_object *sampler = _mesa_get_samplerobj(ctx, i);
+   int swizzles[SWIZZLE_NIL + 1] = {
+      SWIZZLE_X,
+      SWIZZLE_Y,
+      SWIZZLE_Z,
+      SWIZZLE_W,
+      SWIZZLE_ZERO,
+      SWIZZLE_ONE,
+      SWIZZLE_NIL
+   };
+
+   if (t->Target != GL_TEXTURE_BUFFER)
+      img = t->Image[0][t->BaseLevel];
+   else
+      img = NULL;
+
+   if (t->Target == GL_TEXTURE_BUFFER) {
+      /* The hardware doesn't have support for the deprecated integer formats,
+       * so we map them to R/RG in the surface, and swizzle the channels here.
+       */
+      if (_mesa_is_format_integer_color(t->_BufferObjectFormat)) {
+	 switch (_mesa_get_format_base_format(t->_BufferObjectFormat)) {
+	 case GL_ALPHA:
+	    swizzles[0] = SWIZZLE_ZERO;
+	    swizzles[1] = SWIZZLE_ZERO;
+	    swizzles[2] = SWIZZLE_ZERO;
+	    swizzles[3] = SWIZZLE_X;
+	    break;
+	 case GL_LUMINANCE:
+	    swizzles[0] = SWIZZLE_X;
+	    swizzles[1] = SWIZZLE_X;
+	    swizzles[2] = SWIZZLE_X;
+	    swizzles[3] = SWIZZLE_ONE;
+	    break;
+	 case GL_LUMINANCE_ALPHA:
+	    swizzles[0] = SWIZZLE_X;
+	    swizzles[1] = SWIZZLE_X;
+	    swizzles[2] = SWIZZLE_X;
+	    swizzles[3] = SWIZZLE_Y;
+	    break;
+	 case GL_INTENSITY:
+	    swizzles[0] = SWIZZLE_X;
+	    swizzles[1] = SWIZZLE_X;
+	    swizzles[2] = SWIZZLE_X;
+	    swizzles[3] = SWIZZLE_X;
+	    break;
+	 }
+      }
+   } else {
+      if ((img->_BaseFormat == GL_DEPTH_COMPONENT ||
+	   img->_BaseFormat == GL_DEPTH_STENCIL)) {
 	 if (sampler->CompareMode == GL_COMPARE_R_TO_TEXTURE_ARB)
 	    key->compare_funcs[i] = sampler->CompareFunc;
 
@@ -385,12 +427,6 @@ brw_populate_sampler_prog_key_data(struct gl_context *ctx,
 	     key->yuvtex_swap_mask |= 1 << i;
       }
 
-      key->swizzles[i] =
-	 MAKE_SWIZZLE4(swizzles[GET_SWZ(t->_Swizzle, 0)],
-		       swizzles[GET_SWZ(t->_Swizzle, 1)],
-		       swizzles[GET_SWZ(t->_Swizzle, 2)],
-		       swizzles[GET_SWZ(t->_Swizzle, 3)]);
-
       if (sampler->MinFilter != GL_NEAREST &&
 	  sampler->MagFilter != GL_NEAREST) {
 	 if (sampler->WrapS == GL_CLAMP)
@@ -401,9 +437,12 @@ brw_populate_sampler_prog_key_data(struct gl_context *ctx,
 	    key->gl_clamp_mask[2] |= 1 << i;
       }
    }
-   else {
-      key->swizzles[i] = SWIZZLE_NOOP;
-   }
+
+   key->swizzles[i] =
+      MAKE_SWIZZLE4(swizzles[GET_SWZ(t->_Swizzle, 0)],
+		    swizzles[GET_SWZ(t->_Swizzle, 1)],
+		    swizzles[GET_SWZ(t->_Swizzle, 2)],
+		    swizzles[GET_SWZ(t->_Swizzle, 3)]);
 }
 
 static void brw_wm_populate_key( struct brw_context *brw,

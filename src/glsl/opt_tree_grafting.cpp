@@ -49,6 +49,7 @@
 
 #include "ir.h"
 #include "ir_visitor.h"
+#include "ir_rvalue_visitor.h"
 #include "ir_variable_refcount.h"
 #include "ir_basic_block.h"
 #include "ir_optimization.h"
@@ -56,7 +57,7 @@
 
 static bool debug = false;
 
-class ir_tree_grafting_visitor : public ir_hierarchical_visitor {
+class ir_tree_grafting_visitor : public ir_rvalue_visitor {
 public:
    ir_tree_grafting_visitor(ir_assignment *graft_assign,
 			    ir_variable *graft_var)
@@ -68,17 +69,14 @@ public:
 
    virtual ir_visitor_status visit_leave(class ir_assignment *);
    virtual ir_visitor_status visit_enter(class ir_call *);
-   virtual ir_visitor_status visit_enter(class ir_expression *);
    virtual ir_visitor_status visit_enter(class ir_function *);
    virtual ir_visitor_status visit_enter(class ir_function_signature *);
    virtual ir_visitor_status visit_enter(class ir_if *);
    virtual ir_visitor_status visit_enter(class ir_loop *);
-   virtual ir_visitor_status visit_enter(class ir_swizzle *);
-   virtual ir_visitor_status visit_enter(class ir_texture *);
+
+   void handle_rvalue(ir_rvalue **rvalue);
 
    ir_visitor_status check_graft(ir_instruction *ir, ir_variable *var);
-
-   bool do_graft(ir_rvalue **rvalue);
 
    bool progress;
    ir_variable *graft_var;
@@ -113,16 +111,16 @@ dereferences_variable(ir_instruction *ir, ir_variable *var)
    return info.found;
 }
 
-bool
-ir_tree_grafting_visitor::do_graft(ir_rvalue **rvalue)
+void
+ir_tree_grafting_visitor::handle_rvalue(ir_rvalue **rvalue)
 {
    if (!*rvalue)
-      return false;
+      return;
 
    ir_dereference_variable *deref = (*rvalue)->as_dereference_variable();
 
    if (!deref || deref->var != this->graft_var)
-      return false;
+      return;
 
    if (debug) {
       printf("GRAFTING:\n");
@@ -137,7 +135,6 @@ ir_tree_grafting_visitor::do_graft(ir_rvalue **rvalue)
    *rvalue = this->graft_assign->rhs;
 
    this->progress = true;
-   return true;
 }
 
 ir_visitor_status
@@ -175,9 +172,8 @@ ir_tree_grafting_visitor::check_graft(ir_instruction *ir, ir_variable *var)
 ir_visitor_status
 ir_tree_grafting_visitor::visit_leave(ir_assignment *ir)
 {
-   if (do_graft(&ir->rhs) ||
-       do_graft(&ir->condition))
-      return visit_stop;
+   handle_rvalue(&ir->rhs);
+   handle_rvalue(&ir->condition);
 
    /* If this assignment updates a variable used in the assignment
     * we're trying to graft, then we're done.
@@ -215,10 +211,9 @@ ir_tree_grafting_visitor::visit_enter(ir_call *ir)
 	 continue;
       }
 
-      if (do_graft(&new_ir)) {
-	 ir->replace_with(new_ir);
-	 return visit_stop;
-      }
+      handle_rvalue(&new_ir);
+      ir->replace_with(new_ir);
+
       sig_iter.next();
    }
 
@@ -229,67 +224,14 @@ ir_tree_grafting_visitor::visit_enter(ir_call *ir)
 }
 
 ir_visitor_status
-ir_tree_grafting_visitor::visit_enter(ir_expression *ir)
-{
-   for (unsigned int i = 0; i < ir->get_num_operands(); i++) {
-      if (do_graft(&ir->operands[i]))
-	 return visit_stop;
-   }
-
-   return visit_continue;
-}
-
-ir_visitor_status
 ir_tree_grafting_visitor::visit_enter(ir_if *ir)
 {
-   if (do_graft(&ir->condition))
-      return visit_stop;
+   handle_rvalue(&ir->condition);
 
    /* Do not traverse into the body of the if-statement since that is a
     * different basic block.
     */
    return visit_continue_with_parent;
-}
-
-ir_visitor_status
-ir_tree_grafting_visitor::visit_enter(ir_swizzle *ir)
-{
-   if (do_graft(&ir->val))
-      return visit_stop;
-
-   return visit_continue;
-}
-
-ir_visitor_status
-ir_tree_grafting_visitor::visit_enter(ir_texture *ir)
-{
-   if (do_graft(&ir->coordinate) ||
-       do_graft(&ir->projector) ||
-       do_graft(&ir->offset) ||
-       do_graft(&ir->shadow_comparitor))
-	 return visit_stop;
-
-   switch (ir->op) {
-   case ir_tex:
-      break;
-   case ir_txb:
-      if (do_graft(&ir->lod_info.bias))
-	 return visit_stop;
-      break;
-   case ir_txf:
-   case ir_txl:
-   case ir_txs:
-      if (do_graft(&ir->lod_info.lod))
-	 return visit_stop;
-      break;
-   case ir_txd:
-      if (do_graft(&ir->lod_info.grad.dPdx) ||
-	  do_graft(&ir->lod_info.grad.dPdy))
-	 return visit_stop;
-      break;
-   }
-
-   return visit_continue;
 }
 
 struct tree_grafting_info {
@@ -320,8 +262,9 @@ try_tree_grafting(ir_assignment *start,
 	 printf("\n");
       }
 
+      /* End early if we do a graft or if our graft is killed. */
       ir_visitor_status s = ir->accept(&v);
-      if (s == visit_stop)
+      if (s == visit_stop || v.progress)
 	 return v.progress;
    }
 

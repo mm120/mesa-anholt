@@ -1022,6 +1022,7 @@ intel_detect_swizzling(struct intel_screen *screen)
 static __DRIconfig**
 intel_screen_make_configs(__DRIscreen *dri_screen)
 {
+   struct intel_screen *screen = dri_screen->driverPrivate;
    static const gl_format formats[] = {
       MESA_FORMAT_RGB565,
       MESA_FORMAT_ARGB8888
@@ -1034,14 +1035,19 @@ intel_screen_make_configs(__DRIscreen *dri_screen)
 
    static const uint8_t singlesample_samples[1] = {0};
    static const uint8_t multisample_samples[2]  = {4, 8};
+   int num_msaa_modes = 0;
 
-   struct intel_screen *screen = dri_screen->driverPrivate;
+   if (screen->gen >= 7)
+      num_msaa_modes = 2;
+   else if (screen->gen == 6)
+      num_msaa_modes = 1;
+
    uint8_t depth_bits[4], stencil_bits[4];
    __DRIconfig **configs = NULL;
+   __DRIconfig **new_configs;
 
    /* Generate singlesample configs without accumulation buffer. */
    for (int i = 0; i < ARRAY_SIZE(formats); i++) {
-      __DRIconfig **new_configs;
       int num_depth_stencil_bits = 2;
 
       /* Starting with DRI2 protocol version 1.1 we can request a depth/stencil
@@ -1115,7 +1121,6 @@ intel_screen_make_configs(__DRIscreen *dri_screen)
 
       __DRIconfig **new_configs;
       const int num_depth_stencil_bits = 2;
-      int num_msaa_modes = 0;
 
       depth_bits[0] = 0;
       stencil_bits[0] = 0;
@@ -1128,11 +1133,6 @@ intel_screen_make_configs(__DRIscreen *dri_screen)
          stencil_bits[1] = 8;
       }
 
-      if (screen->gen >= 7)
-         num_msaa_modes = 2;
-      else if (screen->gen == 6)
-         num_msaa_modes = 1;
-
       new_configs = driCreateConfigs(formats[i],
                                      depth_bits,
                                      stencil_bits,
@@ -1143,6 +1143,21 @@ intel_screen_make_configs(__DRIscreen *dri_screen)
                                      false);
       configs = driConcatConfigs(configs, new_configs);
    }
+
+   /* Generate a very small number of sRGB visuals.
+    */
+   depth_bits[0] = 24;
+   stencil_bits[0] = 8;
+
+   new_configs = driCreateConfigs(MESA_FORMAT_SARGB8,
+                                  depth_bits, stencil_bits, 1,
+                                  back_buffer_modes + 1, 1,
+                                  multisample_samples, num_msaa_modes,
+                                  true);
+   if (configs == NULL)
+      configs = new_configs;
+   else
+      configs = driConcatConfigs(configs, new_configs);
 
    if (configs == NULL) {
       fprintf(stderr, "[%s:%u] Error creating FBConfig!\n", __func__,

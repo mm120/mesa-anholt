@@ -41,6 +41,7 @@
 #include "main/imports.h"
 
 #include "brw_context.h"
+#include "brw_defines.h"
 #include "brw_state.h"
 #include "intel_batchbuffer.h"
 #include "intel_reg.h"
@@ -66,6 +67,21 @@ brw_queryobj_get_results(struct gl_context *ctx,
 	 query->Base.Result += 80 * (results[1] - results[0]);
       else
 	 query->Base.Result += 1000 * ((results[1] >> 32) - (results[0] >> 32));
+      break;
+
+   case GL_TIMESTAMP:
+      if (intel->gen >= 6) {
+         /* The timestamp register we can read for glGetTimestamp() masks out the
+          * top 32 bits, so we do that here too to let the two counters be
+          * compared against each other.
+          *
+          * The low 32 bits rolls over in ~343 seconds.
+          */
+	 query->Base.Result = 80 * (results[1] & 0xffffffff);
+      } else {
+	 query->Base.Result = 1000 * (results[1] >> 32);
+      }
+
       break;
 
    case GL_SAMPLES_PASSED_ARB:
@@ -200,6 +216,12 @@ brw_end_query(struct gl_context *ctx, struct gl_query_object *q)
    struct brw_query_object *query = (struct brw_query_object *)q;
 
    switch (query->Base.Target) {
+   case GL_TIMESTAMP:
+      drm_intel_bo_unreference(query->bo);
+      query->bo = drm_intel_bo_alloc(intel->bufmgr, "timer query",
+				     4096, 4096);
+      /* FALLTHROUGH */
+
    case GL_TIME_ELAPSED_EXT:
       if (intel->gen >= 6) {
 	  BEGIN_BATCH(5);
@@ -432,6 +454,28 @@ brw_emit_query_end(struct brw_context *brw)
    brw->query.index++;
 }
 
+static uint64_t
+brw_get_timestamp(struct gl_context *ctx)
+{
+   struct intel_context *intel = intel_context(ctx);
+   uint64_t result = 0;
+
+   drm_intel_reg_read(intel->bufmgr, TIMESTAMP, &result);
+
+   /* On IVB, the register reads as 80-ns values in the top 32 bits and
+    * 0x00000001 in the low 32 bits, and I think it's the same for other
+    * chipsets other than the scaling factor.
+    */
+   result = result >> 32;
+
+   if (intel->gen >= 6)
+      return 80 * result;
+   else
+      return 1000 * result;
+
+   return result;
+}
+
 void brw_init_queryobj_functions(struct dd_function_table *functions)
 {
    functions->NewQueryObject = brw_new_query_object;
@@ -440,4 +484,5 @@ void brw_init_queryobj_functions(struct dd_function_table *functions)
    functions->EndQuery = brw_end_query;
    functions->CheckQuery = brw_check_query;
    functions->WaitQuery = brw_wait_query;
+   functions->GetTimestamp = brw_get_timestamp;
 }

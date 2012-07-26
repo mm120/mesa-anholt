@@ -560,7 +560,8 @@ int draw_geometry_shader_run(struct draw_geometry_shader *shader,
    /* we allocate exactly one extra vertex per primitive to allow the GS to emit
     * overflown vertices into some area where they won't harm anyone */
    output_verts->verts =
-      (struct vertex_header *)MALLOC(output_verts->vertex_size *
+      (struct vertex_header *)MALLOC(sizeof(struct vertex_header) +
+                                     output_verts->vertex_size *
                                      max_out_prims *
                                      shader->primitive_boundary);
 

@@ -131,13 +131,14 @@ brw_begin_query(struct gl_context *ctx, struct gl_query_object *q)
 				     4096, 4096);
 
       if (intel->gen >= 6) {
-	  BEGIN_BATCH(4);
-	  OUT_BATCH(_3DSTATE_PIPE_CONTROL);
+	  BEGIN_BATCH(5);
+	  OUT_BATCH(_3DSTATE_PIPE_CONTROL | (5 - 2));
 	  OUT_BATCH(PIPE_CONTROL_WRITE_TIMESTAMP);
 	  OUT_RELOC(query->bo,
 		  I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
 		  PIPE_CONTROL_GLOBAL_GTT_WRITE |
 		  0);
+	  OUT_BATCH(0);
 	  OUT_BATCH(0);
 	  ADVANCE_BATCH();
       
@@ -201,13 +202,14 @@ brw_end_query(struct gl_context *ctx, struct gl_query_object *q)
    switch (query->Base.Target) {
    case GL_TIME_ELAPSED_EXT:
       if (intel->gen >= 6) {
-	  BEGIN_BATCH(4);
-	  OUT_BATCH(_3DSTATE_PIPE_CONTROL);
+	  BEGIN_BATCH(5);
+	  OUT_BATCH(_3DSTATE_PIPE_CONTROL | (5 - 2));
 	  OUT_BATCH(PIPE_CONTROL_WRITE_TIMESTAMP);
 	  OUT_RELOC(query->bo,
 		  I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
 		  PIPE_CONTROL_GLOBAL_GTT_WRITE |
 		  8);
+	  OUT_BATCH(0);
 	  OUT_BATCH(0);
 	  ADVANCE_BATCH();
       

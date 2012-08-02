@@ -159,6 +159,8 @@ brw_queryobj_get_results(struct gl_context *ctx,
       break;
 
    case GL_TIMESTAMP:
+      printf("Q1 TIMESTAMP GET 0x%016"PRIx64" -> 0x%016"PRIx64"\n", (results[1]), 80 * (results[1]));
+
       if (intel->gen >= 6) {
          /* Our timer is a clock that increments every 80ns (regardless of
           * other clock scaling in the system).  The timestamp register we can
@@ -181,6 +183,8 @@ brw_queryobj_get_results(struct gl_context *ctx,
       } else {
 	 query->Base.Result = 1000 * (results[1] >> 32);
       }
+
+      printf("QC TIMESTAMP %f\n", query->Base.Result / 1000000000.0f);
 
       break;
 
@@ -447,10 +451,14 @@ brw_get_timestamp(struct gl_context *ctx)
 
    drm_intel_reg_read(intel->bufmgr, TIMESTAMP, &result);
 
+   printf("R1 TIMESTAMP GET 0x%016"PRIx64" -> 0x%016"PRIx64"\n", result, 80 * result);
+
    /* See logic in brw_queryobj_get_results() */
    result = result >> 32;
    result *= 80;
    result &= (1ull << 36) - 1;
+
+   printf("RC TIMESTAMP %f\n", result / 1000000000.0f);
 
    return result;
 }

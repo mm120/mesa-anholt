@@ -772,6 +772,8 @@ public:
          case GLSL_TYPE_FLOAT:
             cond = bld.CreateFCmpOLT(load, to);
             break;
+         default:
+            assert(0);
          }
          bld.CreateCondBr(cond, body, after);
       }
@@ -795,6 +797,8 @@ public:
          case GLSL_TYPE_FLOAT:
             bld.CreateStore(bld.CreateFAdd(bld.CreateLoad(ctr), llvm_value(ir->increment)), ctr);
             break;
+         default:
+            assert(0);
          }
       }
       bld.CreateBr(header);
@@ -891,6 +895,8 @@ public:
                case GLSL_TYPE_BOOL:
                   elem = llvm::ConstantInt::get(base_type, ir->value.b[idx]);
                   break;
+               default:
+                  assert(0);
                }
                elems.push_back(elem);
                ++idx;

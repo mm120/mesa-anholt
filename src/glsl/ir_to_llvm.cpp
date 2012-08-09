@@ -30,11 +30,6 @@
  * Translates the IR to LLVM
  */
 
-/* this tends to get set as part of LLVM_CFLAGS, but we definitely want asserts */
-#ifdef NDEBUG
-#undef NDEBUG
-#endif
-
 #include "llvm/DerivedTypes.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"

@@ -64,23 +64,25 @@ public:
    ir_to_llvm_visitor();
 
    llvm::LLVMContext& ctx;
-   llvm::Module* mod;
-   llvm::Function* fun;
-   // could easily support more loops, but GLSL doesn't support multiloop break/continue
-   std::pair<llvm::BasicBlock*, llvm::BasicBlock*> loop;
-   llvm::BasicBlock* bb;
-   llvm::Value* result;
+   llvm::Module *mod;
+   llvm::Function *fun;
+   /* could easily support more loops, but GLSL doesn't support multiloop
+    * break/continue
+    */
+   std::pair<llvm::BasicBlock *, llvm::BasicBlock *> loop;
+   llvm::BasicBlock *bb;
+   llvm::Value *result;
    llvm::IRBuilder<> bld;
 
-   ir_to_llvm_visitor(llvm::LLVMContext& p_ctx, llvm::Module* p_mod)
-   : ctx(p_ctx), mod(p_mod), fun(0), loop(std::make_pair((llvm::BasicBlock*)0, (llvm::BasicBlock*)0)), bb(0), bld(ctx)
+   ir_to_llvm_visitor(llvm::LLVMContext &p_ctx, llvm::Module *p_mod)
+      : ctx(p_ctx), mod(p_mod), fun(0), bb(0), bld(ctx)
    {
+      loop = std::make_pair((llvm::BasicBlock *)0, (llvm::BasicBlock *)0);
    }
 
-   llvm::Type* llvm_base_type(unsigned base_type)
+   llvm::Type *llvm_base_type(unsigned base_type)
    {
-      switch(base_type)
-      {
+      switch (base_type) {
       case GLSL_TYPE_VOID:
          return llvm::Type::getVoidTy(ctx);
       case GLSL_TYPE_UINT:
@@ -98,221 +100,227 @@ public:
       }
    }
 
-   llvm::Type* llvm_vec_type(const glsl_type* type)
+   llvm::Type *llvm_vec_type(const glsl_type *type)
    {
-      if(type->is_array())
-         return llvm::ArrayType::get(llvm_type(type->fields.array), type->array_size());
+      if (type->is_array())
+         return llvm::ArrayType::get(llvm_type(type->fields.array),
+                                     type->array_size());
 
-      if(type->is_record())
-      {
-         std::vector<llvm::Type*> fields;
+      if (type->is_record()) {
+         std::vector<llvm::Type *> fields;
          for (unsigned i = 0; i < type->length; i++)
             fields.push_back(llvm_type(type->fields.structure[i].type));
          return llvm::StructType::get(ctx, fields);
       }
 
-      llvm::Type* base_type = llvm_base_type(type->base_type);
-      if(type->vector_elements <= 1)
+      llvm::Type *base_type = llvm_base_type(type->base_type);
+      if (type->vector_elements <= 1)
          return base_type;
       else
          return llvm::VectorType::get(base_type, type->vector_elements);
    }
 
-   llvm::Type* llvm_type(const glsl_type* type)
+   llvm::Type *llvm_type(const glsl_type *type)
    {
-      llvm::Type* vec_type = llvm_vec_type(type);
-      if(type->matrix_columns <= 1)
+      llvm::Type *vec_type = llvm_vec_type(type);
+      if (type->matrix_columns <= 1)
          return vec_type;
       else
          return llvm::ArrayType::get(vec_type, type->matrix_columns);
    }
 
-   typedef std::unordered_map<ir_variable*, llvm::Value*> llvm_variables_t;
+   typedef std::unordered_map<ir_variable *, llvm::Value *> llvm_variables_t;
    llvm_variables_t llvm_variables;
 
-   llvm::Value* llvm_variable(class ir_variable* var)
+   llvm::Value *llvm_variable(class ir_variable *var)
    {
       llvm_variables_t::iterator vari = llvm_variables.find(var);
-      if(vari != llvm_variables.end())
+      if (vari != llvm_variables.end())
          return vari->second;
-      else
-      {
-         llvm::Type* type = llvm_type(var->type);
+      else {
+         llvm::Type *type = llvm_type(var->type);
 
-         llvm::Value* v;
-         if(fun)
-         {
-            if(bb == &fun->getEntryBlock())
+         llvm::Value *v;
+         if (fun) {
+            if (bb == &fun->getEntryBlock())
                v = bld.CreateAlloca(type, 0, var->name);
             else
-               v = new llvm::AllocaInst(type, 0, var->name, fun->getEntryBlock().getTerminator());
+               v = new llvm::AllocaInst(type, 0, var->name,
+                                        fun->getEntryBlock().getTerminator());
          }
-         else // TODO: can anything global be non-constant in GLSL?; fix linkage
-         {
+         else {
+            /* TODO: can anything global be non-constant in GLSL?; fix
+             * linkage
+             */
             llvm::Function::LinkageTypes linkage;
-            if(var->mode == ir_var_auto || var->mode == ir_var_temporary)
+            if (var->mode == ir_var_auto || var->mode == ir_var_temporary)
                linkage = llvm::GlobalValue::InternalLinkage;
             else
                linkage = llvm::GlobalValue::ExternalLinkage;
-            llvm::Constant* init = 0;
-            if(var->constant_value)
+            llvm::Constant *init = 0;
+            if (var->constant_value)
                init = llvm_constant(var->constant_value);
-            else if(linkage == llvm::GlobalValue::InternalLinkage)
+            else if (linkage == llvm::GlobalValue::InternalLinkage)
                init = llvm::UndefValue::get(llvm_type(var->type));
-            v = new llvm::GlobalVariable(*mod, type, var->read_only, linkage, init, var->name);
+            v = new llvm::GlobalVariable(*mod, type, var->read_only, linkage,
+                                         init, var->name);
          }
          llvm_variables[var] = v;
          return v;
       }
    }
 
-   typedef std::unordered_map<ir_function_signature*, llvm::Function*> llvm_functions_t;
+   typedef std::unordered_map<ir_function_signature *,
+                              llvm::Function *> llvm_functions_t;
    llvm_functions_t llvm_functions;
 
-   llvm::Function* llvm_function(class ir_function_signature* sig)
+   llvm::Function *llvm_function(class ir_function_signature *sig)
    {
       llvm_functions_t::iterator funi = llvm_functions.find(sig);
-      if(funi != llvm_functions.end())
+      if (funi != llvm_functions.end())
          return funi->second;
-      else
-      {
-         const char* name = sig->function_name();
+      else {
+         const char *name = sig->function_name();
          llvm::Function::LinkageTypes linkage;
-         if(!strcmp(name, "main") || !sig->is_defined)
+         if (!strcmp(name, "main") || !sig->is_defined)
             linkage = llvm::Function::ExternalLinkage;
          else
             linkage = llvm::Function::InternalLinkage;
-         std::vector<llvm::Type*> params;
+         std::vector<llvm::Type *> params;
          foreach_iter(exec_list_iterator, iter, sig->parameters) {
-            ir_variable* arg = (ir_variable*)iter.get();
+            ir_variable *arg = (ir_variable *)iter.get();
             params.push_back(llvm_type(arg->type));
          }
 
-         llvm::FunctionType* ft = llvm::FunctionType::get(llvm_type(sig->return_type), params, false);
+         llvm::FunctionType *ft =
+            llvm::FunctionType::get(llvm_type(sig->return_type), params, false);
 
-         llvm::Function* f = llvm::Function::Create(ft, linkage, name, mod);
+         llvm::Function *f = llvm::Function::Create(ft, linkage, name, mod);
          llvm_functions[sig] = f;
          return f;
       }
 
    }
 
-   llvm::Value* llvm_value(class ir_instruction* ir)
+   llvm::Value *llvm_value(class ir_instruction *ir)
    {
       result = 0;
       ir->accept(this);
       return result;
    }
 
-   llvm::Constant* llvm_constant(class ir_instruction* ir)
+   llvm::Constant *llvm_constant(class ir_instruction *ir)
    {
-      return &dynamic_cast<llvm::Constant&>(*llvm_value(ir));
+      return &dynamic_cast<llvm::Constant &>(*llvm_value(ir));
    }
 
-   llvm::Constant* llvm_int(unsigned v)
+   llvm::Constant *llvm_int(unsigned v)
    {
       return llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), v);
    }
 
-   llvm::Value* llvm_pointer(class ir_rvalue* ir)
+   llvm::Value *llvm_pointer(class ir_rvalue *ir)
    {
-      if(ir_dereference_variable* deref = ir->as_dereference_variable())
+      if (ir_dereference_variable *deref = ir->as_dereference_variable())
          return llvm_variable(deref->variable_referenced());
-      else if(ir_dereference_array* deref = ir->as_dereference_array())
-      {
-         llvm::Value * ref[] = {
+      else if (ir_dereference_array *deref = ir->as_dereference_array()) {
+         llvm::Value *ref[] = {
             llvm_int(0),
             llvm_value(deref->array_index)
          };
-         return bld.CreateInBoundsGEP(llvm_pointer(deref->array),
-                                      ref);
-         }
-      else if(ir->as_dereference())
-      {
-         ir_dereference_record* deref = (ir_dereference_record*)ir;
+         return bld.CreateInBoundsGEP(llvm_pointer(deref->array), ref);
+      }
+      else if (ir->as_dereference()) {
+         ir_dereference_record *deref = (ir_dereference_record *)ir;
          int idx = deref->record->type->field_index(deref->field);
          assert(idx >= 0);
-         return bld.CreateConstInBoundsGEP2_32(llvm_pointer(deref->record), 0, idx);
+         return bld.CreateConstInBoundsGEP2_32(llvm_pointer(deref->record),
+                                               0, idx);
       }
-      else
-      {
+      else {
          assert(0);
          return 0;
       }
    }
 
-   llvm::Value* llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value* a)
+   llvm::Value *llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value *a)
    {
-      llvm::Type* types[1] = {a->getType()};
+      llvm::Type *types[1] = {a->getType()};
       return bld.CreateCall(llvm::Intrinsic::getDeclaration(mod, id, types), a);
    }
 
-   llvm::Value* llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value* a, llvm::Value* b)
+   llvm::Value *llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value *a, llvm::Value *b)
    {
-      llvm::Type* types[2] = {a->getType(), b->getType()};
+      llvm::Type *types[2] = {a->getType(), b->getType()};
       /* only one type suffix is usually needed, so pass 1 here */
-      return bld.CreateCall2(llvm::Intrinsic::getDeclaration(mod, id, types), a, b);
+      return bld.CreateCall2(llvm::Intrinsic::getDeclaration(mod, id,
+                                                             types), a, b);
    }
 
-   llvm::Constant* llvm_imm(llvm::Type* type, double v)
+   llvm::Constant *llvm_imm(llvm::Type *type, double v)
    {
-      if(type->isVectorTy())
-      {
-         std::vector<llvm::Constant*> values;
-         values.push_back(llvm_imm(((llvm::VectorType*)type)->getElementType(), v));
-         for(unsigned i = 1; i < ((llvm::VectorType*)type)->getNumElements(); ++i)
+      if (type->isVectorTy()) {
+         std::vector<llvm::Constant *> values;
+         values.push_back(llvm_imm(((llvm::VectorType *)type)->getElementType(), v));
+         for (unsigned i = 1; i < ((llvm::VectorType *)type)->getNumElements(); ++i)
             values.push_back(values[0]);
          return llvm::ConstantVector::get(values);
       }
-      else if(type->isIntegerTy())
+      else if (type->isIntegerTy())
          return llvm::ConstantInt::get(type, v);
-      else if(type->isFloatingPointTy())
+      else if (type->isFloatingPointTy())
          return llvm::ConstantFP::get(type, v);
-      else
-      {
+      else {
          assert(0);
          return 0;
       }
    }
 
-   static llvm::Value* create_shuffle3(llvm::IRBuilder<>& bld, llvm::Value* v, unsigned a, unsigned b, unsigned c, const llvm::Twine& name = "")
+   static llvm::Value *create_shuffle3(llvm::IRBuilder<>& bld,
+                                       llvm::Value *v,
+                                       unsigned a, unsigned b, unsigned c,
+                                       const llvm::Twine& name = "")
    {
-      llvm::Type* int_ty = llvm::Type::getInt32Ty(v->getContext());
-      llvm::Constant* vals[3] = {llvm::ConstantInt::get(int_ty, a), llvm::ConstantInt::get(int_ty, b), llvm::ConstantInt::get(int_ty, c)};
+      llvm::Type *int_ty = llvm::Type::getInt32Ty(v->getContext());
+      llvm::Constant *vals[3] = {
+         llvm::ConstantInt::get(int_ty, a),
+         llvm::ConstantInt::get(int_ty, b),
+         llvm::ConstantInt::get(int_ty, c)
+      };
       return bld.CreateShuffleVector(v, llvm::UndefValue::get(v->getType()),
                                      llvm::ConstantVector::get(vals),
                                      name);
    }
 
-   llvm::Value* llvm_expression(ir_expression* ir)
+   llvm::Value *llvm_expression(ir_expression *ir)
    {
-      llvm::Value* ops[2];
-      for(unsigned i = 0; i < ir->get_num_operands(); ++i)
+      llvm::Value *ops[2];
+      for (unsigned i = 0; i < ir->get_num_operands(); ++i)
          ops[i] = llvm_value(ir->operands[i]);
 
-      if(ir->get_num_operands() == 2)
-      {
+      if (ir->get_num_operands() == 2) {
          int vecidx = -1;
          int scaidx = -1;
-         if(ir->operands[0]->type->vector_elements <= 1 && ir->operands[1]->type->vector_elements > 1)
-         {
+         if (ir->operands[0]->type->vector_elements <= 1 &&
+             ir->operands[1]->type->vector_elements > 1) {
             scaidx = 0;
             vecidx = 1;
          }
-         else if(ir->operands[0]->type->vector_elements > 1 && ir->operands[1]->type->vector_elements <= 1)
-         {
+         else if (ir->operands[0]->type->vector_elements > 1 &&
+                  ir->operands[1]->type->vector_elements <= 1) {
             scaidx = 1;
             vecidx = 0;
          }
          else
-            assert(ir->operands[0]->type->vector_elements == ir->operands[1]->type->vector_elements);
+            assert(ir->operands[0]->type->vector_elements ==
+                   ir->operands[1]->type->vector_elements);
 
-         if(scaidx >= 0)
-         {
-            llvm::Value* vec;
+         if (scaidx >= 0) {
+            llvm::Value *vec;
             vec = llvm::UndefValue::get(ops[vecidx]->getType());
-            for(unsigned i = 0; i < ir->operands[vecidx]->type->vector_elements; ++i)
-               vec = bld.CreateInsertElement(vec,  ops[scaidx], llvm_int(i), "sca2vec");
+            for (unsigned i = 0; i < ir->operands[vecidx]->type->vector_elements; ++i)
+               vec = bld.CreateInsertElement(vec,  ops[scaidx],
+                                             llvm_int(i), "sca2vec");
             ops[scaidx] = vec;
          }
       }
@@ -323,36 +331,69 @@ public:
       case ir_unop_neg:
          return bld.CreateNeg(ops[0]);
       case ir_unop_abs:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_UINT:
          case GLSL_TYPE_BOOL:
             return ops[0];
          case GLSL_TYPE_INT:
-            return bld.CreateSelect(bld.CreateICmpSGE(ops[0], llvm_imm(ops[0]->getType(), 0), "sabs.ge"), ops[0], bld.CreateNeg(ops[0], "sabs.neg"), "sabs.select");
+            return bld.CreateSelect(bld.CreateICmpSGE(ops[0],
+                                                      llvm_imm(ops[0]->getType(), 0),
+                                                      "sabs.ge"),
+                                    ops[0], bld.CreateNeg(ops[0], "sabs.neg"),
+                                    "sabs.select");
          case GLSL_TYPE_FLOAT:
-            return bld.CreateSelect(bld.CreateFCmpUGE(ops[0], llvm_imm(ops[0]->getType(), 0), "fabs.ge"), ops[0], bld.CreateFNeg(ops[0], "fabs.neg"), "fabs.select");
+            return bld.CreateSelect(bld.CreateFCmpUGE(ops[0],
+                                                      llvm_imm(ops[0]->getType(), 0),
+                                                      "fabs.ge"),
+                                    ops[0], bld.CreateFNeg(ops[0], "fabs.neg"),
+                                    "fabs.select");
          default:
             assert(0);
          }
+
       case ir_unop_sign:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
             return ops[0];
          case GLSL_TYPE_UINT:
-            return bld.CreateZExt(bld.CreateICmpNE(ops[0], llvm_imm(ops[0]->getType(), 0), "usign.ne"), ops[0]->getType(), "usign.zext");
+            return bld.CreateZExt(bld.CreateICmpNE(ops[0],
+                                                   llvm_imm(ops[0]->getType(),
+                                                            0),
+                                                   "usign.ne"),
+                                  ops[0]->getType(), "usign.zext");
          case GLSL_TYPE_INT:
-            return bld.CreateSelect(bld.CreateICmpNE(ops[0], llvm_imm(ops[0]->getType(), 0), "ssign.ne"),
-                  bld.CreateSelect(bld.CreateICmpSGE(ops[0], llvm_imm(ops[0]->getType(), 0), "ssign.ge"), llvm_imm(ops[0]->getType(), 1), llvm_imm(ops[0]->getType(), -1), "sabs.selects"),
-                  llvm_imm(ops[0]->getType(), 0), "sabs.select0");
+            return bld.CreateSelect(bld.CreateICmpNE(ops[0],
+                                                     llvm_imm(ops[0]->getType(),
+                                                              0),
+                                                     "ssign.ne"),
+                                    bld.CreateSelect(bld.CreateICmpSGE(ops[0],
+                                                                       llvm_imm(ops[0]->getType(), 0),
+                                                                       "ssign.ge"),
+                                                     llvm_imm(ops[0]->getType(),
+                                                              1),
+                                                     llvm_imm(ops[0]->getType(),
+                                                              -1),
+                                                     "sabs.selects"),
+                                    llvm_imm(ops[0]->getType(), 0),
+                                    "sabs.select0");
          case GLSL_TYPE_FLOAT:
-            return bld.CreateSelect(bld.CreateFCmpONE(ops[0], llvm_imm(ops[0]->getType(), 0), "fsign.ne"),
-                  bld.CreateSelect(bld.CreateFCmpUGE(ops[0], llvm_imm(ops[0]->getType(), 0), "fsign.ge"), llvm_imm(ops[0]->getType(), 1), llvm_imm(ops[0]->getType(), -1), "fabs.selects"),
-                  llvm_imm(ops[0]->getType(), 0), "fabs.select0");
+            return bld.CreateSelect(bld.CreateFCmpONE(ops[0],
+                                                      llvm_imm(ops[0]->getType(),
+                                                               0),
+                                                      "fsign.ne"),
+                                    bld.CreateSelect(bld.CreateFCmpUGE(ops[0],
+                                                                       llvm_imm(ops[0]->getType(),
+                                                                                0),
+                                                                       "fsign.ge"),
+                                                     llvm_imm(ops[0]->getType(), 1),
+                                                     llvm_imm(ops[0]->getType(), -1),
+                                                     "fabs.selects"),
+                                    llvm_imm(ops[0]->getType(), 0),
+                                    "fabs.select0");
          default:
             assert(0);
          }
+
       case ir_unop_rcp:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
          return bld.CreateFDiv(llvm_imm(ops[0]->getType(), 1), ops[0]);
@@ -374,16 +415,17 @@ public:
       case ir_unop_cos:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
          return llvm_intrinsic(llvm::Intrinsic::cos, ops[0]);
-      // TODO: implement these somehow
+
+         /* TODO: implement these somehow */
       case ir_unop_dFdx:
          assert(0);
-         //return llvm_intrinsic(llvm::Intrinsic::ddx, ops[0]);
+         /* return llvm_intrinsic(llvm::Intrinsic::ddx, ops[0]); */
       case ir_unop_dFdy:
          assert(0);
-         //return llvm_intrinsic(llvm::Intrinsic::ddy, ops[0]);
+         /* return llvm_intrinsic(llvm::Intrinsic::ddy, ops[0]); */
+
       case ir_binop_add:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
          case GLSL_TYPE_INT:
@@ -393,9 +435,9 @@ public:
          default:
             assert(0);
          }
+
       case ir_binop_sub:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
          case GLSL_TYPE_INT:
@@ -405,9 +447,9 @@ public:
          default:
             assert(0);
          }
-         case ir_binop_mul:
-         switch(ir->operands[0]->type->base_type)
-         {
+
+      case ir_binop_mul:
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
             return bld.CreateAnd(ops[0], ops[1]);
          case GLSL_TYPE_UINT:
@@ -418,9 +460,9 @@ public:
          default:
             assert(0);
          }
-         case ir_binop_div:
-         switch(ir->operands[0]->type->base_type)
-         {
+
+      case ir_binop_div:
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
             return bld.CreateUDiv(ops[0], ops[1]);
@@ -431,9 +473,9 @@ public:
          default:
             assert(0);
          }
+
       case ir_binop_mod:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
             return bld.CreateURem(ops[0], ops[1]);
@@ -444,9 +486,9 @@ public:
          default:
             assert(0);
          }
+
       case ir_binop_less:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
             return bld.CreateICmpULT(ops[0], ops[1]);
@@ -457,9 +499,9 @@ public:
          default:
             assert(0);
          }
+
       case ir_binop_greater:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
             return bld.CreateICmpUGT(ops[0], ops[1]);
@@ -470,9 +512,9 @@ public:
          default:
             assert(0);
          }
+
       case ir_binop_lequal:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
             return bld.CreateICmpULE(ops[0], ops[1]);
@@ -483,9 +525,9 @@ public:
          default:
             assert(0);
          }
+
       case ir_binop_gequal:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
             return bld.CreateICmpUGE(ops[0], ops[1]);
@@ -496,9 +538,9 @@ public:
          default:
             assert(0);
          }
+
       case ir_binop_equal:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
          case GLSL_TYPE_INT:
@@ -509,8 +551,7 @@ public:
             assert(0);
          }
       case ir_binop_nequal:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
          case GLSL_TYPE_INT:
@@ -520,6 +561,7 @@ public:
          default:
             assert(0);
          }
+
       case ir_binop_logic_xor:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_BOOL);
          return bld.CreateICmpNE(ops[0], ops[1]);
@@ -529,11 +571,10 @@ public:
       case ir_binop_logic_and:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_BOOL);
          return bld.CreateAnd(ops[0], ops[1]);
-      case ir_binop_dot:
-      {
-         llvm::Value* prod = NULL;
-         switch(ir->operands[0]->type->base_type)
-         {
+
+      case ir_binop_dot: {
+         llvm::Value *prod = NULL;
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_UINT:
          case GLSL_TYPE_INT:
             prod = bld.CreateMul(ops[0], ops[1], "dot.mul");
@@ -545,16 +586,16 @@ public:
             assert(0);
          }
 
-         if(ir->operands[0]->type->vector_elements <= 1)
+         if (ir->operands[0]->type->vector_elements <= 1)
             return prod;
 
-         llvm::Value* sum = 0;
-         for(unsigned i = 0; i < ir->operands[0]->type->vector_elements; ++i)
-         {
-            llvm::Value* elem = bld.CreateExtractElement(prod, llvm_int(i), "dot.elem");
-            if(sum)
-            {
-               if(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT)
+         llvm::Value *sum = 0;
+         for (unsigned i = 0; i < ir->operands[0]->type->vector_elements; ++i) {
+            llvm::Value *elem = bld.CreateExtractElement(prod,
+                                                         llvm_int(i),
+                                                         "dot.elem");
+            if (sum) {
+               if (ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT)
                   sum = bld.CreateFAdd(sum, elem, "dot.add");
                else
                   sum = bld.CreateAdd(sum, elem, "dot.add");
@@ -564,12 +605,16 @@ public:
          }
          return sum;
       }
+
       case ir_unop_sqrt:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
          return llvm_intrinsic(llvm::Intrinsic::sqrt, ops[0]);
       case ir_unop_rsq:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
-         return bld.CreateFDiv(llvm_imm(ops[0]->getType(), 1), llvm_intrinsic(llvm::Intrinsic::sqrt, ops[0]), "rsqrt.rcp");
+         return bld.CreateFDiv(llvm_imm(ops[0]->getType(), 1),
+                               llvm_intrinsic(llvm::Intrinsic::sqrt, ops[0]),
+                               "rsqrt.rcp");
+
       case ir_unop_i2f:
          return bld.CreateSIToFP(ops[0], llvm_type(ir->type));
       case ir_unop_u2f:
@@ -583,67 +628,86 @@ public:
          return bld.CreateFCmpONE(ops[0], llvm_imm(ops[0]->getType(), 0));
       case ir_unop_i2b:
          return bld.CreateICmpNE(ops[0], llvm_imm(ops[0]->getType(), 0));
-      case ir_unop_trunc:
-      {
-         if(ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
+
+      case ir_unop_trunc: {
+         if (ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
             return ops[0];
          glsl_type int_type = *ir->operands[0]->type;
          int_type.base_type = GLSL_TYPE_INT;
-         return bld.CreateSIToFP(bld.CreateFPToSI(ops[0], llvm_type(&int_type), "trunc.fptosi"),ops[0]->getType(), "trunc.sitofp");
+         return bld.CreateSIToFP(bld.CreateFPToSI(ops[0],
+                                                  llvm_type(&int_type),
+                                                  "trunc.fptosi"),
+                                 ops[0]->getType(), "trunc.sitofp");
       }
-      case ir_unop_floor:
-      {
-         if(ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
+
+      case ir_unop_floor: {
+         if (ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
             return ops[0];
-         llvm::Value* one = llvm_imm(ops[0]->getType(), 1);
+         llvm::Value *one = llvm_imm(ops[0]->getType(), 1);
          return bld.CreateFSub(ops[0], bld.CreateFRem(ops[0], one));
       }
-      case ir_unop_ceil:
-      {
-         if(ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
+
+      case ir_unop_ceil: {
+         if (ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
             return ops[0];
-         llvm::Value* one = llvm_imm(ops[0]->getType(), 1);
-         return bld.CreateFAdd(bld.CreateFSub(ops[0], bld.CreateFRem(ops[0], one)), one);
+         llvm::Value *one = llvm_imm(ops[0]->getType(), 1);
+         return bld.CreateFAdd(bld.CreateFSub(ops[0],
+                                              bld.CreateFRem(ops[0], one)),
+                               one);
       }
-      case ir_unop_fract:
-      {
-         if(ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
+
+      case ir_unop_fract: {
+         if (ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
             return llvm_imm(ops[0]->getType(), 0);
-         llvm::Value* one = llvm_imm(ops[0]->getType(), 1);
+         llvm::Value *one = llvm_imm(ops[0]->getType(), 1);
          return bld.CreateFRem(ops[0], one);
       }
-      // TODO: NaNs might be wrong in min/max, not sure how to fix it
+
+      /* TODO: NaNs might be wrong in min/max, not sure how to fix it */
       case ir_binop_min:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
             return bld.CreateAnd(ops[0], ops[1], "bmin");
          case GLSL_TYPE_UINT:
-            return bld.CreateSelect(bld.CreateICmpULE(ops[0], ops[1], "umin.le"), ops[0], ops[1], "umin.select");
+            return bld.CreateSelect(bld.CreateICmpULE(ops[0], ops[1],
+                                                      "umin.le"),
+                                    ops[0], ops[1], "umin.select");
          case GLSL_TYPE_INT:
-            return bld.CreateSelect(bld.CreateICmpSLE(ops[0], ops[1], "smin.le"), ops[0], ops[1], "smin.select");
+            return bld.CreateSelect(bld.CreateICmpSLE(ops[0], ops[1],
+                                                      "smin.le"),
+                                    ops[0], ops[1], "smin.select");
          case GLSL_TYPE_FLOAT:
-            return bld.CreateSelect(bld.CreateFCmpULE(ops[0], ops[1], "fmin.le"), ops[0], ops[1], "fmin.select");
+            return bld.CreateSelect(bld.CreateFCmpULE(ops[0], ops[1],
+                                                      "fmin.le"),
+                                    ops[0], ops[1], "fmin.select");
          default:
             assert(0);
          }
+
       case ir_binop_max:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
             return bld.CreateOr(ops[0], ops[1], "bmax");
          case GLSL_TYPE_UINT:
-            return bld.CreateSelect(bld.CreateICmpUGE(ops[0], ops[1], "umax.ge"), ops[0], ops[1], "umax.select");
+            return bld.CreateSelect(bld.CreateICmpUGE(ops[0], ops[1],
+                                                      "umax.ge"),
+                                    ops[0], ops[1], "umax.select");
          case GLSL_TYPE_INT:
-            return bld.CreateSelect(bld.CreateICmpSGE(ops[0], ops[1], "smax.ge"), ops[0], ops[1], "smax.select");
+            return bld.CreateSelect(bld.CreateICmpSGE(ops[0], ops[1],
+                                                      "smax.ge"),
+                                    ops[0], ops[1], "smax.select");
          case GLSL_TYPE_FLOAT:
-            return bld.CreateSelect(bld.CreateFCmpUGE(ops[0], ops[1], "fmax.ge"), ops[0], ops[1], "fmax.select");
+            return bld.CreateSelect(bld.CreateFCmpUGE(ops[0], ops[1],
+                                                      "fmax.ge"),
+                                    ops[0], ops[1], "fmax.select");
          default:
             assert(0);
          }
+
       case ir_binop_pow:
          return llvm_intrinsic(llvm::Intrinsic::pow, ops[0], ops[1]);
          break;
+
       case ir_unop_bit_not:
          return bld.CreateNot(ops[0]);
       case ir_binop_bit_and:
@@ -652,9 +716,9 @@ public:
          return bld.CreateXor(ops[0], ops[1]);
       case ir_binop_bit_or:
          return bld.CreateOr(ops[0], ops[1]);
+
       case ir_binop_lshift:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
          case GLSL_TYPE_INT:
@@ -662,9 +726,9 @@ public:
          default:
             assert(0);
          }
+
       case ir_binop_rshift:
-         switch(ir->operands[0]->type->base_type)
-         {
+         switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
             return bld.CreateLShr(ops[0], ops[1]);
@@ -674,13 +738,14 @@ public:
             assert(0);
             return 0;
          }
+
       default:
          assert(0);
          return 0;
       }
    }
 
-   virtual void visit(class ir_expression * ir)
+   virtual void visit(class ir_expression *ir)
    {
       result = llvm_expression(ir);
    }
@@ -700,22 +765,20 @@ public:
       result = bld.CreateLoad(llvm_pointer(ir));
    }
 
-   virtual void visit(class ir_texture * ir)
+   virtual void visit(class ir_texture *ir)
    {
       // TODO
    }
 
-   virtual void visit(class ir_discard * ir)
+   virtual void visit(class ir_discard *ir)
    {
-      llvm::BasicBlock* discard = llvm::BasicBlock::Create(ctx, "discard", fun);
-      llvm::BasicBlock* after;
-      if(ir->condition)
-      {
+      llvm::BasicBlock *discard = llvm::BasicBlock::Create(ctx, "discard", fun);
+      llvm::BasicBlock *after;
+      if (ir->condition) {
          after = llvm::BasicBlock::Create(ctx, "discard.survived", fun);
          bld.CreateCondBr(llvm_value(ir->condition), discard, after);
       }
-      else
-      {
+      else {
          after = llvm::BasicBlock::Create(ctx, "dead_code.discard", fun);
          bld.CreateBr(discard);
       }
@@ -728,7 +791,7 @@ public:
 
    virtual void visit(class ir_loop_jump *ir)
    {
-      llvm::BasicBlock* target;
+      llvm::BasicBlock *target;
 
       switch (ir->mode) {
       case ir_loop_jump::jump_continue:
@@ -749,32 +812,29 @@ public:
       bld.SetInsertPoint(bb);
    }
 
-   virtual void visit(class ir_loop * ir)
+   virtual void visit(class ir_loop *ir)
    {
-      llvm::BasicBlock* body = llvm::BasicBlock::Create(ctx, "loop", fun);
-      llvm::BasicBlock* header = body;
-      llvm::BasicBlock* after = llvm::BasicBlock::Create(ctx, "loop.after", fun);
-      llvm::Value* ctr = NULL;
+      llvm::BasicBlock *body = llvm::BasicBlock::Create(ctx, "loop", fun);
+      llvm::BasicBlock *header = body;
+      llvm::BasicBlock *after = llvm::BasicBlock::Create(ctx, "loop.after", fun);
+      llvm::Value *ctr = NULL;
 
-      if(ir->counter)
-      {
+      if (ir->counter) {
          ctr = llvm_variable(ir->counter);
-         if(ir->from)
+         if (ir->from)
             bld.CreateStore(llvm_value(ir->from), ctr);
-         if(ir->to)
+         if (ir->to)
             header = llvm::BasicBlock::Create(ctx, "loop.header", fun);
       }
 
       bld.CreateBr(header);
 
-      if(ir->counter && ir->to)
-      {
+      if (ir->counter && ir->to) {
          bld.SetInsertPoint(header);
-         llvm::Value* cond = NULL;
-         llvm::Value* load = bld.CreateLoad(ctr);
-         llvm::Value* to = llvm_value(ir->to);
-         switch(ir->counter->type->base_type)
-         {
+         llvm::Value *cond = NULL;
+         llvm::Value *load = bld.CreateLoad(ctr);
+         llvm::Value *to = llvm_value(ir->to);
+         switch (ir->counter->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
             cond = bld.CreateICmpULT(load, to);
@@ -793,22 +853,22 @@ public:
 
       bld.SetInsertPoint(body);
 
-      std::pair<llvm::BasicBlock*, llvm::BasicBlock*> saved_loop = loop;
+      std::pair<llvm::BasicBlock *, llvm::BasicBlock *> saved_loop = loop;
       loop = std::make_pair(header, after);
       visit_exec_list(&ir->body_instructions, this);
       loop = saved_loop;
 
-      if(ir->counter && ir->increment)
-      {
-         switch(ir->counter->type->base_type)
-         {
+      if (ir->counter && ir->increment) {
+         switch (ir->counter->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
          case GLSL_TYPE_INT:
-            bld.CreateStore(bld.CreateAdd(bld.CreateLoad(ctr), llvm_value(ir->increment)), ctr);
+            bld.CreateStore(bld.CreateAdd(bld.CreateLoad(ctr),
+                                          llvm_value(ir->increment)), ctr);
             break;
          case GLSL_TYPE_FLOAT:
-            bld.CreateStore(bld.CreateFAdd(bld.CreateLoad(ctr), llvm_value(ir->increment)), ctr);
+            bld.CreateStore(bld.CreateFAdd(bld.CreateLoad(ctr),
+                                           llvm_value(ir->increment)), ctr);
             break;
          default:
             assert(0);
@@ -822,9 +882,9 @@ public:
 
    virtual void visit(class ir_if *ir)
    {
-      llvm::BasicBlock* bbt = llvm::BasicBlock::Create(ctx, "if", fun);
-      llvm::BasicBlock* bbf = llvm::BasicBlock::Create(ctx, "else", fun);
-      llvm::BasicBlock* bbe = llvm::BasicBlock::Create(ctx, "endif", fun);
+      llvm::BasicBlock *bbt = llvm::BasicBlock::Create(ctx, "if", fun);
+      llvm::BasicBlock *bbf = llvm::BasicBlock::Create(ctx, "else", fun);
+      llvm::BasicBlock *bbe = llvm::BasicBlock::Create(ctx, "endif", fun);
       bld.CreateCondBr(llvm_value(ir->condition), bbt, bbf);
 
       bld.SetInsertPoint(bbt);
@@ -839,9 +899,9 @@ public:
       bld.SetInsertPoint(bb);
    }
 
-   virtual void visit(class ir_return * ir)
+   virtual void visit(class ir_return *ir)
    {
-      if(!ir->value)
+      if (!ir->value)
          bld.CreateRetVoid();
       else
          bld.CreateRet(llvm_value(ir->value));
@@ -850,12 +910,11 @@ public:
       bld.SetInsertPoint(bb);
    }
 
-   virtual void visit(class ir_call * ir)
+   virtual void visit(class ir_call *ir)
    {
-      std::vector<llvm::Value*> args;
+      std::vector<llvm::Value *> args;
 
-      foreach_iter(exec_list_iterator, iter, *ir)
-      {
+      foreach_iter(exec_list_iterator, iter, *ir) {
          ir_rvalue *arg = (ir_constant *)iter.get();
          args.push_back(llvm_value(arg));
       }
@@ -863,38 +922,36 @@ public:
       result = bld.CreateCall(llvm_function(ir->callee), args);
 
       llvm::AttrListPtr attr;
-      ((llvm::CallInst*)result)->setAttributes(attr);
+      ((llvm::CallInst *)result)->setAttributes(attr);
    }
 
-   virtual void visit(class ir_constant * ir)
+   virtual void visit(class ir_constant *ir)
    {
       if (ir->type->base_type == GLSL_TYPE_STRUCT) {
-         std::vector<llvm::Constant*> fields;
+         std::vector<llvm::Constant *> fields;
          foreach_iter(exec_list_iterator, iter, ir->components) {
             ir_constant *field = (ir_constant *)iter.get();
             fields.push_back(llvm_constant(field));
          }
-         result = llvm::ConstantStruct::get((llvm::StructType*)llvm_type(ir->type), fields);
+         result = llvm::ConstantStruct::get((llvm::StructType *)llvm_type(ir->type), fields);
       }
       else if (ir->type->base_type == GLSL_TYPE_ARRAY) {
-         std::vector<llvm::Constant*> elems;
+         std::vector<llvm::Constant *> elems;
          for (unsigned i = 0; i < ir->type->length; i++)
             elems.push_back(llvm_constant(ir->array_elements[i]));
-         result = llvm::ConstantArray::get((llvm::ArrayType*)llvm_type(ir->type), elems);
+         result = llvm::ConstantArray::get((llvm::ArrayType *)llvm_type(ir->type), elems);
       }
-      else
-      {
-         llvm::Type* base_type = llvm_base_type(ir->type->base_type);
-         llvm::Type* type = llvm_type(ir->type);
+      else {
+         llvm::Type *base_type = llvm_base_type(ir->type->base_type);
+         llvm::Type *type = llvm_type(ir->type);
 
-         std::vector<llvm::Constant*> vecs;
+         std::vector<llvm::Constant *> vecs;
          unsigned idx = 0;
          for (unsigned i = 0; i < ir->type->matrix_columns; ++i) {
-            std::vector<llvm::Constant*> elems;
+            std::vector<llvm::Constant *> elems;
             for (unsigned j = 0; j < ir->type->vector_elements; ++j) {
-               llvm::Constant* elem;
-               switch(ir->type->base_type)
-               {
+               llvm::Constant *elem;
+               switch (ir->type->base_type) {
                case GLSL_TYPE_FLOAT:
                   elem = llvm::ConstantFP::get(base_type, ir->value.f[idx]);
                   break;
@@ -914,96 +971,90 @@ public:
                ++idx;
             }
 
-            llvm::Constant* vec;
-            if(ir->type->vector_elements > 1)
+            llvm::Constant *vec;
+            if (ir->type->vector_elements > 1)
                vec = llvm::ConstantVector::get(elems);
             else
                vec = elems[0];
             vecs.push_back(vec);
          }
 
-         if(ir->type->matrix_columns > 1)
-            result = llvm::ConstantArray::get((llvm::ArrayType*)type, vecs);
+         if (ir->type->matrix_columns > 1)
+            result = llvm::ConstantArray::get((llvm::ArrayType *)type, vecs);
          else
             result = vecs[0];
       }
    }
 
-   llvm::Value* llvm_shuffle(llvm::Value* val, int* shuffle_mask, unsigned res_width, const llvm::Twine &name = "")
+   llvm::Value *llvm_shuffle(llvm::Value *val, int *shuffle_mask,
+                             unsigned res_width, const llvm::Twine &name = "")
    {
-      llvm::Type* elem_type = val->getType();
-      llvm::Type* res_type = elem_type;;
+      llvm::Type *elem_type = val->getType();
+      llvm::Type *res_type = elem_type;;
       unsigned val_width = 1;
-      if(val->getType()->isVectorTy())
-      {
-         val_width = ((llvm::VectorType*)val->getType())->getNumElements();
-         elem_type = ((llvm::VectorType*)val->getType())->getElementType();
+      if (val->getType()->isVectorTy()) {
+         val_width = ((llvm::VectorType *)val->getType())->getNumElements();
+         elem_type = ((llvm::VectorType *)val->getType())->getElementType();
       }
-      if(res_width > 1)
+      if (res_width > 1)
          res_type = llvm::VectorType::get(elem_type, res_width);
 
-      std::vector<llvm::Constant*> shuffle_mask_values;
+      std::vector<llvm::Constant *> shuffle_mask_values;
       assert(res_width <= 4);
       bool any_def = false;
-      for(unsigned i = 0; i < res_width; ++i)
-      {
-         if(shuffle_mask[i] < 0)
+      for (unsigned i = 0; i < res_width; ++i) {
+         if (shuffle_mask[i] < 0)
             shuffle_mask_values.push_back(llvm::UndefValue::get(llvm::Type::getInt32Ty(ctx)));
-         else
-         {
+         else {
             any_def = true;
             shuffle_mask_values.push_back(llvm_int(shuffle_mask[i]));
          }
       }
 
-      llvm::Value* undef = llvm::UndefValue::get(res_type);
-      if(!any_def)
+      llvm::Value *undef = llvm::UndefValue::get(res_type);
+      if (!any_def)
          return undef;
 
-      if(val_width > 1)
-      {
-         if(res_width > 1)
-         {
-            if(val_width == res_width)
-            {
+      if (val_width > 1) {
+         if (res_width > 1) {
+            if (val_width == res_width) {
                bool nontrivial = false;
-               for(unsigned i = 0; i < val_width; ++i)
-               {
-                  if(shuffle_mask[i] != (int)i)
+               for (unsigned i = 0; i < val_width; ++i) {
+                  if (shuffle_mask[i] != (int)i)
                      nontrivial = true;
                }
-               if(!nontrivial)
+               if (!nontrivial)
                   return val;
             }
 
-            return bld.CreateShuffleVector(val, llvm::UndefValue::get(val->getType()), llvm::ConstantVector::get(shuffle_mask_values), name);
+            return bld.CreateShuffleVector(val,
+                                           llvm::UndefValue::get(val->getType()),
+                                           llvm::ConstantVector::get(shuffle_mask_values),
+                                           name);
          }
          else
-            return bld.CreateExtractElement(val, llvm_int(shuffle_mask[0]), name);
+            return bld.CreateExtractElement(val, llvm_int(shuffle_mask[0]),
+                                            name);
       }
-      else
-      {
-         if(res_width > 1)
-         {
-            llvm::Value* tmp = undef;
-            for(unsigned i = 0; i < res_width; ++i)
-            {
-               if(shuffle_mask[i] >= 0)
+      else {
+         if (res_width > 1) {
+            llvm::Value *tmp = undef;
+            for (unsigned i = 0; i < res_width; ++i) {
+               if (shuffle_mask[i] >= 0)
                tmp = bld.CreateInsertElement(tmp, val, llvm_int(i), name);
             }
             return tmp;
          }
-         else if(shuffle_mask[0] >= 0)
+         else if (shuffle_mask[0] >= 0)
             return val;
          else
             return undef;
       }
    }
 
-
-   virtual void visit(class ir_swizzle * swz)
+   virtual void visit(class ir_swizzle *swz)
    {
-      llvm::Value* val = llvm_value(swz->val);
+      llvm::Value *val = llvm_value(swz->val);
       int mask[4] = {
          (int)swz->mask.x,
          (int)swz->mask.y,
@@ -1013,53 +1064,52 @@ public:
       result = llvm_shuffle(val, mask, swz->mask.num_components, "swizzle");
    }
 
-   virtual void visit(class ir_assignment * ir)
+   virtual void visit(class ir_assignment *ir)
    {
-      llvm::Value* lhs = llvm_pointer(ir->lhs);
-      llvm::Value* rhs = llvm_value(ir->rhs);
+      llvm::Value *lhs = llvm_pointer(ir->lhs);
+      llvm::Value *rhs = llvm_value(ir->rhs);
       unsigned width = ir->lhs->type->vector_elements;
       unsigned mask = (1 << width) - 1;
       assert(rhs);
 
-      if(!(ir->write_mask & mask))
+      if (!(ir->write_mask & mask))
          return;
 
-      if(ir->rhs->type->vector_elements < width)
-      {
+      if (ir->rhs->type->vector_elements < width) {
          int expand_mask[4] = {-1, -1, -1, -1};
-         for(unsigned i = 0; i < ir->rhs->type->vector_elements; ++i)
+         for (unsigned i = 0; i < ir->rhs->type->vector_elements; ++i)
             expand_mask[i] = i;
-//         printf("ve: %u w %u issw: %i\n", ir->rhs->type->vector_elements, width, !!ir->rhs->as_swizzle());
          rhs = llvm_shuffle(rhs, expand_mask, width, "assign.expand");
       }
 
-      if(width > 1 && (ir->write_mask & mask) != mask)
-      {
-         llvm::Constant* blend_mask[4];
-         for(unsigned i = 0; i < width; ++i)
-         {
-            if(ir->write_mask & (1 << i))
+      if (width > 1 && (ir->write_mask & mask) != mask) {
+         llvm::Constant *blend_mask[4];
+         for (unsigned i = 0; i < width; ++i) {
+            if (ir->write_mask & (1 << i))
                blend_mask[i] = llvm_int(width + i);
             else
                blend_mask[i] = llvm_int(i);
          }
-         rhs = bld.CreateShuffleVector(bld.CreateLoad(lhs), rhs, llvm::ConstantVector::get(blend_mask), "assign.writemask");
+         rhs = bld.CreateShuffleVector(bld.CreateLoad(lhs), rhs,
+                                       llvm::ConstantVector::get(blend_mask),
+                                       "assign.writemask");
       }
 
-      if(ir->condition)
-         rhs = bld.CreateSelect(llvm_value(ir->condition), rhs, bld.CreateLoad(lhs), "assign.conditional");
+      if (ir->condition)
+         rhs = bld.CreateSelect(llvm_value(ir->condition), rhs,
+                                bld.CreateLoad(lhs), "assign.conditional");
 
       bld.CreateStore(rhs, lhs);
    }
 
-   virtual void visit(class ir_variable * var)
+   virtual void visit(class ir_variable *var)
    {
       llvm_variable(var);
    }
 
    virtual void visit(ir_function_signature *sig)
    {
-      if(!sig->is_defined)
+      if (!sig->is_defined)
          return;
 
       assert(!fun);
@@ -1070,7 +1120,7 @@ public:
 
       llvm::Function::arg_iterator ai = fun->arg_begin();
       foreach_iter(exec_list_iterator, iter, sig->parameters) {
-         ir_variable* arg = (ir_variable*)iter.get();
+         ir_variable *arg = (ir_variable *)iter.get();
          ai->setName(arg->name);
          bld.CreateStore(ai, llvm_variable(arg));
          ++ai;
@@ -1082,7 +1132,7 @@ public:
          ir->accept(this);
       }
 
-      if(fun->getReturnType()->isVoidTy())
+      if (fun->getReturnType()->isVoidTy())
          bld.CreateRetVoid();
       else
          bld.CreateRet(llvm::UndefValue::get(fun->getReturnType()));
@@ -1091,11 +1141,10 @@ public:
       fun = NULL;
    }
 
-   virtual void visit(class ir_function * funs)
+   virtual void visit(class ir_function *funs)
    {
-      foreach_iter(exec_list_iterator, iter, *funs)
-      {
-         ir_function_signature* sig = (ir_function_signature*)iter.get();
+      foreach_iter(exec_list_iterator, iter, *funs) {
+         ir_function_signature *sig = (ir_function_signature *)iter.get();
          sig->accept(this);
       }
    }
@@ -1105,18 +1154,16 @@ struct llvm::Module *
 glsl_ir_to_llvm_module(struct exec_list *ir)
 {
    llvm::LLVMContext& ctx = llvm::getGlobalContext();
-   llvm::Module* mod = new llvm::Module("glsl", ctx);
+   llvm::Module *mod = new llvm::Module("glsl", ctx);
    ir_to_llvm_visitor v(ctx, mod);
 
    visit_exec_list(ir, &v);
 
-//   mod->dump();
-   if(llvm::verifyModule(*mod, llvm::PrintMessageAction, 0))
-   {
+   /* mod->dump(); */
+   if (llvm::verifyModule(*mod, llvm::PrintMessageAction, 0)) {
       delete mod;
       return 0;
    }
 
    return mod;
-   //v.ir_to_llvm_emit_op1(NULL, OPCODE_END, ir_to_llvm_undef_dst, ir_to_llvm_undef);
 }

@@ -78,6 +78,20 @@ all-local: libdricore@VERSION@.la
 	$(MKDIR_P) $(top_builddir)/$(LIB_DIR);
 	ln -f .libs/libdricore@VERSION@.so.1.0.0 $(top_builddir)/$(LIB_DIR)/libdricore@VERSION@.so.1;
 	ln -sf libdricore@VERSION@.so.1 $(top_builddir)/$(LIB_DIR)/libdricore@VERSION@.so
+
+
+if HAVE_LLVM
+noinst_LTLIBRARIES += libdricore-llvm.la
+libdricore_llvm_la_SOURCES = \
+	$(GLSL_SRCDIR)/ir_to_llvm.cpp \
+	$(GLSL_SRCDIR)/ir_to_llvm.h
+libdricore_llvm_la_CFLAGS = $(AM_CFLAGS) $(LLVM_CFLAGS)
+libdricore_llvm_la_CXXFLAGS = $(AM_CXXFLAGS) $(LLVM_CXXFLAGS) -Wno-overloaded-virtual
+
+libdricore@VERSION@_la_LIBADD += libdricore-llvm.la
+libdricore@VERSION@_la_LDFLAGS += $(LLVM_LDFLAGS) $(LLVM_LIBS)
+endif
+
 endif
 
 CLEANFILES = \

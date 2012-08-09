@@ -2110,6 +2110,7 @@ AM_CONDITIONAL(HAVE_DRI_DRIVER, echo "$DRIVER_DIRS" | grep 'dri' >/dev/null 2>&1
 AM_CONDITIONAL(HAVE_X86_ASM, echo "$DEFINES" | grep 'X86_ASM' >/dev/null 2>&1)
 AM_CONDITIONAL(HAVE_X86_64_ASM, echo "$DEFINES" | grep 'X86_64_ASM' >/dev/null 2>&1)
 AM_CONDITIONAL(HAVE_SPARC_ASM, echo "$DEFINES" | grep 'SPARC_ASM' >/dev/null 2>&1)
+AM_CONDITIONAL(HAVE_LLVM, test "x$" != "x0")
 
 dnl prepend CORE_DIRS to SRC_DIRS
 SRC_DIRS="$CORE_DIRS $SRC_DIRS"

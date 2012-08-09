@@ -52,20 +52,69 @@ i965_dri_la_SOURCES = \
 
 if HAVE_LLVM
 noinst_LTLIBRARIES = libi965_llvm.la
-libi965_llvm_la_SOURCES = brw_vec4_llvm.cpp
+libi965_llvm_la_SOURCES = \
+	brw_vec4_llvm.cpp \
+	gen_instr_info.cpp \
+	gen_instr_info.h \
+	gen_isel_dag_to_dag.cpp \
+	gen_mc_asm_info.cpp \
+	gen_mc_asm_info.h \
+	gen_mc_target_desc.cpp \
+	gen_register_info.cpp \
+	gen_register_info.h \
+	gen_subtarget.cpp \
+	gen_subtarget.h \
+	gen_target_lowering.cpp \
+	gen_target_lowering.h \
+	gen_target_machine.cpp \
+	gen_target_machine.h
+
 libi965_llvm_la_CFLAGS = $(AM_CFLAGS) $(LLVM_CFLAGS)
-libi965_llvm_la_CXXFLAGS = $(AM_CXXFLAGS) $(LLVM_CXXFLAGS) -Wno-overloaded-virtual -Wno-cast-qual
-LLVM_LIBADD = libi965_llvm.la
+libi965_llvm_la_CXXFLAGS = $(AM_CXXFLAGS) $(LLVM_CXXFLAGS) \
+        -UDEBUG \
+        -Wno-overloaded-virtual \
+        -Wno-cast-qual
+I965_LLVM_LIBADD = libi965_llvm.la
+I965_LLVM_LDFLAGS = $(LLVM_LDFLAGS) $(LLVM_LIBS)
+
+BUILT_SOURCES = \
+	gen_asm_writer.h.inc \
+	gen_calling_conv.h.inc \
+	gen_code_emitter.h.inc \
+	gen_dag_isel.h.inc \
+	gen_instr_info.h.inc \
+	gen_register_info.h.inc \
+	gen_subtarget_info.h.inc
+
+TABLEGEN = $(AM_V_GEN)$(LLVM_BINDIR)/llvm-tblgen -I $(LLVM_INCLUDEDIR)
+
+gen_asm_writer.h.inc: *.td
+	$(TABLEGEN) -gen-asm-writer gen.td -o $@ || rm -f $@
+gen_calling_conv.h.inc: *.td
+	$(TABLEGEN) -gen-callingconv gen.td -o $@ || rm -f $@
+gen_code_emitter.h.inc: *.td
+	$(TABLEGEN) -gen-emitter gen.td -o $@ || rm -f $@
+gen_dag_isel.h.inc: *.td
+	$(TABLEGEN) -gen-dag-isel gen.td -o $@ || rm -f $@
+gen_instr_info.h.inc: *.td
+	$(TABLEGEN) -gen-instr-info gen.td -o $@ || rm -f $@
+gen_register_info.h.inc: *.td
+	$(TABLEGEN) -gen-register-info gen.td -o $@ || rm -f $@
+gen_subtarget_info.h.inc: *.td
+	$(TABLEGEN) -gen-subtarget gen.td -o $@ || rm -f $@
+
 else
 AM_CFLAGS += -DNO_LLVM
 AM_CXXFLAGS += -DNO_LLVM
 endif
 
-i965_dri_la_LDFLAGS = -module -avoid-version -shared
+i965_dri_la_LDFLAGS = -module -avoid-version -shared \
+        $(I965_LLVM_LDFLAGS)
+
 i965_dri_la_LIBADD = \
 	$(DRI_LIB_DEPS) \
 	$(INTEL_LIBS) \
-	$(LLVM_LIBADD) \
+	$(I965_LLVM_LIBADD) \
 	../common/libdricommon.la
 
 # Provide compatibility with scripts for the old Mesa build system for
@@ -73,3 +122,5 @@ i965_dri_la_LIBADD = \
 all-local: i965_dri.la
 	$(MKDIR_P) $(top_builddir)/$(LIB_DIR);
 	ln -f .libs/i965_dri.so $(top_builddir)/$(LIB_DIR)/i965_dri.so;
+
+CLEANFILES = $(BUILT_SOURCES)

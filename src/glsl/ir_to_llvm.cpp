@@ -531,7 +531,7 @@ public:
          return bld.CreateAnd(ops[0], ops[1]);
       case ir_binop_dot:
       {
-         llvm::Value* prod;
+         llvm::Value* prod = NULL;
          switch(ir->operands[0]->type->base_type)
          {
          case GLSL_TYPE_UINT:
@@ -729,11 +729,19 @@ public:
    virtual void visit(class ir_loop_jump *ir)
    {
       llvm::BasicBlock* target;
-      if(ir->mode == ir_loop_jump::jump_continue)
+
+      switch (ir->mode) {
+      case ir_loop_jump::jump_continue:
          target = loop.first;
-      else if(ir->mode == ir_loop_jump::jump_break)
+         break;
+      case ir_loop_jump::jump_break:
          target = loop.second;
-      assert(target);
+         break;
+      default:
+         assert(!"not reached");
+         target = NULL;
+         break;
+      }
 
       bld.CreateBr(target);
 
@@ -746,7 +754,7 @@ public:
       llvm::BasicBlock* body = llvm::BasicBlock::Create(ctx, "loop", fun);
       llvm::BasicBlock* header = body;
       llvm::BasicBlock* after = llvm::BasicBlock::Create(ctx, "loop.after", fun);
-      llvm::Value* ctr;
+      llvm::Value* ctr = NULL;
 
       if(ir->counter)
       {
@@ -762,7 +770,7 @@ public:
       if(ir->counter && ir->to)
       {
          bld.SetInsertPoint(header);
-         llvm::Value* cond;
+         llvm::Value* cond = NULL;
          llvm::Value* load = bld.CreateLoad(ctr);
          llvm::Value* to = llvm_value(ir->to);
          switch(ir->counter->type->base_type)

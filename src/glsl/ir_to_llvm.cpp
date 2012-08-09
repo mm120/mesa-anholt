@@ -991,7 +991,12 @@ public:
    virtual void visit(class ir_swizzle * swz)
    {
       llvm::Value* val = llvm_value(swz->val);
-      int mask[4] = {swz->mask.x, swz->mask.y, swz->mask.z, swz->mask.w};
+      int mask[4] = {
+         (int)swz->mask.x,
+         (int)swz->mask.y,
+         (int)swz->mask.z,
+         (int)swz->mask.w
+      };
       result = llvm_shuffle(val, mask, swz->mask.num_components, "swizzle");
    }
 

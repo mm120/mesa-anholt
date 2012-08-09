@@ -703,7 +703,7 @@ _mesa_uniform(struct gl_context *ctx, struct gl_shader_program *shProg,
       int i;
 
       for (i = 0; i < count; i++) {
-	 const unsigned texUnit = ((unsigned *) values)[i];
+	 const unsigned texUnit = ((const unsigned *) values)[i];
 
          /* check that the sampler (tex unit index) is legal */
          if (texUnit >= ctx->Const.MaxCombinedTextureImageUnits) {
@@ -769,7 +769,7 @@ _mesa_uniform(struct gl_context *ctx, struct gl_shader_program *shProg,
 
       for (i = 0; i < count; i++) {
 	 shProg->SamplerUnits[uni->sampler + offset + i] =
-	    ((unsigned *) values)[i];
+	    ((const unsigned *) values)[i];
       }
 
       bool flushed = false;

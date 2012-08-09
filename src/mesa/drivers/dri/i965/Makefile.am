@@ -45,18 +45,79 @@ AM_CXXFLAGS = $(AM_CFLAGS)
 
 dridir = $(DRI_DRIVER_INSTALL_DIR)
 
-noinst_LTLIBRARIES = libi965_dri.la
+noinst_LTLIBRARIES = libi965_dri.la $(LLVM_HELPER_LIB)
 dri_LTLIBRARIES = i965_dri.la
 
 libi965_dri_la_SOURCES = \
 	$(i965_C_FILES) \
 	$(i965_CXX_FILES)
 
+if HAVE_LLVM
+LLVM_HELPER_LIB = libi965_llvm.la
+libi965_llvm_la_SOURCES = \
+	brw_fs_llvm.cpp \
+	gen_frame_lowering.cpp \
+	gen_frame_lowering.h \
+	gen_instr_info.cpp \
+	gen_instr_info.h \
+	gen_isel_dag_to_dag.cpp \
+	gen_mc_asm_info.cpp \
+	gen_mc_asm_info.h \
+	gen_mc_target_desc.cpp \
+	gen_register_info.cpp \
+	gen_register_info.h \
+	gen_subtarget.cpp \
+	gen_subtarget.h \
+	gen_target_lowering.cpp \
+	gen_target_lowering.h \
+	gen_target_machine.cpp \
+	gen_target_machine.h
+
+libi965_llvm_la_CFLAGS = $(AM_CFLAGS) $(LLVM_CFLAGS)
+libi965_llvm_la_CXXFLAGS = $(AM_CXXFLAGS) $(LLVM_CXXFLAGS) \
+        -UDEBUG \
+        -Wno-overloaded-virtual \
+        -Wno-cast-qual
+I965_LLVM_LIBADD = libi965_llvm.la
+I965_LLVM_LDFLAGS = $(LLVM_LDFLAGS) $(LLVM_LIBS) `$(LLVM_CONFIG) --libs ipo`
+
+BUILT_SOURCES = \
+	gen_asm_writer.h.inc \
+	gen_calling_conv.h.inc \
+	gen_code_emitter.h.inc \
+	gen_dag_isel.h.inc \
+	gen_instr_info.h.inc \
+	gen_register_info.h.inc \
+	gen_subtarget_info.h.inc
+
+TABLEGEN = $(AM_V_GEN)$(LLVM_BINDIR)/llvm-tblgen -I $(LLVM_INCLUDEDIR)
+
+gen_asm_writer.h.inc: *.td
+	$(TABLEGEN) -gen-asm-writer gen.td -o $@ || (rm -f $@; exit 1)
+gen_calling_conv.h.inc: *.td
+	$(TABLEGEN) -gen-callingconv gen.td -o $@ || (rm -f $@; exit 1)
+gen_code_emitter.h.inc: *.td
+	$(TABLEGEN) -gen-emitter gen.td -o $@ || (rm -f $@; exit 1)
+gen_dag_isel.h.inc: *.td
+	$(TABLEGEN) -gen-dag-isel gen.td -o $@ || (rm -f $@; exit 1)
+gen_instr_info.h.inc: *.td
+	$(TABLEGEN) -gen-instr-info gen.td -o $@ || (rm -f $@; exit 1)
+gen_register_info.h.inc: *.td
+	$(TABLEGEN) -gen-register-info gen.td -o $@ || (rm -f $@; exit 1)
+gen_subtarget_info.h.inc: *.td
+	$(TABLEGEN) -gen-subtarget gen.td -o $@ || (rm -f $@; exit 1)
+
+else
+AM_CFLAGS += -DNO_LLVM
+AM_CXXFLAGS += -DNO_LLVM
+endif
+
 # list of libs to be linked against by i965_dri.so and i965 test programs.
 COMMON_LIBS = \
 	libi965_dri.la \
 	$(DRI_LIB_DEPS) \
 	$(INTEL_LIBS) \
+	$(I965_LLVM_LIBADD) \
 	../common/libdricommon.la
 
 TEST_LIBS = \
@@ -66,7 +127,8 @@ TEST_LIBS = \
 
 i965_dri_la_SOURCES =
 i965_dri_la_LIBADD = $(COMMON_LIBS)
-i965_dri_la_LDFLAGS = -module -avoid-version -shared
+i965_dri_la_LDFLAGS = -module -avoid-version -shared \
+        $(I965_LLVM_LDFLAGS)
 
 TESTS = test_eu_compact
 check_PROGRAMS = test_eu_compact
@@ -83,3 +145,5 @@ all-local: i965_dri.la
 	ln -f .libs/i965_dri.so $(top_builddir)/$(LIB_DIR)/i965_dri.so;
 
 endif
+
+CLEANFILES = $(BUILT_SOURCES)

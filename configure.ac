@@ -1643,6 +1643,10 @@ if test "x$enable_gallium_llvm" = xauto; then
     i*86|x86_64) enable_gallium_llvm=yes;;
     esac
 fi
+case $DRI_DIRS in
+*i965*)
+    enable_gallium_llvm=yes;;
+esac
 if test "x$enable_gallium_llvm" = xyes; then
     if test "x$llvm_prefix" != x; then
         AC_PATH_PROG([LLVM_CONFIG], [llvm-config], [no], ["$llvm_prefix/bin"])

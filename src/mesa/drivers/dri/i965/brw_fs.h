@@ -229,6 +229,8 @@ public:
 					   fs_reg reg);
 
    bool run();
+   bool build_llvm();
+
    void setup_paramvalues_refs();
    void assign_curb_setup();
    void calculate_urb_setup();

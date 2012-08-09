@@ -62,6 +62,13 @@ libglsl_la_SOURCES = \
 libglsl_la_LIBADD = libglslcommon.la
 libglsl_la_LDFLAGS =
 
+if HAVE_LLVM
+libglsl_la_SOURCES += \
+	ir_to_llvm.cpp \
+	ir_to_llvm.h
+AM_CFLAGS += $(LLVM_CFLAGS)
+endif
+
 glsl_compiler_SOURCES = \
 	$(GLSL2_SOURCES)
 

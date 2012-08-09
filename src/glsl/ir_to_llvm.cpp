@@ -843,7 +843,7 @@ public:
          args.push_back(llvm_value(arg));
       }
 
-      result = bld.CreateCall(llvm_function(ir->get_callee()), args.begin(), args.end());
+      result = bld.CreateCall(llvm_function(ir->callee), args.begin(), args.end());
 
       llvm::AttrListPtr attr;
       ((llvm::CallInst*)result)->setAttributes(attr);

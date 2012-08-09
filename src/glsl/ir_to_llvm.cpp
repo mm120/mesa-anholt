@@ -272,22 +272,6 @@ public:
       }
    }
 
-   static Value *create_shuffle3(IRBuilder<>& bld,
-                                 Value *v,
-                                 unsigned a, unsigned b, unsigned c,
-                                 const Twine& name = "")
-   {
-      Type *int_ty = Type::getInt32Ty(v->getContext());
-      Constant *vals[3] = {
-         ConstantInt::get(int_ty, a),
-         ConstantInt::get(int_ty, b),
-         ConstantInt::get(int_ty, c)
-      };
-      return bld.CreateShuffleVector(v, UndefValue::get(v->getType()),
-                                     ConstantVector::get(vals),
-                                     name);
-   }
-
    Value *llvm_expression(ir_expression *ir)
    {
       Value *ops[2];

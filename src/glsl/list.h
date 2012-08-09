@@ -328,7 +328,7 @@ struct exec_list {
        * The first two methods tend to generate better code on modern systems
        * because they save a pointer dereference.
        */
-      return head == (exec_node *) &tail;
+      return head == (const exec_node *) &tail;
    }
 
    const exec_node *get_head() const

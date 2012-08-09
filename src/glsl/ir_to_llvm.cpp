@@ -220,8 +220,12 @@ public:
          return llvm_variable(deref->variable_referenced());
       else if(ir_dereference_array* deref = ir->as_dereference_array())
       {
-         llvm::Value* gep[2] = {llvm_int(0), llvm_value(deref->array_index)};
-         return bld.CreateInBoundsGEP(llvm_pointer(deref->array), gep, gep + 2);
+         llvm::Value * ref[] = {
+            llvm_int(0),
+            llvm_value(deref->array_index)
+         };
+         return bld.CreateInBoundsGEP(llvm_pointer(deref->array),
+                                      ref);
          }
       else if(ir->as_dereference())
       {
@@ -240,14 +244,14 @@ public:
    llvm::Value* llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value* a)
    {
       llvm::Type* types[1] = {a->getType()};
-      return bld.CreateCall(llvm::Intrinsic::getDeclaration(mod, id, types, 1), a);
+      return bld.CreateCall(llvm::Intrinsic::getDeclaration(mod, id, types), a);
    }
 
    llvm::Value* llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value* a, llvm::Value* b)
    {
       llvm::Type* types[2] = {a->getType(), b->getType()};
       /* only one type suffix is usually needed, so pass 1 here */
-      return bld.CreateCall2(llvm::Intrinsic::getDeclaration(mod, id, types, 1), a, b);
+      return bld.CreateCall2(llvm::Intrinsic::getDeclaration(mod, id, types), a, b);
    }
 
    llvm::Constant* llvm_imm(llvm::Type* type, double v)
@@ -275,7 +279,9 @@ public:
    {
       llvm::Type* int_ty = llvm::Type::getInt32Ty(v->getContext());
       llvm::Constant* vals[3] = {llvm::ConstantInt::get(int_ty, a), llvm::ConstantInt::get(int_ty, b), llvm::ConstantInt::get(int_ty, c)};
-      return bld.CreateShuffleVector(v, llvm::UndefValue::get(v->getType()), llvm::ConstantVector::get(vals, 3), name);
+      return bld.CreateShuffleVector(v, llvm::UndefValue::get(v->getType()),
+                                     llvm::ConstantVector::get(vals),
+                                     name);
    }
 
    llvm::Value* llvm_expression(ir_expression* ir)
@@ -846,7 +852,7 @@ public:
          args.push_back(llvm_value(arg));
       }
 
-      result = bld.CreateCall(llvm_function(ir->callee), args.begin(), args.end());
+      result = bld.CreateCall(llvm_function(ir->callee), args);
 
       llvm::AttrListPtr attr;
       ((llvm::CallInst*)result)->setAttributes(attr);
@@ -871,7 +877,6 @@ public:
       else
       {
          llvm::Type* base_type = llvm_base_type(ir->type->base_type);
-         llvm::Type* vec_type = llvm_vec_type(ir->type);
          llvm::Type* type = llvm_type(ir->type);
 
          std::vector<llvm::Constant*> vecs;
@@ -903,7 +908,7 @@ public:
 
             llvm::Constant* vec;
             if(ir->type->vector_elements > 1)
-               vec = llvm::ConstantVector::get((llvm::VectorType*)vec_type, elems);
+               vec = llvm::ConstantVector::get(elems);
             else
                vec = elems[0];
             vecs.push_back(vec);
@@ -929,17 +934,17 @@ public:
       if(res_width > 1)
          res_type = llvm::VectorType::get(elem_type, res_width);
 
-      llvm::Constant* shuffle_mask_values[4];
+      std::vector<llvm::Constant*> shuffle_mask_values;
       assert(res_width <= 4);
       bool any_def = false;
       for(unsigned i = 0; i < res_width; ++i)
       {
          if(shuffle_mask[i] < 0)
-            shuffle_mask_values[i] = llvm::UndefValue::get(llvm::Type::getInt32Ty(ctx));
+            shuffle_mask_values.push_back(llvm::UndefValue::get(llvm::Type::getInt32Ty(ctx)));
          else
          {
             any_def = true;
-            shuffle_mask_values[i] = llvm_int(shuffle_mask[i]);
+            shuffle_mask_values.push_back(llvm_int(shuffle_mask[i]));
          }
       }
 
@@ -963,7 +968,7 @@ public:
                   return val;
             }
 
-            return bld.CreateShuffleVector(val, llvm::UndefValue::get(val->getType()), llvm::ConstantVector::get(shuffle_mask_values, res_width), name);
+            return bld.CreateShuffleVector(val, llvm::UndefValue::get(val->getType()), llvm::ConstantVector::get(shuffle_mask_values), name);
          }
          else
             return bld.CreateExtractElement(val, llvm_int(shuffle_mask[0]), name);
@@ -1030,7 +1035,7 @@ public:
             else
                blend_mask[i] = llvm_int(i);
          }
-         rhs = bld.CreateShuffleVector(bld.CreateLoad(lhs), rhs, llvm::ConstantVector::get(blend_mask, width), "assign.writemask");
+         rhs = bld.CreateShuffleVector(bld.CreateLoad(lhs), rhs, llvm::ConstantVector::get(blend_mask), "assign.writemask");
       }
 
       if(ir->condition)

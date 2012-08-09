@@ -77,7 +77,7 @@ public:
    {
    }
 
-   const llvm::Type* llvm_base_type(unsigned base_type)
+   llvm::Type* llvm_base_type(unsigned base_type)
    {
       switch(base_type)
       {
@@ -98,29 +98,29 @@ public:
       }
    }
 
-   const llvm::Type* llvm_vec_type(const glsl_type* type)
+   llvm::Type* llvm_vec_type(const glsl_type* type)
    {
       if(type->is_array())
          return llvm::ArrayType::get(llvm_type(type->fields.array), type->array_size());
 
       if(type->is_record())
       {
-         std::vector<const llvm::Type*> fields;
+         std::vector<llvm::Type*> fields;
          for (unsigned i = 0; i < type->length; i++)
             fields.push_back(llvm_type(type->fields.structure[i].type));
          return llvm::StructType::get(ctx, fields);
       }
 
-      const llvm::Type* base_type = llvm_base_type(type->base_type);
+      llvm::Type* base_type = llvm_base_type(type->base_type);
       if(type->vector_elements <= 1)
          return base_type;
       else
          return llvm::VectorType::get(base_type, type->vector_elements);
    }
 
-   const llvm::Type* llvm_type(const glsl_type* type)
+   llvm::Type* llvm_type(const glsl_type* type)
    {
-      const llvm::Type* vec_type = llvm_vec_type(type);
+      llvm::Type* vec_type = llvm_vec_type(type);
       if(type->matrix_columns <= 1)
          return vec_type;
       else
@@ -137,7 +137,7 @@ public:
          return vari->second;
       else
       {
-         const llvm::Type* type = llvm_type(var->type);
+         llvm::Type* type = llvm_type(var->type);
 
          llvm::Value* v;
          if(fun)
@@ -182,7 +182,7 @@ public:
             linkage = llvm::Function::ExternalLinkage;
          else
             linkage = llvm::Function::InternalLinkage;
-         std::vector<const llvm::Type*> params;
+         std::vector<llvm::Type*> params;
          foreach_iter(exec_list_iterator, iter, sig->parameters) {
             ir_variable* arg = (ir_variable*)iter.get();
             params.push_back(llvm_type(arg->type));
@@ -239,18 +239,18 @@ public:
 
    llvm::Value* llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value* a)
    {
-      const llvm::Type* types[1] = {a->getType()};
+      llvm::Type* types[1] = {a->getType()};
       return bld.CreateCall(llvm::Intrinsic::getDeclaration(mod, id, types, 1), a);
    }
 
    llvm::Value* llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value* a, llvm::Value* b)
    {
-      const llvm::Type* types[2] = {a->getType(), b->getType()};
+      llvm::Type* types[2] = {a->getType(), b->getType()};
       /* only one type suffix is usually needed, so pass 1 here */
       return bld.CreateCall2(llvm::Intrinsic::getDeclaration(mod, id, types, 1), a, b);
    }
 
-   llvm::Constant* llvm_imm(const llvm::Type* type, double v)
+   llvm::Constant* llvm_imm(llvm::Type* type, double v)
    {
       if(type->isVectorTy())
       {
@@ -273,7 +273,7 @@ public:
 
    static llvm::Value* create_shuffle3(llvm::IRBuilder<>& bld, llvm::Value* v, unsigned a, unsigned b, unsigned c, const llvm::Twine& name = "")
    {
-      const llvm::Type* int_ty = llvm::Type::getInt32Ty(v->getContext());
+      llvm::Type* int_ty = llvm::Type::getInt32Ty(v->getContext());
       llvm::Constant* vals[3] = {llvm::ConstantInt::get(int_ty, a), llvm::ConstantInt::get(int_ty, b), llvm::ConstantInt::get(int_ty, c)};
       return bld.CreateShuffleVector(v, llvm::UndefValue::get(v->getType()), llvm::ConstantVector::get(vals, 3), name);
    }
@@ -885,9 +885,9 @@ public:
       }
       else
       {
-         const llvm::Type* base_type = llvm_base_type(ir->type->base_type);
-         const llvm::Type* vec_type = llvm_vec_type(ir->type);
-         const llvm::Type* type = llvm_type(ir->type);
+         llvm::Type* base_type = llvm_base_type(ir->type->base_type);
+         llvm::Type* vec_type = llvm_vec_type(ir->type);
+         llvm::Type* type = llvm_type(ir->type);
 
          std::vector<llvm::Constant*> vecs;
          unsigned idx = 0;
@@ -931,8 +931,8 @@ public:
 
    llvm::Value* llvm_shuffle(llvm::Value* val, int* shuffle_mask, unsigned res_width, const llvm::Twine &name = "")
    {
-      const llvm::Type* elem_type = val->getType();
-      const llvm::Type* res_type = elem_type;;
+      llvm::Type* elem_type = val->getType();
+      llvm::Type* res_type = elem_type;;
       unsigned val_width = 1;
       if(val->getType()->isVectorTy())
       {

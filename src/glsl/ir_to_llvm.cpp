@@ -715,7 +715,6 @@ public:
       }
 
       bld.SetInsertPoint(discard);
-      bld.CreateUnwind();
 
       bb = after;
       bld.SetInsertPoint(bb);

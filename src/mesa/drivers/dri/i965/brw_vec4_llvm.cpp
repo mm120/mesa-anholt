@@ -27,8 +27,13 @@
 #include "llvm/DerivedTypes.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
+#include "llvm/PassManager.h"
+#include "llvm/Transforms/Scalar.h"
+#include <llvm/Support/FormattedStream.h>
+#include "llvm/Support/TargetRegistry.h"
 #include "glsl/ir_to_llvm.h"
 #include "brw_vec4.h"
+#include "gen_target_machine.h"
 
 using namespace llvm;
 using namespace brw;
@@ -42,6 +47,39 @@ vec4_visitor::build_llvm()
    if (!mod)
       return false;
 
+   mod->dump();
+
+   gen_initialize_llvm_target();
+   gen_initialize_llvm_target_mc();
+
+   std::string FS;
+   std::string TT = "FINISHME";
+   std::string CPU = "gen7";
+   TargetOptions TO;
+
+   gen_target_machine *tm = (gen_target_machine *)
+      the_gen_target.createTargetMachine(
+         TT,
+         CPU,
+         FS,
+         TO,
+         Reloc::Default,
+         CodeModel::Default,
+         CodeGenOpt::Default);
+
+   PassManager PM;
+   PM.add(new TargetData(*tm->getTargetData()));
+   PM.add(createPromoteMemoryToRegisterPass());
+
+   std::string CodeString;
+   raw_string_ostream oStream(CodeString);
+   formatted_raw_ostream out(oStream);
+
+   tm->addPassesToEmitFile(PM, out, TargetMachine::CGFT_AssemblyFile, true);
+
+   PM.run(*mod);
+
+   printf("dump2\n");
    mod->dump();
 
    return true;

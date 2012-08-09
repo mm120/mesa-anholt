@@ -1144,8 +1144,10 @@ glsl_ir_to_llvm_module(struct exec_list *ir)
 
    visit_exec_list(ir, &v);
 
-   /* mod->dump(); */
    if (verifyModule(*mod, PrintMessageAction, 0)) {
+      fprintf(stderr, "LLVM IR verify failed.  LLVM IR:\n");
+      mod->dump();
+
       delete mod;
       return 0;
    }

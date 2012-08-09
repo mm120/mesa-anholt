@@ -308,8 +308,13 @@ public:
       switch (ir->operation) {
       case ir_unop_logic_not:
          return bld.CreateNot(ops[0]);
+
       case ir_unop_neg:
-         return bld.CreateNeg(ops[0]);
+         if (ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT)
+            return bld.CreateFNeg(ops[0]);
+         else
+            return bld.CreateNeg(ops[0]);
+
       case ir_unop_abs:
          switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_UINT:

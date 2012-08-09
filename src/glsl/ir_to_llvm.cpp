@@ -55,6 +55,8 @@ namespace std
    using namespace tr1;
 }
 
+using namespace llvm;
+
 #include "ir.h"
 #include "ir_visitor.h"
 #include "glsl_types.h"
@@ -63,107 +65,107 @@ class ir_to_llvm_visitor : public ir_visitor {
 public:
    ir_to_llvm_visitor();
 
-   llvm::LLVMContext& ctx;
-   llvm::Module *mod;
-   llvm::Function *fun;
+   LLVMContext& ctx;
+   Module *mod;
+   Function *fun;
    /* could easily support more loops, but GLSL doesn't support multiloop
     * break/continue
     */
-   std::pair<llvm::BasicBlock *, llvm::BasicBlock *> loop;
-   llvm::BasicBlock *bb;
-   llvm::Value *result;
-   llvm::IRBuilder<> bld;
+   std::pair<BasicBlock *, BasicBlock *> loop;
+   BasicBlock *bb;
+   Value *result;
+   IRBuilder<> bld;
 
-   ir_to_llvm_visitor(llvm::LLVMContext &p_ctx, llvm::Module *p_mod)
+   ir_to_llvm_visitor(LLVMContext &p_ctx, Module *p_mod)
       : ctx(p_ctx), mod(p_mod), fun(0), bb(0), bld(ctx)
    {
-      loop = std::make_pair((llvm::BasicBlock *)0, (llvm::BasicBlock *)0);
+      loop = std::make_pair((BasicBlock *)0, (BasicBlock *)0);
    }
 
-   llvm::Type *llvm_base_type(unsigned base_type)
+   Type *llvm_base_type(unsigned base_type)
    {
       switch (base_type) {
       case GLSL_TYPE_VOID:
-         return llvm::Type::getVoidTy(ctx);
+         return Type::getVoidTy(ctx);
       case GLSL_TYPE_UINT:
       case GLSL_TYPE_INT:
-         return llvm::Type::getInt32Ty(ctx);
+         return Type::getInt32Ty(ctx);
       case GLSL_TYPE_FLOAT:
-         return llvm::Type::getFloatTy(ctx);
+         return Type::getFloatTy(ctx);
       case GLSL_TYPE_BOOL:
-         return llvm::Type::getInt1Ty(ctx);
+         return Type::getInt1Ty(ctx);
       case GLSL_TYPE_SAMPLER:
-         return llvm::PointerType::getUnqual(llvm::Type::getVoidTy(ctx));
+         return PointerType::getUnqual(Type::getVoidTy(ctx));
       default:
          assert(0);
          return 0;
       }
    }
 
-   llvm::Type *llvm_vec_type(const glsl_type *type)
+   Type *llvm_vec_type(const glsl_type *type)
    {
       if (type->is_array())
-         return llvm::ArrayType::get(llvm_type(type->fields.array),
-                                     type->array_size());
+         return ArrayType::get(llvm_type(type->fields.array),
+                               type->array_size());
 
       if (type->is_record()) {
-         std::vector<llvm::Type *> fields;
+         std::vector<Type *> fields;
          for (unsigned i = 0; i < type->length; i++)
             fields.push_back(llvm_type(type->fields.structure[i].type));
-         return llvm::StructType::get(ctx, fields);
+         return StructType::get(ctx, fields);
       }
 
-      llvm::Type *base_type = llvm_base_type(type->base_type);
+      Type *base_type = llvm_base_type(type->base_type);
       if (type->vector_elements <= 1)
          return base_type;
       else
-         return llvm::VectorType::get(base_type, type->vector_elements);
+         return VectorType::get(base_type, type->vector_elements);
    }
 
-   llvm::Type *llvm_type(const glsl_type *type)
+   Type *llvm_type(const glsl_type *type)
    {
-      llvm::Type *vec_type = llvm_vec_type(type);
+      Type *vec_type = llvm_vec_type(type);
       if (type->matrix_columns <= 1)
          return vec_type;
       else
-         return llvm::ArrayType::get(vec_type, type->matrix_columns);
+         return ArrayType::get(vec_type, type->matrix_columns);
    }
 
-   typedef std::unordered_map<ir_variable *, llvm::Value *> llvm_variables_t;
+   typedef std::unordered_map<ir_variable *, Value *> llvm_variables_t;
    llvm_variables_t llvm_variables;
 
-   llvm::Value *llvm_variable(class ir_variable *var)
+   Value *llvm_variable(class ir_variable *var)
    {
       llvm_variables_t::iterator vari = llvm_variables.find(var);
       if (vari != llvm_variables.end())
          return vari->second;
       else {
-         llvm::Type *type = llvm_type(var->type);
+         Type *type = llvm_type(var->type);
 
-         llvm::Value *v;
+         Value *v;
          if (fun) {
             if (bb == &fun->getEntryBlock())
                v = bld.CreateAlloca(type, 0, var->name);
             else
-               v = new llvm::AllocaInst(type, 0, var->name,
-                                        fun->getEntryBlock().getTerminator());
+               v = new AllocaInst(type, 0, var->name,
+                                  fun->getEntryBlock().getTerminator());
          }
          else {
             /* TODO: can anything global be non-constant in GLSL?; fix
              * linkage
              */
-            llvm::Function::LinkageTypes linkage;
+            Function::LinkageTypes linkage;
             if (var->mode == ir_var_auto || var->mode == ir_var_temporary)
-               linkage = llvm::GlobalValue::InternalLinkage;
+               linkage = GlobalValue::InternalLinkage;
             else
-               linkage = llvm::GlobalValue::ExternalLinkage;
-            llvm::Constant *init = 0;
+               linkage = GlobalValue::ExternalLinkage;
+            Constant *init = 0;
             if (var->constant_value)
                init = llvm_constant(var->constant_value);
-            else if (linkage == llvm::GlobalValue::InternalLinkage)
-               init = llvm::UndefValue::get(llvm_type(var->type));
-            v = new llvm::GlobalVariable(*mod, type, var->read_only, linkage,
-                                         init, var->name);
+            else if (linkage == GlobalValue::InternalLinkage)
+               init = UndefValue::get(llvm_type(var->type));
+            v = new GlobalVariable(*mod, type, var->read_only, linkage,
+                                   init, var->name);
          }
          llvm_variables[var] = v;
          return v;
@@ -171,60 +173,60 @@ public:
    }
 
    typedef std::unordered_map<ir_function_signature *,
-                              llvm::Function *> llvm_functions_t;
+                              Function *> llvm_functions_t;
    llvm_functions_t llvm_functions;
 
-   llvm::Function *llvm_function(class ir_function_signature *sig)
+   Function *llvm_function(class ir_function_signature *sig)
    {
       llvm_functions_t::iterator funi = llvm_functions.find(sig);
       if (funi != llvm_functions.end())
          return funi->second;
       else {
          const char *name = sig->function_name();
-         llvm::Function::LinkageTypes linkage;
+         Function::LinkageTypes linkage;
          if (!strcmp(name, "main") || !sig->is_defined)
-            linkage = llvm::Function::ExternalLinkage;
+            linkage = Function::ExternalLinkage;
          else
-            linkage = llvm::Function::InternalLinkage;
-         std::vector<llvm::Type *> params;
+            linkage = Function::InternalLinkage;
+         std::vector<Type *> params;
          foreach_iter(exec_list_iterator, iter, sig->parameters) {
             ir_variable *arg = (ir_variable *)iter.get();
             params.push_back(llvm_type(arg->type));
          }
 
-         llvm::FunctionType *ft =
-            llvm::FunctionType::get(llvm_type(sig->return_type), params, false);
+         FunctionType *ft = FunctionType::get(llvm_type(sig->return_type),
+                                              params, false);
 
-         llvm::Function *f = llvm::Function::Create(ft, linkage, name, mod);
+         Function *f = Function::Create(ft, linkage, name, mod);
          llvm_functions[sig] = f;
          return f;
       }
 
    }
 
-   llvm::Value *llvm_value(class ir_instruction *ir)
+   Value *llvm_value(class ir_instruction *ir)
    {
       result = 0;
       ir->accept(this);
       return result;
    }
 
-   llvm::Constant *llvm_constant(class ir_instruction *ir)
+   Constant *llvm_constant(class ir_instruction *ir)
    {
-      return &dynamic_cast<llvm::Constant &>(*llvm_value(ir));
+      return &dynamic_cast<Constant &>(*llvm_value(ir));
    }
 
-   llvm::Constant *llvm_int(unsigned v)
+   Constant *llvm_int(unsigned v)
    {
-      return llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), v);
+      return ConstantInt::get(Type::getInt32Ty(ctx), v);
    }
 
-   llvm::Value *llvm_pointer(class ir_rvalue *ir)
+   Value *llvm_pointer(class ir_rvalue *ir)
    {
       if (ir_dereference_variable *deref = ir->as_dereference_variable())
          return llvm_variable(deref->variable_referenced());
       else if (ir_dereference_array *deref = ir->as_dereference_array()) {
-         llvm::Value *ref[] = {
+         Value *ref[] = {
             llvm_int(0),
             llvm_value(deref->array_index)
          };
@@ -243,58 +245,57 @@ public:
       }
    }
 
-   llvm::Value *llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value *a)
+   Value *llvm_intrinsic(Intrinsic::ID id, Value *a)
    {
-      llvm::Type *types[1] = {a->getType()};
-      return bld.CreateCall(llvm::Intrinsic::getDeclaration(mod, id, types), a);
+      Type *types[1] = {a->getType()};
+      return bld.CreateCall(Intrinsic::getDeclaration(mod, id, types), a);
    }
 
-   llvm::Value *llvm_intrinsic(llvm::Intrinsic::ID id, llvm::Value *a, llvm::Value *b)
+   Value *llvm_intrinsic(Intrinsic::ID id, Value *a, Value *b)
    {
-      llvm::Type *types[2] = {a->getType(), b->getType()};
+      Type *types[2] = {a->getType(), b->getType()};
       /* only one type suffix is usually needed, so pass 1 here */
-      return bld.CreateCall2(llvm::Intrinsic::getDeclaration(mod, id,
-                                                             types), a, b);
+      return bld.CreateCall2(Intrinsic::getDeclaration(mod, id, types), a, b);
    }
 
-   llvm::Constant *llvm_imm(llvm::Type *type, double v)
+   Constant *llvm_imm(Type *type, double v)
    {
       if (type->isVectorTy()) {
-         std::vector<llvm::Constant *> values;
-         values.push_back(llvm_imm(((llvm::VectorType *)type)->getElementType(), v));
-         for (unsigned i = 1; i < ((llvm::VectorType *)type)->getNumElements(); ++i)
+         std::vector<Constant *> values;
+         values.push_back(llvm_imm(((VectorType *)type)->getElementType(), v));
+         for (unsigned i = 1; i < ((VectorType *)type)->getNumElements(); ++i)
             values.push_back(values[0]);
-         return llvm::ConstantVector::get(values);
+         return ConstantVector::get(values);
       }
       else if (type->isIntegerTy())
-         return llvm::ConstantInt::get(type, v);
+         return ConstantInt::get(type, v);
       else if (type->isFloatingPointTy())
-         return llvm::ConstantFP::get(type, v);
+         return ConstantFP::get(type, v);
       else {
          assert(0);
          return 0;
       }
    }
 
-   static llvm::Value *create_shuffle3(llvm::IRBuilder<>& bld,
-                                       llvm::Value *v,
-                                       unsigned a, unsigned b, unsigned c,
-                                       const llvm::Twine& name = "")
+   static Value *create_shuffle3(IRBuilder<>& bld,
+                                 Value *v,
+                                 unsigned a, unsigned b, unsigned c,
+                                 const Twine& name = "")
    {
-      llvm::Type *int_ty = llvm::Type::getInt32Ty(v->getContext());
-      llvm::Constant *vals[3] = {
-         llvm::ConstantInt::get(int_ty, a),
-         llvm::ConstantInt::get(int_ty, b),
-         llvm::ConstantInt::get(int_ty, c)
+      Type *int_ty = Type::getInt32Ty(v->getContext());
+      Constant *vals[3] = {
+         ConstantInt::get(int_ty, a),
+         ConstantInt::get(int_ty, b),
+         ConstantInt::get(int_ty, c)
       };
-      return bld.CreateShuffleVector(v, llvm::UndefValue::get(v->getType()),
-                                     llvm::ConstantVector::get(vals),
+      return bld.CreateShuffleVector(v, UndefValue::get(v->getType()),
+                                     ConstantVector::get(vals),
                                      name);
    }
 
-   llvm::Value *llvm_expression(ir_expression *ir)
+   Value *llvm_expression(ir_expression *ir)
    {
-      llvm::Value *ops[2];
+      Value *ops[2];
       for (unsigned i = 0; i < ir->get_num_operands(); ++i)
          ops[i] = llvm_value(ir->operands[i]);
 
@@ -316,8 +317,8 @@ public:
                    ir->operands[1]->type->vector_elements);
 
          if (scaidx >= 0) {
-            llvm::Value *vec;
-            vec = llvm::UndefValue::get(ops[vecidx]->getType());
+            Value *vec;
+            vec = UndefValue::get(ops[vecidx]->getType());
             for (unsigned i = 0; i < ir->operands[vecidx]->type->vector_elements; ++i)
                vec = bld.CreateInsertElement(vec,  ops[scaidx],
                                              llvm_int(i), "sca2vec");
@@ -399,30 +400,30 @@ public:
          return bld.CreateFDiv(llvm_imm(ops[0]->getType(), 1), ops[0]);
       case ir_unop_exp:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
-         return llvm_intrinsic(llvm::Intrinsic::exp, ops[0]);
+         return llvm_intrinsic(Intrinsic::exp, ops[0]);
       case ir_unop_exp2:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
-         return llvm_intrinsic(llvm::Intrinsic::exp2, ops[0]);
+         return llvm_intrinsic(Intrinsic::exp2, ops[0]);
       case ir_unop_log:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
-         return llvm_intrinsic(llvm::Intrinsic::log, ops[0]);
+         return llvm_intrinsic(Intrinsic::log, ops[0]);
       case ir_unop_log2:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
-         return llvm_intrinsic(llvm::Intrinsic::log2, ops[0]);
+         return llvm_intrinsic(Intrinsic::log2, ops[0]);
       case ir_unop_sin:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
-         return llvm_intrinsic(llvm::Intrinsic::sin, ops[0]);
+         return llvm_intrinsic(Intrinsic::sin, ops[0]);
       case ir_unop_cos:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
-         return llvm_intrinsic(llvm::Intrinsic::cos, ops[0]);
+         return llvm_intrinsic(Intrinsic::cos, ops[0]);
 
          /* TODO: implement these somehow */
       case ir_unop_dFdx:
          assert(0);
-         /* return llvm_intrinsic(llvm::Intrinsic::ddx, ops[0]); */
+         /* return llvm_intrinsic(Intrinsic::ddx, ops[0]); */
       case ir_unop_dFdy:
          assert(0);
-         /* return llvm_intrinsic(llvm::Intrinsic::ddy, ops[0]); */
+         /* return llvm_intrinsic(Intrinsic::ddy, ops[0]); */
 
       case ir_binop_add:
          switch (ir->operands[0]->type->base_type) {
@@ -573,7 +574,7 @@ public:
          return bld.CreateAnd(ops[0], ops[1]);
 
       case ir_binop_dot: {
-         llvm::Value *prod = NULL;
+         Value *prod = NULL;
          switch (ir->operands[0]->type->base_type) {
          case GLSL_TYPE_UINT:
          case GLSL_TYPE_INT:
@@ -589,11 +590,11 @@ public:
          if (ir->operands[0]->type->vector_elements <= 1)
             return prod;
 
-         llvm::Value *sum = 0;
+         Value *sum = 0;
          for (unsigned i = 0; i < ir->operands[0]->type->vector_elements; ++i) {
-            llvm::Value *elem = bld.CreateExtractElement(prod,
-                                                         llvm_int(i),
-                                                         "dot.elem");
+            Value *elem = bld.CreateExtractElement(prod,
+                                                   llvm_int(i),
+                                                   "dot.elem");
             if (sum) {
                if (ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT)
                   sum = bld.CreateFAdd(sum, elem, "dot.add");
@@ -608,11 +609,11 @@ public:
 
       case ir_unop_sqrt:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
-         return llvm_intrinsic(llvm::Intrinsic::sqrt, ops[0]);
+         return llvm_intrinsic(Intrinsic::sqrt, ops[0]);
       case ir_unop_rsq:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
          return bld.CreateFDiv(llvm_imm(ops[0]->getType(), 1),
-                               llvm_intrinsic(llvm::Intrinsic::sqrt, ops[0]),
+                               llvm_intrinsic(Intrinsic::sqrt, ops[0]),
                                "rsqrt.rcp");
 
       case ir_unop_i2f:
@@ -643,14 +644,14 @@ public:
       case ir_unop_floor: {
          if (ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
             return ops[0];
-         llvm::Value *one = llvm_imm(ops[0]->getType(), 1);
+         Value *one = llvm_imm(ops[0]->getType(), 1);
          return bld.CreateFSub(ops[0], bld.CreateFRem(ops[0], one));
       }
 
       case ir_unop_ceil: {
          if (ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
             return ops[0];
-         llvm::Value *one = llvm_imm(ops[0]->getType(), 1);
+         Value *one = llvm_imm(ops[0]->getType(), 1);
          return bld.CreateFAdd(bld.CreateFSub(ops[0],
                                               bld.CreateFRem(ops[0], one)),
                                one);
@@ -659,7 +660,7 @@ public:
       case ir_unop_fract: {
          if (ir->operands[0]->type->base_type != GLSL_TYPE_FLOAT)
             return llvm_imm(ops[0]->getType(), 0);
-         llvm::Value *one = llvm_imm(ops[0]->getType(), 1);
+         Value *one = llvm_imm(ops[0]->getType(), 1);
          return bld.CreateFRem(ops[0], one);
       }
 
@@ -705,7 +706,7 @@ public:
          }
 
       case ir_binop_pow:
-         return llvm_intrinsic(llvm::Intrinsic::pow, ops[0], ops[1]);
+         return llvm_intrinsic(Intrinsic::pow, ops[0], ops[1]);
          break;
 
       case ir_unop_bit_not:
@@ -772,14 +773,14 @@ public:
 
    virtual void visit(class ir_discard *ir)
    {
-      llvm::BasicBlock *discard = llvm::BasicBlock::Create(ctx, "discard", fun);
-      llvm::BasicBlock *after;
+      BasicBlock *discard = BasicBlock::Create(ctx, "discard", fun);
+      BasicBlock *after;
       if (ir->condition) {
-         after = llvm::BasicBlock::Create(ctx, "discard.survived", fun);
+         after = BasicBlock::Create(ctx, "discard.survived", fun);
          bld.CreateCondBr(llvm_value(ir->condition), discard, after);
       }
       else {
-         after = llvm::BasicBlock::Create(ctx, "dead_code.discard", fun);
+         after = BasicBlock::Create(ctx, "dead_code.discard", fun);
          bld.CreateBr(discard);
       }
 
@@ -791,7 +792,7 @@ public:
 
    virtual void visit(class ir_loop_jump *ir)
    {
-      llvm::BasicBlock *target;
+      BasicBlock *target;
 
       switch (ir->mode) {
       case ir_loop_jump::jump_continue:
@@ -808,32 +809,32 @@ public:
 
       bld.CreateBr(target);
 
-      bb = llvm::BasicBlock::Create(ctx, "dead_code.jump", fun);
+      bb = BasicBlock::Create(ctx, "dead_code.jump", fun);
       bld.SetInsertPoint(bb);
    }
 
    virtual void visit(class ir_loop *ir)
    {
-      llvm::BasicBlock *body = llvm::BasicBlock::Create(ctx, "loop", fun);
-      llvm::BasicBlock *header = body;
-      llvm::BasicBlock *after = llvm::BasicBlock::Create(ctx, "loop.after", fun);
-      llvm::Value *ctr = NULL;
+      BasicBlock *body = BasicBlock::Create(ctx, "loop", fun);
+      BasicBlock *header = body;
+      BasicBlock *after = BasicBlock::Create(ctx, "loop.after", fun);
+      Value *ctr = NULL;
 
       if (ir->counter) {
          ctr = llvm_variable(ir->counter);
          if (ir->from)
             bld.CreateStore(llvm_value(ir->from), ctr);
          if (ir->to)
-            header = llvm::BasicBlock::Create(ctx, "loop.header", fun);
+            header = BasicBlock::Create(ctx, "loop.header", fun);
       }
 
       bld.CreateBr(header);
 
       if (ir->counter && ir->to) {
          bld.SetInsertPoint(header);
-         llvm::Value *cond = NULL;
-         llvm::Value *load = bld.CreateLoad(ctr);
-         llvm::Value *to = llvm_value(ir->to);
+         Value *cond = NULL;
+         Value *load = bld.CreateLoad(ctr);
+         Value *to = llvm_value(ir->to);
          switch (ir->counter->type->base_type) {
          case GLSL_TYPE_BOOL:
          case GLSL_TYPE_UINT:
@@ -853,7 +854,7 @@ public:
 
       bld.SetInsertPoint(body);
 
-      std::pair<llvm::BasicBlock *, llvm::BasicBlock *> saved_loop = loop;
+      std::pair<BasicBlock *, BasicBlock *> saved_loop = loop;
       loop = std::make_pair(header, after);
       visit_exec_list(&ir->body_instructions, this);
       loop = saved_loop;
@@ -882,9 +883,9 @@ public:
 
    virtual void visit(class ir_if *ir)
    {
-      llvm::BasicBlock *bbt = llvm::BasicBlock::Create(ctx, "if", fun);
-      llvm::BasicBlock *bbf = llvm::BasicBlock::Create(ctx, "else", fun);
-      llvm::BasicBlock *bbe = llvm::BasicBlock::Create(ctx, "endif", fun);
+      BasicBlock *bbt = BasicBlock::Create(ctx, "if", fun);
+      BasicBlock *bbf = BasicBlock::Create(ctx, "else", fun);
+      BasicBlock *bbe = BasicBlock::Create(ctx, "endif", fun);
       bld.CreateCondBr(llvm_value(ir->condition), bbt, bbf);
 
       bld.SetInsertPoint(bbt);
@@ -906,13 +907,13 @@ public:
       else
          bld.CreateRet(llvm_value(ir->value));
 
-      bb = llvm::BasicBlock::Create(ctx, "dead_code.return", fun);
+      bb = BasicBlock::Create(ctx, "dead_code.return", fun);
       bld.SetInsertPoint(bb);
    }
 
    virtual void visit(class ir_call *ir)
    {
-      std::vector<llvm::Value *> args;
+      std::vector<Value *> args;
 
       foreach_iter(exec_list_iterator, iter, *ir) {
          ir_rvalue *arg = (ir_constant *)iter.get();
@@ -921,48 +922,48 @@ public:
 
       result = bld.CreateCall(llvm_function(ir->callee), args);
 
-      llvm::AttrListPtr attr;
-      ((llvm::CallInst *)result)->setAttributes(attr);
+      AttrListPtr attr;
+      ((CallInst *)result)->setAttributes(attr);
    }
 
    virtual void visit(class ir_constant *ir)
    {
       if (ir->type->base_type == GLSL_TYPE_STRUCT) {
-         std::vector<llvm::Constant *> fields;
+         std::vector<Constant *> fields;
          foreach_iter(exec_list_iterator, iter, ir->components) {
             ir_constant *field = (ir_constant *)iter.get();
             fields.push_back(llvm_constant(field));
          }
-         result = llvm::ConstantStruct::get((llvm::StructType *)llvm_type(ir->type), fields);
+         result = ConstantStruct::get((StructType *)llvm_type(ir->type), fields);
       }
       else if (ir->type->base_type == GLSL_TYPE_ARRAY) {
-         std::vector<llvm::Constant *> elems;
+         std::vector<Constant *> elems;
          for (unsigned i = 0; i < ir->type->length; i++)
             elems.push_back(llvm_constant(ir->array_elements[i]));
-         result = llvm::ConstantArray::get((llvm::ArrayType *)llvm_type(ir->type), elems);
+         result = ConstantArray::get((ArrayType *)llvm_type(ir->type), elems);
       }
       else {
-         llvm::Type *base_type = llvm_base_type(ir->type->base_type);
-         llvm::Type *type = llvm_type(ir->type);
+         Type *base_type = llvm_base_type(ir->type->base_type);
+         Type *type = llvm_type(ir->type);
 
-         std::vector<llvm::Constant *> vecs;
+         std::vector<Constant *> vecs;
          unsigned idx = 0;
          for (unsigned i = 0; i < ir->type->matrix_columns; ++i) {
-            std::vector<llvm::Constant *> elems;
+            std::vector<Constant *> elems;
             for (unsigned j = 0; j < ir->type->vector_elements; ++j) {
-               llvm::Constant *elem;
+               Constant *elem;
                switch (ir->type->base_type) {
                case GLSL_TYPE_FLOAT:
-                  elem = llvm::ConstantFP::get(base_type, ir->value.f[idx]);
+                  elem = ConstantFP::get(base_type, ir->value.f[idx]);
                   break;
                case GLSL_TYPE_UINT:
-                  elem = llvm::ConstantInt::get(base_type, ir->value.u[idx]);
+                  elem = ConstantInt::get(base_type, ir->value.u[idx]);
                   break;
                case GLSL_TYPE_INT:
-                  elem = llvm::ConstantInt::get(base_type, ir->value.i[idx]);
+                  elem = ConstantInt::get(base_type, ir->value.i[idx]);
                   break;
                case GLSL_TYPE_BOOL:
-                  elem = llvm::ConstantInt::get(base_type, ir->value.b[idx]);
+                  elem = ConstantInt::get(base_type, ir->value.b[idx]);
                   break;
                default:
                   assert(0);
@@ -971,47 +972,47 @@ public:
                ++idx;
             }
 
-            llvm::Constant *vec;
+            Constant *vec;
             if (ir->type->vector_elements > 1)
-               vec = llvm::ConstantVector::get(elems);
+               vec = ConstantVector::get(elems);
             else
                vec = elems[0];
             vecs.push_back(vec);
          }
 
          if (ir->type->matrix_columns > 1)
-            result = llvm::ConstantArray::get((llvm::ArrayType *)type, vecs);
+            result = ConstantArray::get((ArrayType *)type, vecs);
          else
             result = vecs[0];
       }
    }
 
-   llvm::Value *llvm_shuffle(llvm::Value *val, int *shuffle_mask,
-                             unsigned res_width, const llvm::Twine &name = "")
+   Value *llvm_shuffle(Value *val, int *shuffle_mask,
+                       unsigned res_width, const Twine &name = "")
    {
-      llvm::Type *elem_type = val->getType();
-      llvm::Type *res_type = elem_type;;
+      Type *elem_type = val->getType();
+      Type *res_type = elem_type;;
       unsigned val_width = 1;
       if (val->getType()->isVectorTy()) {
-         val_width = ((llvm::VectorType *)val->getType())->getNumElements();
-         elem_type = ((llvm::VectorType *)val->getType())->getElementType();
+         val_width = ((VectorType *)val->getType())->getNumElements();
+         elem_type = ((VectorType *)val->getType())->getElementType();
       }
       if (res_width > 1)
-         res_type = llvm::VectorType::get(elem_type, res_width);
+         res_type = VectorType::get(elem_type, res_width);
 
-      std::vector<llvm::Constant *> shuffle_mask_values;
+      std::vector<Constant *> shuffle_mask_values;
       assert(res_width <= 4);
       bool any_def = false;
       for (unsigned i = 0; i < res_width; ++i) {
          if (shuffle_mask[i] < 0)
-            shuffle_mask_values.push_back(llvm::UndefValue::get(llvm::Type::getInt32Ty(ctx)));
+            shuffle_mask_values.push_back(UndefValue::get(Type::getInt32Ty(ctx)));
          else {
             any_def = true;
             shuffle_mask_values.push_back(llvm_int(shuffle_mask[i]));
          }
       }
 
-      llvm::Value *undef = llvm::UndefValue::get(res_type);
+      Value *undef = UndefValue::get(res_type);
       if (!any_def)
          return undef;
 
@@ -1028,8 +1029,8 @@ public:
             }
 
             return bld.CreateShuffleVector(val,
-                                           llvm::UndefValue::get(val->getType()),
-                                           llvm::ConstantVector::get(shuffle_mask_values),
+                                           UndefValue::get(val->getType()),
+                                           ConstantVector::get(shuffle_mask_values),
                                            name);
          }
          else
@@ -1038,10 +1039,10 @@ public:
       }
       else {
          if (res_width > 1) {
-            llvm::Value *tmp = undef;
+            Value *tmp = undef;
             for (unsigned i = 0; i < res_width; ++i) {
                if (shuffle_mask[i] >= 0)
-               tmp = bld.CreateInsertElement(tmp, val, llvm_int(i), name);
+                  tmp = bld.CreateInsertElement(tmp, val, llvm_int(i), name);
             }
             return tmp;
          }
@@ -1054,7 +1055,7 @@ public:
 
    virtual void visit(class ir_swizzle *swz)
    {
-      llvm::Value *val = llvm_value(swz->val);
+      Value *val = llvm_value(swz->val);
       int mask[4] = {
          (int)swz->mask.x,
          (int)swz->mask.y,
@@ -1066,8 +1067,8 @@ public:
 
    virtual void visit(class ir_assignment *ir)
    {
-      llvm::Value *lhs = llvm_pointer(ir->lhs);
-      llvm::Value *rhs = llvm_value(ir->rhs);
+      Value *lhs = llvm_pointer(ir->lhs);
+      Value *rhs = llvm_value(ir->rhs);
       unsigned width = ir->lhs->type->vector_elements;
       unsigned mask = (1 << width) - 1;
       assert(rhs);
@@ -1083,7 +1084,7 @@ public:
       }
 
       if (width > 1 && (ir->write_mask & mask) != mask) {
-         llvm::Constant *blend_mask[4];
+         Constant *blend_mask[4];
          for (unsigned i = 0; i < width; ++i) {
             if (ir->write_mask & (1 << i))
                blend_mask[i] = llvm_int(width + i);
@@ -1091,7 +1092,7 @@ public:
                blend_mask[i] = llvm_int(i);
          }
          rhs = bld.CreateShuffleVector(bld.CreateLoad(lhs), rhs,
-                                       llvm::ConstantVector::get(blend_mask),
+                                       ConstantVector::get(blend_mask),
                                        "assign.writemask");
       }
 
@@ -1115,10 +1116,10 @@ public:
       assert(!fun);
       fun = llvm_function(sig);
 
-      bb = llvm::BasicBlock::Create(ctx, "entry", fun);
+      bb = BasicBlock::Create(ctx, "entry", fun);
       bld.SetInsertPoint(bb);
 
-      llvm::Function::arg_iterator ai = fun->arg_begin();
+      Function::arg_iterator ai = fun->arg_begin();
       foreach_iter(exec_list_iterator, iter, sig->parameters) {
          ir_variable *arg = (ir_variable *)iter.get();
          ai->setName(arg->name);
@@ -1135,7 +1136,7 @@ public:
       if (fun->getReturnType()->isVoidTy())
          bld.CreateRetVoid();
       else
-         bld.CreateRet(llvm::UndefValue::get(fun->getReturnType()));
+         bld.CreateRet(UndefValue::get(fun->getReturnType()));
 
       bb = NULL;
       fun = NULL;
@@ -1150,17 +1151,17 @@ public:
    }
 };
 
-struct llvm::Module *
+struct Module *
 glsl_ir_to_llvm_module(struct exec_list *ir)
 {
-   llvm::LLVMContext& ctx = llvm::getGlobalContext();
-   llvm::Module *mod = new llvm::Module("glsl", ctx);
+   LLVMContext& ctx = getGlobalContext();
+   Module *mod = new Module("glsl", ctx);
    ir_to_llvm_visitor v(ctx, mod);
 
    visit_exec_list(ir, &v);
 
    /* mod->dump(); */
-   if (llvm::verifyModule(*mod, llvm::PrintMessageAction, 0)) {
+   if (verifyModule(*mod, PrintMessageAction, 0)) {
       delete mod;
       return 0;
    }

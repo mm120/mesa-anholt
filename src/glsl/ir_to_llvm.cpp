@@ -558,24 +558,6 @@ public:
          }
          return sum;
       }
-      case ir_binop_cross:
-         assert(ir->operands[0]->type->vector_elements == 3);
-         switch(ir->operands[0]->type->base_type)
-         {
-         case GLSL_TYPE_UINT:
-         case GLSL_TYPE_INT:
-            return bld.CreateSub(
-                  bld.CreateMul(create_shuffle3(bld, ops[0], 1, 2, 0, "cross.a120"), create_shuffle3(bld, ops[1], 2, 0, 1, "cross.a201"), "cross.ab"),
-                  bld.CreateMul(create_shuffle3(bld, ops[1], 1, 2, 0, "cross.b120"), create_shuffle3(bld, ops[0], 2, 0, 1, "cross.b201"), "cross.ba"),
-                  "cross.sub");
-         case GLSL_TYPE_FLOAT:
-            return bld.CreateFSub(
-                  bld.CreateFMul(create_shuffle3(bld, ops[0], 1, 2, 0, "cross.a120"), create_shuffle3(bld, ops[1], 2, 0, 1, "cross.a201"), "cross.ab"),
-                  bld.CreateFMul(create_shuffle3(bld, ops[1], 1, 2, 0, "cross.b120"), create_shuffle3(bld, ops[0], 2, 0, 1, "cross.b201"), "cross.ba"),
-                  "cross.sub");
-         default:
-            assert(0);
-         }
       case ir_unop_sqrt:
          assert(ir->operands[0]->type->base_type == GLSL_TYPE_FLOAT);
          return llvm_intrinsic(llvm::Intrinsic::sqrt, ops[0]);

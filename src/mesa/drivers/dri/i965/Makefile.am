@@ -50,10 +50,22 @@ i965_dri_la_SOURCES = \
 	$(i965_C_FILES) \
 	$(i965_CXX_FILES)
 
+if HAVE_LLVM
+noinst_LTLIBRARIES = libi965_llvm.la
+libi965_llvm_la_SOURCES = brw_vec4_llvm.cpp
+libi965_llvm_la_CFLAGS = $(AM_CFLAGS) $(LLVM_CFLAGS)
+libi965_llvm_la_CXXFLAGS = $(AM_CXXFLAGS) $(LLVM_CXXFLAGS) -Wno-overloaded-virtual -Wno-cast-qual
+LLVM_LIBADD = libi965_llvm.la
+else
+AM_CFLAGS += -DNO_LLVM
+AM_CXXFLAGS += -DNO_LLVM
+endif
+
 i965_dri_la_LDFLAGS = -module -avoid-version -shared
 i965_dri_la_LIBADD = \
 	$(DRI_LIB_DEPS) \
 	$(INTEL_LIBS) \
+	$(LLVM_LIBADD) \
 	../common/libdricommon.la
 
 # Provide compatibility with scripts for the old Mesa build system for

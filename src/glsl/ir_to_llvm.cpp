@@ -159,7 +159,7 @@ public:
                linkage = GlobalValue::InternalLinkage;
             else
                linkage = GlobalValue::ExternalLinkage;
-            Constant *init = 0;
+            Constant *init = NULL;
             if (var->constant_value)
                init = llvm_constant(var->constant_value);
             else if (linkage == GlobalValue::InternalLinkage)
@@ -206,7 +206,7 @@ public:
 
    Value *llvm_value(class ir_instruction *ir)
    {
-      result = 0;
+      result = NULL;
       ir->accept(this);
       return result;
    }

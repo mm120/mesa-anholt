@@ -211,9 +211,9 @@ public:
       return result;
    }
 
-   Constant *llvm_constant(class ir_instruction *ir)
+   Constant *llvm_constant(class ir_constant *ir)
    {
-      return &dynamic_cast<Constant &>(*llvm_value(ir));
+      return (Constant *)llvm_value(ir);
    }
 
    Constant *llvm_int(unsigned v)

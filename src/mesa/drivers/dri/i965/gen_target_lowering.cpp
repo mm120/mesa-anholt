@@ -28,6 +28,17 @@
 #include "gen_target_machine.h"
 #include "gen_target_lowering.h"
 
+gen_target_lowering::gen_target_lowering(TargetMachine &tm)
+: TargetLowering(tm, new TargetLoweringObjectFileELF())
+{
+   /* We want to see constants as immediate values, which we'll insert as the
+    * immediates of instructions.  This sometimes costs us some instructions,
+    * but it means that we don't have to upload them as push constants, which
+    * would involve a memcpy of them per uniform change.
+    */
+   setOperationAction(ISD::ConstantFP,  MVT::f32, Legal);
+}
+
 SDValue
 gen_target_lowering::LowerFormalArguments(SDValue Chain, CallingConv::ID CallConv,
                                           bool isVarArg,

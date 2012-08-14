@@ -29,10 +29,7 @@ using namespace llvm;
 class gen_target_lowering : public TargetLowering
 {
 public:
-   gen_target_lowering(TargetMachine &tm)
-      : TargetLowering(tm, new TargetLoweringObjectFileELF())
-   {
-   }
+   gen_target_lowering(TargetMachine &tm);
 
    virtual SDValue LowerFormalArguments(SDValue Chain, CallingConv::ID CallConv,
                                         bool isVarArg,

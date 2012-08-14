@@ -89,19 +89,19 @@ BUILT_SOURCES = \
 TABLEGEN = $(AM_V_GEN)$(LLVM_BINDIR)/llvm-tblgen -I $(LLVM_INCLUDEDIR)
 
 gen_asm_writer.h.inc: *.td
-	$(TABLEGEN) -gen-asm-writer gen.td -o $@ || rm -f $@
+	$(TABLEGEN) -gen-asm-writer gen.td -o $@ || (rm -f $@; exit 1)
 gen_calling_conv.h.inc: *.td
-	$(TABLEGEN) -gen-callingconv gen.td -o $@ || rm -f $@
+	$(TABLEGEN) -gen-callingconv gen.td -o $@ || (rm -f $@; exit 1)
 gen_code_emitter.h.inc: *.td
-	$(TABLEGEN) -gen-emitter gen.td -o $@ || rm -f $@
+	$(TABLEGEN) -gen-emitter gen.td -o $@ || (rm -f $@; exit 1)
 gen_dag_isel.h.inc: *.td
-	$(TABLEGEN) -gen-dag-isel gen.td -o $@ || rm -f $@
+	$(TABLEGEN) -gen-dag-isel gen.td -o $@ || (rm -f $@; exit 1)
 gen_instr_info.h.inc: *.td
-	$(TABLEGEN) -gen-instr-info gen.td -o $@ || rm -f $@
+	$(TABLEGEN) -gen-instr-info gen.td -o $@ || (rm -f $@; exit 1)
 gen_register_info.h.inc: *.td
-	$(TABLEGEN) -gen-register-info gen.td -o $@ || rm -f $@
+	$(TABLEGEN) -gen-register-info gen.td -o $@ || (rm -f $@; exit 1)
 gen_subtarget_info.h.inc: *.td
-	$(TABLEGEN) -gen-subtarget gen.td -o $@ || rm -f $@
+	$(TABLEGEN) -gen-subtarget gen.td -o $@ || (rm -f $@; exit 1)
 
 else
 AM_CFLAGS += -DNO_LLVM

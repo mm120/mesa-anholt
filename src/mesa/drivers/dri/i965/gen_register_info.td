@@ -55,4 +55,7 @@ def g7   : GRF<7,   "g7">;
 def g8   : GRF<8,   "g8">;
 
 /* This is the general purpose temporary register class. */
-def grfs : RegisterClass<"gen", [f32, i32], 32, (sequence "g%u", 0, 8)>;
+def igrfs : RegisterClass<"gen", [v4i32], 32, (sequence "g%u", 0, 8)>;
+def i32grfs : RegisterClass<"gen", [i32], 32, (sequence "g%u", 0, 8)>;
+def fgrfs : RegisterClass<"gen", [v4f32], 32, (sequence "g%u", 0, 8)>;
+def grfs : RegisterClass<"gen", [v4f32, v4i32], 32, (sequence "g%u", 0, 8)>;

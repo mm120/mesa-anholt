@@ -22,14 +22,14 @@
  */
 
 class inst<dag outs, dag ins, string asmstr, list<dag> pattern> : Instruction {
-   field bits<32> bits0;
+   field bits<32> Inst;
    field bits<32> bits1;
    field bits<32> bits2;
    field bits<32> bits3;
 
    bits<7> opcode;
 
-   let bits0{6-0} = opcode;
+   let Inst{6-0} = opcode;
 
    let Namespace = "gen";
    dag OutOperandList = outs;
@@ -42,6 +42,14 @@ class arith<bits<7> opcode_val, dag outs, dag ins, string asmstr, list<dag> patt
    : inst<outs, ins, asmstr, pattern> {
    let opcode = opcode_val;
 }
+
+def STUB_LOAD : arith<0,
+    (outs fgrfs:$dst), (ins i32grfs:$offset),
+    "stub_load $offset, $dst", [(set fgrfs:$dst, (load i32grfs:$offset))]>;
+
+def STUB_STORE : arith<0,
+    (outs), (ins fgrfs:$dst, i32grfs:$offset),
+    "stub_store $offset, $dst", [(store fgrfs:$dst, i32grfs:$offset)]>;
 
 def ADD : arith<64,
     (outs grfs:$dst), (ins grfs:$src1, grfs:$src2),

@@ -44,12 +44,12 @@ class arith<bits<7> opcode_val, dag outs, dag ins, string asmstr, list<dag> patt
 }
 
 def STUB_LOAD : arith<0,
-    (outs fgrfs:$dst), (ins i32grfs:$offset),
-    "stub_load $offset, $dst", [(set fgrfs:$dst, (load i32grfs:$offset))]>;
+    (outs fgrfs:$dst), (ins igrfs:$offset),
+    "stub_load $offset, $dst", [(set fgrfs:$dst, (load igrfs:$offset))]>;
 
 def STUB_STORE : arith<0,
-    (outs), (ins fgrfs:$dst, i32grfs:$offset),
-    "stub_store $offset, $dst", [(store fgrfs:$dst, i32grfs:$offset)]>;
+    (outs), (ins fgrfs:$dst, igrfs:$offset),
+    "stub_store $offset, $dst", [(store fgrfs:$dst, igrfs:$offset)]>;
 
 def ADD : arith<64,
     (outs grfs:$dst), (ins grfs:$src1, grfs:$src2),

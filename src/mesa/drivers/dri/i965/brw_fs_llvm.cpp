@@ -32,14 +32,13 @@
 #include <llvm/Support/FormattedStream.h>
 #include "llvm/Support/TargetRegistry.h"
 #include "glsl/ir_to_llvm.h"
-#include "brw_vec4.h"
+#include "brw_fs.h"
 #include "gen_target_machine.h"
 
 using namespace llvm;
-using namespace brw;
 
 bool
-vec4_visitor::build_llvm()
+fs_visitor::build_llvm()
 {
    Module *mod;
 

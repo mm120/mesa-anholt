@@ -53,7 +53,7 @@ i965_dri_la_SOURCES = \
 if HAVE_LLVM
 noinst_LTLIBRARIES = libi965_llvm.la
 libi965_llvm_la_SOURCES = \
-	brw_vec4_llvm.cpp \
+	brw_fs_llvm.cpp \
 	gen_instr_info.cpp \
 	gen_instr_info.h \
 	gen_isel_dag_to_dag.cpp \

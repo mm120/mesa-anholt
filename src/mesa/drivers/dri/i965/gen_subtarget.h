@@ -21,6 +21,8 @@
  * IN THE SOFTWARE.
  */
 
+#pragma once
+
 #include "llvm/Target/TargetSubtargetInfo.h"
 #define GET_SUBTARGETINFO_HEADER
 #define GET_SUBTARGETINFO_ENUM
@@ -29,10 +31,18 @@
 using namespace llvm;
 
 namespace llvm {
+
+/* The capitalization gets forced by the code-generated ParseSubtargetFeatures
+ * implementation.
+ */
 class genSubtarget : public genGenSubtargetInfo {
 public:
+   genSubtarget(StringRef TT, StringRef CPU, StringRef FS);
+   ~genSubtarget();
+
    int gen;
 
    void ParseSubtargetFeatures(StringRef CPU, StringRef FS);
 };
-}
+
+} /* namespace llvm */

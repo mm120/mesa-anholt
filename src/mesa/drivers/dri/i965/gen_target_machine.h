@@ -31,6 +31,7 @@
 
 #include "gen_frame_lowering.h"
 #include "gen_register_info.h"
+#include "gen_subtarget.h"
 #include "gen_instr_info.h"
 
 using namespace llvm;
@@ -49,9 +50,16 @@ public:
                       CodeGenOpt::Level OL);
 
    const TargetData DataLayout;
+
+   genSubtarget subtarget;
    gen_instr_info *instr_info;
    gen_target_lowering *target_lowering;
    gen_frame_lowering frame_lowering;
+
+   virtual const genSubtarget *getSubtargetImpl() const
+   {
+      return &subtarget;
+   }
 
    virtual const gen_instr_info *getInstrInfo() const
    {

@@ -31,3 +31,17 @@
 #define GET_SUBTARGETINFO_TARGET_DESC
 #define GET_SUBTARGETINFO_CTOR
 #include "gen_subtarget_info.h.inc"
+
+namespace llvm {
+
+genSubtarget::genSubtarget(StringRef TT, StringRef CPU, StringRef FS)
+   : genGenSubtargetInfo(TT, CPU, FS)
+{
+   ParseSubtargetFeatures(CPU, FS);
+}
+
+genSubtarget::~genSubtarget()
+{
+}
+
+} /* namespace llvm */

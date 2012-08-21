@@ -29,6 +29,7 @@
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetFrameLowering.h"
 
+#include "gen_frame_lowering.h"
 #include "gen_register_info.h"
 #include "gen_instr_info.h"
 
@@ -50,6 +51,7 @@ public:
    const TargetData DataLayout;
    gen_instr_info *instr_info;
    gen_target_lowering *target_lowering;
+   gen_frame_lowering frame_lowering;
 
    virtual const gen_instr_info *getInstrInfo() const
    {
@@ -67,6 +69,11 @@ public:
    }
 
    virtual const TargetLowering *getTargetLowering() const;
+
+   virtual const gen_frame_lowering *getFrameLowering() const
+   {
+      return &frame_lowering;
+   }
 
    virtual TargetPassConfig *createPassConfig(PassManagerBase &PM);
 };

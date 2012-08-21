@@ -42,7 +42,8 @@ gen_target_machine::gen_target_machine(const Target &T,
                                        CodeModel::Model CM,
                                        CodeGenOpt::Level OL)
    : LLVMTargetMachine(T, TT, CPU, FS, TO, RM, CM, OL),
-     DataLayout("e-p:32:32")
+     DataLayout("e-p:32:32"),
+     frame_lowering(TargetFrameLowering::StackGrowsUp, 0, 0)
 {
    instr_info = new gen_instr_info(*this);
    target_lowering = new gen_target_lowering(*this);

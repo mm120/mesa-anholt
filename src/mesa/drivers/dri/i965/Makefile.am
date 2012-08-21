@@ -54,6 +54,8 @@ if HAVE_LLVM
 noinst_LTLIBRARIES = libi965_llvm.la
 libi965_llvm_la_SOURCES = \
 	brw_fs_llvm.cpp \
+	gen_frame_lowering.cpp \
+	gen_frame_lowering.h \
 	gen_instr_info.cpp \
 	gen_instr_info.h \
 	gen_isel_dag_to_dag.cpp \

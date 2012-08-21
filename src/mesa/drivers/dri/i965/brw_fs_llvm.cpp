@@ -29,6 +29,7 @@
 #include "llvm/Module.h"
 #include "llvm/PassManager.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Assembly/PrintModulePass.h"
 #include "llvm/Transforms/IPO.h"
 #include <llvm/Support/FormattedStream.h>
 #include "llvm/Support/TargetRegistry.h"
@@ -82,6 +83,8 @@ fs_visitor::build_llvm()
     * registers.
     */
    PM.add(createPromoteMemoryToRegisterPass());
+
+   PM.add(createPrintModulePass(&outs()));
 
    std::string CodeString;
    raw_string_ostream oStream(CodeString);

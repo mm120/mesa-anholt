@@ -29,6 +29,7 @@
 #include "llvm/Module.h"
 #include "llvm/PassManager.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/IPO.h"
 #include <llvm/Support/FormattedStream.h>
 #include "llvm/Support/TargetRegistry.h"
 #include "glsl/ir_to_llvm.h"
@@ -68,6 +69,18 @@ fs_visitor::build_llvm()
 
    PassManager PM;
    PM.add(new TargetData(*tm->getTargetData()));
+
+   /* We want to turn ir_to_llvm's globals for uniforms and ins/outs into
+    * temporary storage (thus registers) which get set up using intrinsics.
+    * The first step is for them to be internal linkage.
+    */
+   PM.add(createInternalizePass(true));
+   /* Then, we turn all the internal linkage globals into allocas. */
+   PM.add(createGlobalOptimizerPass());
+
+   /* Turn all the allocas (variable storage) into stores of unallocated
+    * registers.
+    */
    PM.add(createPromoteMemoryToRegisterPass());
 
    std::string CodeString;

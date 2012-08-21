@@ -75,7 +75,7 @@ libi965_llvm_la_CXXFLAGS = $(AM_CXXFLAGS) $(LLVM_CXXFLAGS) \
         -Wno-overloaded-virtual \
         -Wno-cast-qual
 I965_LLVM_LIBADD = libi965_llvm.la
-I965_LLVM_LDFLAGS = $(LLVM_LDFLAGS) $(LLVM_LIBS)
+I965_LLVM_LDFLAGS = $(LLVM_LDFLAGS) $(LLVM_LIBS) `$(LLVM_CONFIG) --libs ipo`
 
 BUILT_SOURCES = \
 	gen_asm_writer.h.inc \

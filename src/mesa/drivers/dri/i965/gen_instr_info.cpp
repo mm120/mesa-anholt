@@ -21,8 +21,10 @@
  * IN THE SOFTWARE.
  */
 
-/** @file gen_target_machine.h
- * Implements the TargetMachine class for gen4+ Intel GPUs.
+/** @file gen_instr_info.cpp
+ *
+ * Implements the tiny bit of wrapper required for the code-generated
+ * genGenInstrInfo class from gen_instr_info.td.
  */
 
 #include "gen_target_machine.h"

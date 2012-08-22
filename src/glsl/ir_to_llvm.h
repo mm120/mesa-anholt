@@ -46,7 +46,7 @@ namespace std
 
 class ir_to_llvm : public ir_visitor {
 public:
-   ir_to_llvm(llvm::LLVMContext &ctx, llvm::Module *mod);
+   ir_to_llvm(llvm::LLVMContext &ctx);
    llvm::Type *llvm_base_type(unsigned base_type);
    llvm::Type *llvm_vec_type(const glsl_type *type);
    llvm::Type *llvm_type(const glsl_type *type);
@@ -82,6 +82,26 @@ public:
    virtual void visit(ir_function *ir);
    virtual void visit(ir_function_signature *ir);
 
+   /**
+    * Called at the start of generating code for main(), this can be used for
+    * setting up values in the global variables using intrinsics.
+    */
+   virtual void build_prologue() = 0;
+
+   /**
+    * Called at the end of generating code for main(), this can be used for
+    * setting up outputs of the global variables to actual hardware state
+    * using intrinsics.
+    *
+    * Note that if you don't implement this function to actually do something
+    * with the global outputs, optimization of the module with Internalize and
+    * GlobalOptimizer passes will end up dead-code eliminating all of main()!
+    */
+   virtual void build_epilogue() = 0;
+
+   /** Walks the shader's ir and returns an LLVM module for the code. */
+   llvm::Module *build_module(struct exec_list *ir);
+
    llvm::LLVMContext& ctx;
    llvm::Module *mod;
    llvm::Function *fun;
@@ -99,9 +119,6 @@ public:
    typedef std::unordered_map<ir_function_signature *,
       llvm::Function *> llvm_functions_t;
    llvm_functions_t llvm_functions;
-
 };
-
-struct llvm::Module * glsl_ir_to_llvm_module(struct exec_list *ir);
 
 #endif /* IR_TO_LLVM_H_ */

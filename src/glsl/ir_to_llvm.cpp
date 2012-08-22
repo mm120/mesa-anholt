@@ -43,8 +43,8 @@ using namespace llvm;
 #include "ir_to_llvm.h"
 #include "glsl_types.h"
 
-ir_to_llvm::ir_to_llvm(LLVMContext &ctx, Module *mod)
-   : ctx(ctx), mod(mod), fun(0), bb(0), bld(ctx)
+ir_to_llvm::ir_to_llvm(LLVMContext &ctx)
+   : ctx(ctx), fun(0), bb(0), bld(ctx)
 {
    loop = std::make_pair((BasicBlock *)0, (BasicBlock *)0);
 }
@@ -1098,6 +1098,8 @@ ir_to_llvm::visit(ir_function_signature *sig)
    bb = BasicBlock::Create(ctx, "entry", fun);
    bld.SetInsertPoint(bb);
 
+   build_prologue();
+
    Function::arg_iterator ai = fun->arg_begin();
    foreach_iter(exec_list_iterator, iter, sig->parameters) {
       ir_variable *arg = (ir_variable *)iter.get();
@@ -1111,6 +1113,8 @@ ir_to_llvm::visit(ir_function_signature *sig)
 
       ir->accept(this);
    }
+
+   build_epilogue();
 
    if (fun->getReturnType()->isVoidTy())
       bld.CreateRetVoid();
@@ -1131,13 +1135,11 @@ ir_to_llvm::visit(ir_function *funs)
 }
 
 struct Module *
-glsl_ir_to_llvm_module(struct exec_list *ir)
+ir_to_llvm::build_module(struct exec_list *ir)
 {
-   LLVMContext& ctx = getGlobalContext();
-   Module *mod = new Module("glsl", ctx);
-   ir_to_llvm v(ctx, mod);
+   mod = new Module("glsl", ctx);
 
-   visit_exec_list(ir, &v);
+   visit_exec_list(ir, this);
 
    if (verifyModule(*mod, PrintMessageAction, 0)) {
       fprintf(stderr, "LLVM IR verify failed.  LLVM IR:\n");

@@ -39,12 +39,40 @@
 
 using namespace llvm;
 
+namespace {
+class fs_ir_to_llvm : public ir_to_llvm
+{
+public:
+   fs_ir_to_llvm();
+   virtual void build_prologue();
+   virtual void build_epilogue();
+};
+
+} /* namespace */
+
+fs_ir_to_llvm::fs_ir_to_llvm()
+   : ir_to_llvm(getGlobalContext())
+{
+}
+
+void
+fs_ir_to_llvm::build_prologue()
+{
+}
+
+void
+fs_ir_to_llvm::build_epilogue()
+{
+}
+
 bool
 fs_visitor::build_llvm()
 {
    Module *mod;
 
-   mod = glsl_ir_to_llvm_module(shader->ir);
+   fs_ir_to_llvm build;
+
+   mod = build.build_module(shader->ir);
    if (!mod)
       return false;
 

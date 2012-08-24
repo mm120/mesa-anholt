@@ -29,6 +29,12 @@
  */
 struct brw_sampler_prog_key_data {
    /**
+    * Either 0, or the compare func that for this sampler indicating that it
+    * should be lowered to sample + math instead of a sample_c message.
+    */
+   GLenum lower_shadow_compare_func[BRW_MAX_TEX_UNIT];
+
+   /**
     * EXT_texture_swizzle and DEPTH_TEXTURE_MODE swizzles.
     */
    uint16_t swizzles[BRW_MAX_TEX_UNIT];

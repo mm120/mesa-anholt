@@ -436,6 +436,7 @@ brw_populate_sampler_prog_key_data(struct gl_context *ctx,
 				   const struct gl_program *prog,
 				   struct brw_sampler_prog_key_data *key)
 {
+   struct intel_context *intel = intel_context(ctx);
    for (int i = 0; i < BRW_MAX_TEX_UNIT; i++) {
       if (!prog->TexturesUsed[i])
 	 continue;
@@ -511,6 +512,13 @@ brw_populate_sampler_prog_key_data(struct gl_context *ctx,
 	    if (sampler->WrapR == GL_CLAMP)
 	       key->gl_clamp_mask[2] |= 1 << i;
 	 }
+
+         if (intel->gen == 7 &&
+             sampler->CompareMode == GL_COMPARE_R_TO_TEXTURE_ARB &&
+             sampler->MinFilter == GL_NEAREST &&
+             sampler->MagFilter == GL_NEAREST) {
+            key->lower_shadow_compare_func[i] = sampler->CompareFunc;
+         }
       }
       else {
 	 key->swizzles[i] = SWIZZLE_NOOP;

@@ -1056,7 +1056,8 @@ fs_visitor::emit_texture_gen7(ir_texture *ir, fs_reg dst, fs_reg coordinate,
       base_mrf--;
    }
 
-   if (ir->shadow_comparitor) {
+   if (ir->shadow_comparitor &&
+       c->key.tex.lower_shadow_compare_func[sampler] == 0) {
       emit(BRW_OPCODE_MOV, fs_reg(MRF, base_mrf + mlen), shadow_c);
       mlen += reg_width;
    }
@@ -1350,8 +1351,69 @@ fs_visitor::visit(ir_texture *ir)
 
    inst->sampler = sampler;
 
-   if (ir->shadow_comparitor)
-      inst->shadow_compare = true;
+   if (ir->shadow_comparitor) {
+      if (c->key.tex.lower_shadow_compare_func[sampler] != 0) {
+         /* On gen7, the shadow comparison hardware totally underperforms, and
+          * we can do the comparison math faster on our own.
+          */
+         fs_inst *inst;
+         fs_reg compare_result = fs_reg(this, glsl_type::float_type);
+         uint32_t condition = 0;
+
+         /* Compare the X of our unswizzled result channels to our comparitor.
+          * (our depth texture is bound as either some intensity format, or
+          * R32G32 with depth in r).
+          */
+         switch (c->key.tex.lower_shadow_compare_func[sampler]) {
+         case GL_LESS:
+            condition = BRW_CONDITIONAL_L;
+            break;
+         case GL_GREATER:
+            condition = BRW_CONDITIONAL_G;
+            break;
+         case GL_LEQUAL:
+            condition = BRW_CONDITIONAL_LE;
+            break;
+         case GL_GEQUAL:
+            condition = BRW_CONDITIONAL_GE;
+            break;
+         case GL_EQUAL:
+            condition = BRW_CONDITIONAL_EQ;
+            break;
+         case GL_NOTEQUAL:
+            condition = BRW_CONDITIONAL_NEQ;
+            break;
+
+         case GL_NEVER:
+            compare_result = fs_reg(0.0f);
+            goto smear;
+
+         case GL_ALWAYS:
+            compare_result = fs_reg(1.0f);
+            goto smear;
+
+         default:
+            assert(!"Should not get here: bad shadow compare function");
+            break;
+         }
+
+         emit(BRW_OPCODE_MOV, compare_result, fs_reg(0.0f));
+         inst = emit(BRW_OPCODE_CMP, reg_null_cmp, shadow_comparitor, dst);
+         inst->conditional_mod = condition;
+         inst = emit(BRW_OPCODE_MOV, compare_result, fs_reg(1.0f));
+         inst->predicated = true;
+
+      smear:
+         /* Now set 1.0 or 0.0 according to the comparison result. */
+         for (int i = 0; i < ir->type->vector_elements; i++) {
+            emit(BRW_OPCODE_MOV, dst, compare_result);
+            dst.reg_offset++;
+         }
+         dst.reg_offset = 0;
+      } else {
+         inst->shadow_compare = true;
+      }
+   }
 
    swizzle_result(ir, dst, sampler);
 }

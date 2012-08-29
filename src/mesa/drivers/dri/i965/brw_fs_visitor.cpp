@@ -1218,7 +1218,8 @@ fs_visitor::emit_texture_gen5(ir_texture *ir, fs_reg dst, fs_reg coordinate,
 }
 
 fs_inst *
-fs_visitor::emit_texture_gen7(ir_texture *ir, fs_reg dst, fs_reg coordinate,
+fs_visitor::emit_texture_gen7(ir_texture *ir, fs_reg dst, int writemask,
+                              fs_reg coordinate,
                               fs_reg shadow_c, fs_reg lod, fs_reg lod2,
                               fs_reg sample_index)
 {
@@ -1228,13 +1229,17 @@ fs_visitor::emit_texture_gen7(ir_texture *ir, fs_reg dst, fs_reg coordinate,
    fs_reg payload = fs_reg(this, glsl_type::float_type);
    fs_reg next = payload;
 
-   if (ir->op == ir_tg4 || (ir->offset && ir->op != ir_txf)) {
+   if (ir->op == ir_tg4 || (ir->offset && ir->op != ir_txf) ||
+       writemask != 0xf) {
       /* For general texture offsets (no txf workaround), we need a header to
        * put them in.  Note that for 16-wide we're making space for two actual
        * hardware registers here, so the emit will have to fix up for this.
        *
-       * * ir4_tg4 needs to place its channel select in the header,
+       * ir4_tg4 needs to place its channel select in the header,
        * for interaction with ARB_texture_swizzle
+       *
+       * The writemask for skipping of some of the output registers also
+       * appears in the header.
        */
       header_present = true;
       next.reg_offset++;
@@ -1403,7 +1408,7 @@ fs_visitor::emit_texture_gen7(ir_texture *ir, fs_reg dst, fs_reg coordinate,
    else
       inst->mlen = next.reg_offset * reg_width;
    inst->header_present = header_present;
-   inst->regs_written = 4;
+   inst->regs_written = _mesa_bitcount(writemask);
 
    virtual_grf_sizes[payload.reg] = next.reg_offset;
    if (inst->mlen > 11) {
@@ -1526,6 +1531,7 @@ fs_visitor::visit(ir_texture *ir)
     * (pre-gen6, or gen6+ with GL_CLAMP).
     */
    int texunit = prog->SamplerUnits[sampler];
+   int writemask = 0xf;
 
    if (ir->op == ir_tg4) {
       /* When tg4 is used with the degenerate ZERO/ONE swizzles, don't bother
@@ -1562,6 +1568,42 @@ fs_visitor::visit(ir_texture *ir)
          needed_dst_channels |= 1 << last_swizzle->mask.w;
    } else {
       needed_dst_channels = 0xf;
+   }
+
+   /* On SIMD8, we ask for all of the texture channels even if they aren't all
+    * used.  On SIMD16, we can ask the hardware to return fewer channels,
+    * which lets us have lower register pressure (particularly important on
+    * convolution shaders).
+    *
+    * This could use porting back to pre-gen7.
+    */
+   int dst_size = 4;
+   bool needs_writemask_reswizzle = false;
+   if (brw->gen >= 7 && dispatch_width == 16 &&
+       ir->op != ir_txs && ir->op != ir_tg4) {
+      writemask = 0;
+      for (int i = 0; i < 4; i++) {
+         int swiz = GET_SWZ(c->key.tex.swizzles[sampler], i);
+         /* Note that SWIZZLE_ONE/ZERO are larger than any set channel in
+          * needed_dst_channels.
+          */
+         if (needed_dst_channels & (1 << swiz))
+            writemask |= 1 << swiz;
+      }
+
+      if (writemask != 0 && writemask != 0xf) {
+         dst_size = _mesa_bitcount(writemask);
+         needs_writemask_reswizzle = true;
+      } else {
+         /* From the gen4 PRM, volume 4, page 159 ("Message Header"):
+          *
+          *     "Programming Notes: A message with all four channels masked is
+          *      not allowed."
+          *
+          * The instruction should be dead-code-removable, hopefully.
+          */
+         writemask = 0xf;
+      }
    }
 
    /* Should be lowered by do_lower_texture_projection */
@@ -1622,13 +1664,12 @@ fs_visitor::visit(ir_texture *ir)
       assert(!"Unrecognized texture opcode");
    };
 
-   /* Writemasking doesn't eliminate channels on SIMD8 texture
-    * samples, so don't worry about them.
-    */
-   fs_reg dst = fs_reg(this, glsl_type::get_instance(ir->type->base_type, 4, 1));
+   fs_reg dst = fs_reg(this, glsl_type::get_instance(ir->type->base_type,
+                                                     dst_size, 1));
 
    if (brw->gen >= 7) {
-      inst = emit_texture_gen7(ir, dst, coordinate, shadow_comparitor,
+      inst = emit_texture_gen7(ir, dst, writemask,
+                               coordinate, shadow_comparitor,
                                lod, lod2, sample_index);
    } else if (brw->gen >= 5) {
       inst = emit_texture_gen5(ir, dst, coordinate, shadow_comparitor,
@@ -1644,6 +1685,11 @@ fs_visitor::visit(ir_texture *ir)
    if (ir->op == ir_tg4)
       inst->m0_2 |= gather_channel(ir, sampler) << 16; // M0.2:16-17
 
+   if (writemask != 0xf) {
+      /* m0.2 bits 12-15 can be set to suppress writeback of rgba channels. */
+      inst->m0_2 |= ((~writemask) & 0xf) << 12;
+   }
+
    inst->sampler = sampler;
 
    if (ir->shadow_comparitor)
@@ -1658,6 +1704,24 @@ fs_visitor::visit(ir_texture *ir)
          depth.reg_offset = 2;
          emit_math(SHADER_OPCODE_INT_QUOTIENT, depth, depth, fs_reg(6));
       }
+   }
+
+   /* We reswizzle a writemasked texture message back out to a vec4.  These
+    * MOVs will get copy propagated out generally.
+    */
+   if (needs_writemask_reswizzle) {
+      fs_reg reswizzled_dst =
+         fs_reg(this, glsl_type::get_instance(ir->type->base_type, 4, 1));
+
+      fs_reg reswizzle_chan = reswizzled_dst;
+      for (int i = 0; i < 4; i++) {
+         if (writemask & (1 << i)) {
+            emit(BRW_OPCODE_MOV, reswizzle_chan, dst);
+            dst.reg_offset++;
+         }
+         reswizzle_chan.reg_offset++;
+      }
+      dst = reswizzled_dst;
    }
 
    swizzle_result(ir, needed_dst_channels, dst, sampler);

@@ -367,7 +367,7 @@ void
 fs_generator::generate_tex(fs_inst *inst, struct brw_reg dst, struct brw_reg src)
 {
    int msg_type = -1;
-   int rlen = 4;
+   int rlen = inst->regs_written * dispatch_width / 8;
    uint32_t simd_mode = BRW_SAMPLER_SIMD_MODE_SIMD8;
    uint32_t return_format;
 
@@ -511,10 +511,8 @@ fs_generator::generate_tex(fs_inst *inst, struct brw_reg dst, struct brw_reg src
    }
    assert(msg_type != -1);
 
-   if (simd_mode == BRW_SAMPLER_SIMD_MODE_SIMD16) {
-      rlen = 8;
+   if (simd_mode == BRW_SAMPLER_SIMD_MODE_SIMD16)
       dst = vec16(dst);
-   }
 
    if (brw->gen >= 7 && inst->header_present && dispatch_width == 16) {
       /* The send-from-GRF for 16-wide texturing with a header has an extra

@@ -354,7 +354,8 @@ public:
    fs_inst *emit_texture_gen5(ir_texture *ir, fs_reg dst, fs_reg coordinate,
                               fs_reg shadow_comp, fs_reg lod, fs_reg lod2,
                               fs_reg sample_index);
-   fs_inst *emit_texture_gen7(ir_texture *ir, fs_reg dst, fs_reg coordinate,
+   fs_inst *emit_texture_gen7(ir_texture *ir, fs_reg dst, int writemask,
+                              fs_reg coordinate,
                               fs_reg shadow_comp, fs_reg lod, fs_reg lod2,
                               fs_reg sample_index);
    fs_reg fix_math_operand(fs_reg src);

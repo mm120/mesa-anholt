@@ -367,7 +367,6 @@ void
 fs_generator::generate_tex(fs_inst *inst, struct brw_reg dst, struct brw_reg src)
 {
    int msg_type = -1;
-   int rlen = inst->regs_written * dispatch_width / 8;
    uint32_t simd_mode = BRW_SAMPLER_SIMD_MODE_SIMD8;
    uint32_t return_format;
 
@@ -383,9 +382,14 @@ fs_generator::generate_tex(fs_inst *inst, struct brw_reg dst, struct brw_reg src
       break;
    }
 
+   int rlen;
    if (dispatch_width == 16 &&
-      !inst->force_uncompressed && !inst->force_sechalf)
+       !inst->force_uncompressed && !inst->force_sechalf) {
       simd_mode = BRW_SAMPLER_SIMD_MODE_SIMD16;
+      rlen = inst->regs_written * dispatch_width / 8;
+   } else {
+      rlen = 4;
+   }
 
    if (brw->gen >= 5) {
       switch (inst->opcode) {

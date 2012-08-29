@@ -416,6 +416,43 @@ fs_visitor::setup_mrf_hack_interference(struct ra_graph *g, int first_mrf_node)
    }
 }
 
+/**
+ * Sets interference between virtual GRFs and the high GRFs for writemasked
+ * SIMD8 SEND messages.
+ */
+void
+fs_visitor::setup_texture_interference(struct ra_graph *g,
+                                       int last_high_grf_node)
+{
+   for (int i = 0; i < 4; i++) {
+      ra_set_node_reg(g, last_high_grf_node - i, BRW_MAX_GRF - i - 1);
+   }
+
+   foreach_list(node, &this->instructions) {
+      fs_inst *inst = (fs_inst *)node;
+
+      if (!inst->is_tex())
+         continue;
+
+      /* SIMD16 texturing skips destination registers according to the
+       * writemask.
+       */
+      if (dispatch_width == 16 &&
+          !inst->force_uncompressed && !inst->force_sechalf) {
+         continue;
+      }
+      /* SIMD8 texturing calls only return up to 4 regs. */
+      assert(inst->regs_written <= 4);
+      /* We need to keep the starting GRF plus the rlen the HW sees (4) under
+       * BRW_MAX_GRF.
+       */
+      int extra_regs_written = 4 - inst->regs_written;
+      for (int i = 0; i < extra_regs_written; i++) {
+         ra_add_node_interference(g, inst->dst.reg, last_high_grf_node - i);
+      }
+   }
+}
+
 bool
 fs_visitor::assign_regs()
 {
@@ -432,12 +469,28 @@ fs_visitor::assign_regs()
    int rsi = reg_width - 1; /* Which brw->wm.reg_sets[] to use */
    calculate_live_intervals();
 
+   /* These are the nodes for our VGRFs that we are trying to get allocated. */
    int node_count = this->virtual_grf_count;
+
+   /* These are nodes we set to specific physical GRFs and mark interfering
+    * with VGRFs to allow the payload registers to get reused.
+    */
    int first_payload_node = node_count;
    node_count += payload_node_count;
+
+   /* These are nodes we set to specific physical GRFs and mark interfering
+    * with VGRFs to allow the fake MRF register space to get reused.
+    */
    int first_mrf_hack_node = node_count;
    if (brw->gen >= 7)
       node_count += BRW_MAX_GRF - GEN7_MRF_HACK_START;
+
+   /* These are nodes we set to specific physical GRFs to keep SIMD8 texturing
+    * calls from walking off the end of register space.
+    */
+   node_count += 4;
+   int last_high_grf_node = node_count - 1;
+
    struct ra_graph *g = ra_alloc_interference_graph(brw->wm.reg_sets[rsi].regs,
                                                     node_count);
 
@@ -473,6 +526,7 @@ fs_visitor::assign_regs()
    }
 
    setup_payload_interference(g, payload_node_count, first_payload_node);
+   setup_texture_interference(g, last_high_grf_node);
    if (brw->gen >= 7)
       setup_mrf_hack_interference(g, first_mrf_hack_node);
 

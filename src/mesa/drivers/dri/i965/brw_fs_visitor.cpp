@@ -1570,25 +1570,35 @@ fs_visitor::visit(ir_texture *ir)
       needed_dst_channels = 0xf;
    }
 
-   /* On SIMD8, we ask for all of the texture channels even if they aren't all
-    * used.  On SIMD16, we can ask the hardware to return fewer channels,
-    * which lets us have lower register pressure (particularly important on
-    * convolution shaders).
+   /* On SIMD16, we can ask the hardware to return fewer channels, which lets
+    * us have lower register pressure (particularly important on convolution
+    * shaders).
+    *
+    * On SIMD8, the return length is always 4, and the message's writemask
+    * only determines which of those channels are modified.  This means that
+    * we can reduce destination register size only if there are unused
+    * channels starting from the end.  Also, because I'm concerned that the hw
+    * might try to reference the unwritten registers in some way, we'll make
+    * these texture destinations not get register allocated to the end of
+    * register space.
     *
     * This could use porting back to pre-gen7.
     */
    int dst_size = 4;
    bool needs_writemask_reswizzle = false;
-   if (brw->gen >= 7 && dispatch_width == 16 &&
-       ir->op != ir_txs && ir->op != ir_tg4) {
+   if (brw->gen >= 7 && ir->op != ir_txs && ir->op != ir_tg4) {
       writemask = 0;
       for (int i = 0; i < 4; i++) {
          int swiz = GET_SWZ(c->key.tex.swizzles[sampler], i);
          /* Note that SWIZZLE_ONE/ZERO are larger than any set channel in
           * needed_dst_channels.
           */
-         if (needed_dst_channels & (1 << swiz))
-            writemask |= 1 << swiz;
+         if (needed_dst_channels & (1 << swiz)) {
+            if (dispatch_width == 16)
+               writemask |= 1 << swiz;
+            else
+               writemask |= (1 << (swiz + 1)) - 1;
+         }
       }
 
       if (writemask != 0 && writemask != 0xf) {

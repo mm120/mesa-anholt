@@ -526,11 +526,12 @@ fs_generator::generate_tex(fs_inst *inst, struct brw_reg dst, struct brw_reg src
       src.nr++;
    }
 
-   /* Load the message header if present.  If there's a texture offset,
-    * we need to set it up explicitly and load the offset bitfield.
-    * Otherwise, we can use an implied move from g0 to the first message reg.
+   /* Load the message header if present.  If there's a special m0_2 required
+    * in the header (texture offset or writemasking), need to set it up
+    * explicitly.  Otherwise, we can use an implied move from g0 to the first
+    * message reg.
     */
-   if (inst->texture_offset) {
+   if (inst->m0_2) {
       struct brw_reg header_reg;
 
       if (brw->gen >= 7) {
@@ -548,7 +549,7 @@ fs_generator::generate_tex(fs_inst *inst, struct brw_reg dst, struct brw_reg src
       /* Then set the offset bits in DWord 2. */
       brw_MOV(p, retype(brw_vec1_reg(header_reg.file,
                                      header_reg.nr, 2), BRW_REGISTER_TYPE_UD),
-                 brw_imm_ud(inst->texture_offset));
+                 brw_imm_ud(inst->m0_2));
       brw_pop_insn_state(p);
    } else if (inst->header_present) {
       if (brw->gen >= 7) {

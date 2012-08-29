@@ -167,7 +167,7 @@ public:
    int mlen; /**< SEND message length */
    int regs_written; /**< Number of vgrfs written by a SEND message, or 1 */
    int base_mrf; /**< First MRF in the SEND message, if mlen is nonzero. */
-   uint32_t texture_offset; /**< Texture offset bitfield */
+   uint32_t m0_2; /**< M0.2 bits to be set for texture messages */
    int sampler;
    int target; /**< MRT target. */
    bool eot;

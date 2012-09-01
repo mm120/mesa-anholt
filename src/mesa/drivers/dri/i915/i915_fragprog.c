@@ -1172,6 +1172,7 @@ static void
 translate_program(struct i915_fragment_program *p)
 {
    struct i915_context *i915 = I915_CONTEXT(p->ctx);
+   struct intel_context *intel = &i915->intel;
 
    if (INTEL_DEBUG & DEBUG_WM) {
       printf("fp:\n");
@@ -1185,6 +1186,7 @@ translate_program(struct i915_fragment_program *p)
    fixup_depth_write(p);
    i915_fini_program(p);
 
+   intel->stats.fs_recompiles++;
    p->translated = 1;
 }
 

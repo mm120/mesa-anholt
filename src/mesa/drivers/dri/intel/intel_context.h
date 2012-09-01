@@ -142,6 +142,24 @@ struct intel_batchbuffer {
    } saved;
 };
 
+/** Various software-collected statistics printed under INTEL_DEBUG=perf. */
+struct intel_stats
+{
+   uint64_t verts;
+   int vs_recompiles;
+   int fs_recompiles;
+
+   /* Bandwidth tracking */
+   uint64_t batch_data;
+   uint64_t batch_state_data;
+   uint64_t streamed_vertex_data;
+   uint64_t bo_data;
+   uint64_t async_blit_data;
+   uint64_t vs_pull_constant_data;
+   uint64_t fs_pull_constant_data;
+   uint64_t texture_data;
+};
+
 /**
  * intel_context is derived from Mesa's context class: struct gl_context.
  */
@@ -258,6 +276,10 @@ struct intel_context
       uint32_t buffer_offset;
       char buffer[4096];
    } upload;
+
+   struct intel_stats stats;
+   struct intel_stats last_printed_stats;
+   double last_stats_print_time;
 
    GLuint stats_wm;
 

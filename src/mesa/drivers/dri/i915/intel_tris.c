@@ -311,6 +311,7 @@ void intel_flush_prim(struct intel_context *intel)
       ADVANCE_BATCH();
    }
 
+   intel->stats.verts += count;
    if (intel->always_flush_cache) {
       intel_batchbuffer_emit_mi_flush(intel);
    }

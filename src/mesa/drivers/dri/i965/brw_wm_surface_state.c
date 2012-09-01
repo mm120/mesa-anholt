@@ -933,6 +933,7 @@ brw_upload_wm_pull_constants(struct brw_context *brw)
    drm_intel_bo_unreference(brw->wm.const_bo);
    brw->wm.const_bo = drm_intel_bo_alloc(intel->bufmgr, "WM const bo",
 					 size, 64);
+   intel->stats.fs_pull_constant_data += size;
 
    /* _NEW_PROGRAM_CONSTANTS */
    drm_intel_gem_bo_map_gtt(brw->wm.const_bo);

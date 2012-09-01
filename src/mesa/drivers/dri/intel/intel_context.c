@@ -522,10 +522,72 @@ intel_flush_rendering_to_batch(struct gl_context *ctx)
       INTEL_FIREVERTICES(intel);
 }
 
+static void
+intel_debug_perf_stats(struct intel_context *intel)
+{
+   double t = get_time();
+   double dt = t - intel->last_stats_print_time;
+
+   if (intel->last_stats_print_time == 0) {
+      intel->last_stats_print_time = t;
+      return;
+   }
+
+   if (dt < 1)
+      return;
+
+   struct intel_stats *a = &intel->stats;
+   struct intel_stats *b = &intel->last_printed_stats;
+   const float mb = 1024.0 * 1024.0;
+   const float mbs = mb * dt;
+
+   printf("Perf stats:\n");
+   printf("  Vertices: %.1f Mverts/s\n", (a->verts - b->verts) / dt / 1000000);
+   printf("  Batchbuffer upload bandwidth: %.1f MB/s\n",
+          (a->batch_data - b->batch_data) / mbs);
+   printf("  Batched state upload bandwidth: %.1f MB/s\n",
+          (a->batch_state_data - b->batch_state_data) / mbs);
+   printf("  Non-BO vertex upload bandwidth: %.1f MB/s\n",
+          (a->streamed_vertex_data - b->streamed_vertex_data) / mbs);
+   printf("  BO upload bandwidth: %.1f MB/s\n",
+          (a->bo_data - b->bo_data) / mbs);
+   printf("  Synchronization avoidance blit bandwidth: %.1f MB/s\n",
+          (a->async_blit_data - b->async_blit_data) / mbs);
+   printf("  texture upload bandwidth: %.1f MB/s\n",
+          (a->texture_data - b->texture_data) / mbs);
+   if (intel->gen >= 4) {
+      printf("  VS pull constant upload bandwidth: %.1f MB/s\n",
+             (a->vs_pull_constant_data - b->vs_pull_constant_data) / mbs);
+      printf("  FS pull constant upload bandwidth: %.1f MB/s\n",
+             (a->fs_pull_constant_data - b->fs_pull_constant_data) / mbs);
+   }
+   printf("  Total accounted for bandwidth: %.1f MB/s\n",
+          ((a->batch_data +
+            a->batch_state_data +
+            a->streamed_vertex_data +
+            a->bo_data +
+            a->async_blit_data +
+            a->vs_pull_constant_data +
+            a->fs_pull_constant_data) -
+           (b->batch_data +
+            b->batch_state_data +
+            b->streamed_vertex_data +
+            b->bo_data +
+            b->async_blit_data +
+            b->vs_pull_constant_data +
+            b->fs_pull_constant_data)) / mbs);
+
+   intel->last_printed_stats = intel->stats;
+   intel->last_stats_print_time = t;
+}
+
 void
 _intel_flush(struct gl_context *ctx, const char *file, int line)
 {
    struct intel_context *intel = intel_context(ctx);
+
+   if (unlikely(INTEL_DEBUG & DEBUG_PERF))
+      intel_debug_perf_stats(intel);
 
    intel_flush_rendering_to_batch(ctx);
 
@@ -803,6 +865,28 @@ intelDestroyContext(__DRIcontext * driContextPriv)
       if (INTEL_DEBUG & DEBUG_AUB) {
          intel_batchbuffer_flush(intel);
 	 aub_dump_bmp(&intel->ctx);
+      }
+
+      if (INTEL_DEBUG & DEBUG_PERF) {
+         const float MB = 1024.0 * 1024;
+
+         printf("  Vertices: %.1f Mverts\n", intel->stats.verts / 1000000.0);
+         printf("  VS compiles: %d\n", intel->stats.vs_recompiles);
+         printf("  FS compiles: %d\n", intel->stats.fs_recompiles);
+         printf("  Batchbuffer data: %.1f MB\n", intel->stats.batch_data / MB);
+         printf("  Batched state data: %.1f MB\n",
+                intel->stats.batch_state_data / MB);
+         printf("  Non-BO vertex data: %.1f MB\n",
+                intel->stats.streamed_vertex_data / MB);
+         printf("  BO data: %.1fMB\n", intel->stats.bo_data / MB);
+         printf("  Synchronization avoidance blit data: %.1f MB\n",
+                intel->stats.async_blit_data / MB);
+         if (intel->gen >= 4) {
+            printf("VS pull constant data: %.1f MB\n",
+               intel->stats.vs_pull_constant_data / MB);
+            printf("FS pull constant data: %.1f MB\n",
+               intel->stats.fs_pull_constant_data / MB);
+         }
       }
 
       _mesa_meta_free(&intel->ctx);

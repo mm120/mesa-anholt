@@ -172,6 +172,8 @@ do_flush_locked(struct intel_context *intel)
 				 batch->bo->size - batch->state_batch_offset,
 				 (char *)batch->map + batch->state_batch_offset);
    }
+   intel->stats.batch_data += 4 * batch->used;
+   intel->stats.batch_state_data += batch->bo->size - batch->state_batch_offset;
 
    if (!intel->intelScreen->no_hw) {
       int flags;

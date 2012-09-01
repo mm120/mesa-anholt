@@ -294,6 +294,8 @@ do_vs_prog(struct brw_context *brw,
 		    &brw->vs.prog_offset, &brw->vs.prog_data);
    ralloc_free(mem_ctx);
 
+   intel->stats.vs_recompiles++;
+
    return true;
 }
 

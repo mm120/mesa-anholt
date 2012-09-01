@@ -344,6 +344,7 @@ bool do_wm_prog(struct brw_context *brw,
 		    &c->prog_data, sizeof(c->prog_data),
 		    &brw->wm.prog_offset, &brw->wm.prog_data);
 
+   intel->stats.fs_recompiles++;
    return true;
 }
 

@@ -198,6 +198,7 @@ static void brw_emit_prim(struct brw_context *brw,
 
    intel->batch.need_workaround_flush = true;
 
+   intel->stats.verts += verts_per_instance * prim->num_instances;
    if (intel->always_flush_cache) {
       intel_batchbuffer_emit_mi_flush(intel);
    }
@@ -252,6 +253,7 @@ static void gen7_emit_prim(struct brw_context *brw,
    OUT_BATCH(base_vertex_location);
    ADVANCE_BATCH();
 
+   intel->stats.verts += verts_per_instance * prim->num_instances;
    if (intel->always_flush_cache) {
       intel_batchbuffer_emit_mi_flush(intel);
    }

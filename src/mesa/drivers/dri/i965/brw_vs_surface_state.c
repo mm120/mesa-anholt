@@ -76,6 +76,7 @@ brw_upload_vs_pull_constants(struct brw_context *brw)
    brw->vs.const_bo = drm_intel_bo_alloc(intel->bufmgr, "vp_const_buffer",
 					 brw->vs.prog_data->nr_pull_params * 4,
 					 64);
+   intel->stats.vs_pull_constant_data += brw->vs.prog_data->nr_pull_params * 4;
 
    drm_intel_gem_bo_map_gtt(brw->vs.const_bo);
    for (i = 0; i < brw->vs.prog_data->nr_pull_params; i++) {

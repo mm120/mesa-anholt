@@ -157,8 +157,10 @@ intel_bufferobj_data(struct gl_context * ctx,
       if (!intel_obj->buffer)
          return false;
 
-      if (data != NULL)
+      if (data != NULL) {
 	 drm_intel_bo_subdata(intel_obj->buffer, 0, size, data);
+         intel->stats.bo_data += size;
+      }
    }
 
    return true;
@@ -183,6 +185,8 @@ intel_bufferobj_subdata(struct gl_context * ctx,
 
    if (size == 0)
       return;
+
+   intel->stats.bo_data += size;
 
    assert(intel_obj);
 
@@ -214,6 +218,8 @@ intel_bufferobj_subdata(struct gl_context * ctx,
       } else {
          perf_debug("Using a blit copy to avoid stalling on glBufferSubData() "
                     "to a busy buffer object.\n");
+         intel->stats.async_blit_data += size;
+
 	 drm_intel_bo *temp_bo =
 	    drm_intel_bo_alloc(intel->bufmgr, "subdata temp", size, 64);
 
@@ -223,6 +229,7 @@ intel_bufferobj_subdata(struct gl_context * ctx,
 				intel_obj->buffer, offset,
 				temp_bo, 0,
 				size);
+         intel->stats.async_blit_data += size;
 
 	 drm_intel_bo_unreference(temp_bo);
       }
@@ -339,6 +346,17 @@ intel_bufferobj_map_range(struct gl_context * ctx,
       }
    }
 
+   /* Assume that if an invalidate buffer is done, then a relatively
+    * insignificant part of the total buffer size allocated will actually be
+    * uploaded.  If we have FLUSH_EXPLICIT, we will know the exact size
+    * during the callback.
+    */
+   if ((access & GL_MAP_WRITE_BIT) &&
+       !(access & GL_MAP_INVALIDATE_BUFFER_BIT) &&
+       !(access & GL_MAP_FLUSH_EXPLICIT_BIT)) {
+      intel->stats.bo_data += length;
+   }
+
    /* If the user is mapping a range of an active buffer object but
     * doesn't require the current contents of that range, make a new
     * BO, and we'll copy what they put in there out at unmap or
@@ -390,6 +408,8 @@ intel_bufferobj_flush_mapped_range(struct gl_context *ctx,
    struct intel_buffer_object *intel_obj = intel_buffer_object(obj);
    drm_intel_bo *temp_bo;
 
+   intel->stats.bo_data += length;
+
    /* Unless we're in the range map using a temporary system buffer,
     * there's no work to do.
     */
@@ -407,6 +427,7 @@ intel_bufferobj_flush_mapped_range(struct gl_context *ctx,
 			  intel_obj->buffer, obj->Offset + offset,
 			  temp_bo, 0,
 			  length);
+   intel->stats.async_blit_data += length;
 
    drm_intel_bo_unreference(temp_bo);
 }
@@ -441,6 +462,7 @@ intel_bufferobj_unmap(struct gl_context * ctx, struct gl_buffer_object *obj)
 			     intel_obj->buffer, obj->Offset,
 			     intel_obj->range_map_bo, 0,
 			     obj->Length);
+      intel->stats.async_blit_data += obj->Length;
 
       /* Since we've emitted some blits to buffers that will (likely) be used
        * in rendering operations in other cache domains in this batch, emit a
@@ -474,6 +496,7 @@ intel_bufferobj_buffer(struct intel_context *intel,
       drm_intel_bo_subdata(intel_obj->buffer,
 			   0, intel_obj->Base.Size,
 			   intel_obj->sys_buffer);
+      intel->stats.bo_data += intel_obj->Base.Size;
 
       free(intel_obj->sys_buffer);
       intel_obj->sys_buffer = NULL;
@@ -496,6 +519,7 @@ intel_upload_finish(struct intel_context *intel)
 				intel->upload.buffer_offset,
 				intel->upload.buffer_len,
 				intel->upload.buffer);
+           intel->stats.streamed_vertex_data += intel->upload.buffer_len;
 	   intel->upload.buffer_len = 0;
    }
 

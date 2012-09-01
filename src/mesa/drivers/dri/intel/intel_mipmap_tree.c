@@ -1528,6 +1528,9 @@ intel_miptree_map_singlesample(struct intel_context *intel,
       intel_miptree_slice_set_needs_hiz_resolve(mt, level, slice);
    }
 
+   if (mode & GL_MAP_WRITE_BIT)
+      intel->stats.texture_data += x * y * mt->region->cpp;
+
    if (mt->format == MESA_FORMAT_S8) {
       intel_miptree_map_s8(intel, mt, map, level, slice);
    } else if (mt->wraps_etc1) {

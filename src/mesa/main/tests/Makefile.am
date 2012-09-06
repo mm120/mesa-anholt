@@ -10,16 +10,19 @@ AM_CPPFLAGS = \
 	-I$(top_builddir)/include \
 	$(API_DEFINES) $(DEFINES) $(INCLUDE_DIRS)
 
-TESTS = main-test
-check_PROGRAMS = main-test
+TESTS = main-test \
+        threadpool-test
+check_PROGRAMS = $(TESTS)
+
+MESA_LIBS = \
+	$(top_builddir)/src/mesa/libmesa.la \
+	$(PTHREAD_LIBS)
 
 main_test_SOURCES =			\
 	enum_strings.cpp
-
 main_test_LDADD = \
-	$(top_builddir)/src/mesa/libmesa.la \
+        $(MESA_LIBS) \
 	$(top_builddir)/src/gtest/libgtest.la \
-	$(PTHREAD_LIBS) \
 	$(DLOPEN_LIBS)
 
 if HAVE_SHARED_GLAPI
@@ -34,3 +37,6 @@ else
 main_test_SOURCES +=			\
 	stubs.cpp
 endif
+
+threadpool_test_SOURCES = threadpool-test.c
+threadpool_test_LDADD = $(MESA_LIBS)

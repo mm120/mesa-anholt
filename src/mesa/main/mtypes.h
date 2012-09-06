@@ -2229,6 +2229,8 @@ struct gl_shader
    /** Shaders containing built-in functions that are used for linking. */
    struct gl_shader *builtins_to_link[16];
    unsigned num_builtins_to_link;
+
+   struct threadpool_task *DelayedCompile;
 };
 
 
@@ -2560,6 +2562,8 @@ struct gl_shared_state
    _glthread_Mutex TexMutex;		/**< texobj thread safety */
    GLuint TextureStateStamp;	        /**< state notification for shared tex */
    /*@}*/
+
+   struct threadpool *ThreadPool;
 
    /** Default buffer object for vertex arrays that aren't in VBOs */
    struct gl_buffer_object *NullBufferObj;

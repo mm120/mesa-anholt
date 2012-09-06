@@ -45,6 +45,7 @@
 #include "main/mtypes.h"
 #include "main/shaderapi.h"
 #include "main/shaderobj.h"
+#include "main/threadpool.h"
 #include "main/uniforms.h"
 #include "program/program.h"
 #include "program/prog_parameter.h"
@@ -233,6 +234,8 @@ attach_shader(struct gl_context *ctx, GLuint program, GLuint shader)
       return;
    }
 
+   _mesa_wait_for_delayed_shader_compile(ctx, sh);
+
    n = shProg->NumShaders;
    for (i = 0; i < n; i++) {
       if (shProg->Shaders[i] == sh) {
@@ -339,6 +342,8 @@ delete_shader(struct gl_context *ctx, GLuint shader)
    sh = _mesa_lookup_shader_err(ctx, shader, "glDeleteShader");
    if (!sh)
       return;
+
+   _mesa_wait_for_delayed_shader_compile(ctx, sh);
 
    if (!sh->DeletePending) {
       sh->DeletePending = GL_TRUE;
@@ -609,6 +614,8 @@ get_shaderiv(struct gl_context *ctx, GLuint name, GLenum pname, GLint *params)
       return;
    }
 
+   _mesa_wait_for_delayed_shader_compile(ctx, shader);
+
    switch (pname) {
    case GL_SHADER_TYPE:
       *params = shader->Type;
@@ -655,6 +662,9 @@ get_shader_info_log(struct gl_context *ctx, GLuint shader, GLsizei bufSize,
       _mesa_error(ctx, GL_INVALID_VALUE, "glGetShaderInfoLog(shader)");
       return;
    }
+
+   _mesa_wait_for_delayed_shader_compile(ctx, sh);
+
    _mesa_copy_string(infoLog, bufSize, length, sh->InfoLog);
 }
 
@@ -671,6 +681,9 @@ get_shader_source(struct gl_context *ctx, GLuint shader, GLsizei maxLength,
    if (!sh) {
       return;
    }
+
+   _mesa_wait_for_delayed_shader_compile(ctx, sh);
+
    _mesa_copy_string(sourceOut, maxLength, length, sh->Source);
 }
 
@@ -688,6 +701,8 @@ shader_source(struct gl_context *ctx, GLuint shader, const GLchar *source)
    if (!sh)
       return;
 
+   _mesa_wait_for_delayed_shader_compile(ctx, sh);
+
    /* free old shader source string and install new one */
    free((void *)sh->Source);
    sh->Source = source;
@@ -697,6 +712,39 @@ shader_source(struct gl_context *ctx, GLuint shader, const GLchar *source)
 #endif
 }
 
+void
+_mesa_wait_for_delayed_shader_compile(struct gl_context *ctx,
+                                      struct gl_shader *sh)
+{
+   _mesa_threadpool_wait_for_task(ctx->Shared->ThreadPool, &sh->DelayedCompile);
+}
+
+struct delayed_compile_shader_data
+{
+   struct gl_context *ctx;
+   struct gl_shader *shader;
+};
+
+static void
+delayed_compile_shader_task(void *in_data)
+{
+   struct delayed_compile_shader_data *data = in_data;
+   struct gl_context *ctx = data->ctx;
+   struct gl_shader *sh = data->shader;
+
+   /* this call will set the sh->CompileStatus field to indicate if
+    * compilation was successful.
+    */
+   _mesa_glsl_compile_shader(ctx, sh);
+
+   free(data);
+
+   if (sh->CompileStatus == GL_FALSE &&
+       (ctx->Shader.Flags & GLSL_REPORT_ERRORS)) {
+      _mesa_debug(ctx, "Error compiling shader %u:\n%s\n",
+                  sh->Name, sh->InfoLog);
+   }
+}
 
 /**
  * Compile a shader.
@@ -706,6 +754,7 @@ compile_shader(struct gl_context *ctx, GLuint shaderObj)
 {
    struct gl_shader *sh;
    struct gl_shader_compiler_options *options;
+   struct delayed_compile_shader_data *delayed_compile_shader_data;
 
    sh = _mesa_lookup_shader_err(ctx, shaderObj, "glCompileShader");
    if (!sh)
@@ -716,16 +765,13 @@ compile_shader(struct gl_context *ctx, GLuint shaderObj)
    /* set default pragma state for shader */
    sh->Pragmas = options->DefaultPragmas;
 
-   /* this call will set the sh->CompileStatus field to indicate if
-    * compilation was successful.
-    */
-   _mesa_glsl_compile_shader(ctx, sh);
-
-   if (sh->CompileStatus == GL_FALSE && 
-       (ctx->Shader.Flags & GLSL_REPORT_ERRORS)) {
-      _mesa_debug(ctx, "Error compiling shader %u:\n%s\n",
-                  sh->Name, sh->InfoLog);
-   }
+   delayed_compile_shader_data = malloc(sizeof(*delayed_compile_shader_data));
+   delayed_compile_shader_data->ctx = ctx;
+   delayed_compile_shader_data->shader = sh;
+   _mesa_wait_for_delayed_shader_compile(ctx, sh);
+   sh->DelayedCompile = _mesa_threadpool_queue_task(ctx->Shared->ThreadPool,
+                                                    delayed_compile_shader_task,
+                                                    delayed_compile_shader_data);
 }
 
 
@@ -1657,6 +1703,8 @@ _mesa_CreateShaderProgramEXT(GLenum type, const GLchar *string)
 
 	 shProg = _mesa_lookup_shader_program(ctx, program);
 	 sh = _mesa_lookup_shader(ctx, shader);
+
+         _mesa_wait_for_delayed_shader_compile(ctx, sh);
 
 	 get_shaderiv(ctx, shader, GL_COMPILE_STATUS, &compiled);
 	 if (compiled) {

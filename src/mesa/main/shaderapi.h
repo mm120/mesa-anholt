@@ -59,6 +59,10 @@ _mesa_count_active_attribs(struct gl_shader_program *shProg);
 extern size_t
 _mesa_longest_attribute_name_length(struct gl_shader_program *shProg);
 
+void
+_mesa_wait_for_delayed_shader_compile(struct gl_context *ctx,
+                                      struct gl_shader *sh);
+
 extern void GLAPIENTRY
 _mesa_AttachObjectARB(GLhandleARB, GLhandleARB);
 

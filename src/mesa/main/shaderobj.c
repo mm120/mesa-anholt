@@ -34,6 +34,7 @@
 #include "main/hash.h"
 #include "main/mfeatures.h"
 #include "main/mtypes.h"
+#include "main/shaderapi.h"
 #include "main/shaderobj.h"
 #include "main/uniforms.h"
 #include "program/program.h"
@@ -44,7 +45,6 @@
 /**********************************************************************/
 /*** Shader object functions                                        ***/
 /**********************************************************************/
-
 
 /**
  * Set ptr to point to sh.
@@ -124,6 +124,7 @@ _mesa_new_shader(struct gl_context *ctx, GLuint name, GLenum type)
 static void
 _mesa_delete_shader(struct gl_context *ctx, struct gl_shader *sh)
 {
+   _mesa_wait_for_delayed_shader_compile(ctx, sh);
    free((void *)sh->Source);
    _mesa_reference_program(ctx, &sh->Program, NULL);
    ralloc_free(sh);

@@ -101,6 +101,7 @@ MAIN_FILES = \
 	$(SRCDIR)main/texstorage.c \
 	$(SRCDIR)main/texstore.c \
 	$(SRCDIR)main/texturebarrier.c \
+	$(SRCDIR)main/threadpool.c \
 	$(SRCDIR)main/transformfeedback.c \
 	$(SRCDIR)main/uniforms.c \
 	$(SRCDIR)main/uniform_query.cpp \

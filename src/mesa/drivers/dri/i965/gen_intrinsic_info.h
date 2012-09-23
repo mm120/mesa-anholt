@@ -21,25 +21,29 @@
  * IN THE SOFTWARE.
  */
 
-include "llvm/Target/Target.td"
+#pragma once
 
-def gen_instr_info : InstrInfo {}
+#include "llvm/Target/TargetIntrinsicInfo.h"
+#include "llvm/Intrinsics.h"
 
-class Proc<string Name, list<SubtargetFeature> Features>
-   : Processor<Name, NoItineraries, Features>;
+using namespace llvm;
 
-def feature_gen6 : SubtargetFeature<"gen6", "gen", "6",
-    "Enable gen6 features">;
-def feature_gen7 : SubtargetFeature<"gen7", "gen", "7",
-    "Enable gen7 features">;
-
-def : Proc<"gen6", [feature_gen6]>;
-def : Proc<"gen7", [feature_gen7]>;
-
-def gen : Target {
-   let InstructionSet = gen_instr_info;
+namespace genIntrinsic {
+enum ID {
+    last_non_gen_intrinsic = Intrinsic::num_intrinsics-1,
+#define GET_INTRINSIC_ENUM_VALUES
+#include "gen_intrinsics.h.inc"
+#undef GET_INTRINSIC_ENUM_VALUES
+   , num_gen_intrinsics};
 }
 
-include "gen_intrinsics.td"
-include "gen_register_info.td"
-include "gen_instr_info.td"
+class gen_intrinsic_info : public TargetIntrinsicInfo
+{
+public:
+   std::string getName(unsigned IntrID, Type **Tys = 0,
+                       unsigned numTys = 0) const;
+   unsigned lookupName(const char *Name, unsigned Len) const;
+   bool isOverloaded(unsigned IntrID) const;
+   Function *getDeclaration(Module *M, unsigned ID, Type **Tys = 0,
+                            unsigned numTys = 0) const;
+};

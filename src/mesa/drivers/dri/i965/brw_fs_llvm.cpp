@@ -36,6 +36,7 @@
 #include "glsl/ir_to_llvm.h"
 #include "brw_fs.h"
 #include "gen_target_machine.h"
+#include "gen_intrinsic_info.h"
 
 using namespace llvm;
 
@@ -46,6 +47,13 @@ public:
    fs_ir_to_llvm();
    virtual void build_prologue();
    virtual void build_epilogue();
+
+   Value *gen_intrinsic(genIntrinsic::ID id, Value *a);
+   Value *gen_intrinsic(genIntrinsic::ID id, Value *a, Value *b);
+
+   void *mem_ctx;
+   exec_list *instructions;
+   gen_target_machine *tm;
 };
 
 } /* namespace */
@@ -53,6 +61,7 @@ public:
 fs_ir_to_llvm::fs_ir_to_llvm()
    : ir_to_llvm(getGlobalContext())
 {
+   instructions = NULL;
 }
 
 void
@@ -63,6 +72,45 @@ fs_ir_to_llvm::build_prologue()
 void
 fs_ir_to_llvm::build_epilogue()
 {
+   foreach_list(node, instructions) {
+      ir_instruction *ir = (ir_instruction *)node;
+      ir_variable *var = ir->as_variable();
+      if (!var)
+         continue;
+
+      if (var->mode == ir_var_out) {
+         /* Create the storage for the output. */
+         (void)llvm_variable(var);
+
+         for (int i = 0; i < var->type->vector_elements; i++) {
+            ir_constant *index = new(mem_ctx) ir_constant(i);
+            ir_dereference_variable *deref =
+               new(mem_ctx) ir_dereference_variable(var);
+            ir_dereference_array *deref_array =
+               new(mem_ctx) ir_dereference_array(deref, index);
+            Value *chan = llvm_pointer(deref_array);
+
+            gen_intrinsic(genIntrinsic::gen_MOV_MRF_F, llvm_int(i),
+                          bld.CreateLoad(chan));
+         }
+      }
+   }
+}
+
+Value *
+fs_ir_to_llvm::gen_intrinsic(genIntrinsic::ID id, Value *a)
+{
+   Type *types[1] = {a->getType()};
+   return bld.CreateCall(tm->intrinsic_info.getDeclaration(mod, id, types), a);
+}
+
+Value *
+fs_ir_to_llvm::gen_intrinsic(genIntrinsic::ID id, Value *a, Value *b)
+{
+   Type *types[2] = {a->getType(), b->getType()};
+   /* only one type suffix is usually needed, so pass 1 here */
+   return bld.CreateCall2(tm->intrinsic_info.getDeclaration(mod, id,
+                                                            types), a, b);
 }
 
 bool
@@ -71,12 +119,6 @@ fs_visitor::build_llvm()
    Module *mod;
 
    fs_ir_to_llvm build;
-
-   mod = build.build_module(shader->ir);
-   if (!mod)
-      return false;
-
-   mod->dump();
 
    gen_initialize_llvm_target();
    gen_initialize_llvm_target_mc();
@@ -95,6 +137,15 @@ fs_visitor::build_llvm()
          Reloc::Default,
          CodeModel::Default,
          CodeGenOpt::Default);
+
+   build.mem_ctx = mem_ctx;
+   build.instructions = shader->ir;
+   build.tm = tm;
+   mod = build.build_module(shader->ir);
+   if (!mod)
+      return false;
+
+   mod->dump();
 
    PassManager PM;
    PM.add(new TargetData(*tm->getTargetData()));

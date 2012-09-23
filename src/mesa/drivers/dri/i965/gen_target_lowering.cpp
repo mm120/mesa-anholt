@@ -42,6 +42,36 @@ gen_target_lowering::gen_target_lowering(TargetMachine &tm)
     */
    setOperationAction(ISD::ConstantFP,  MVT::f32, Legal);
 
+   setOperationAction(ISD::INTRINSIC_WO_CHAIN, MVT::Other, Custom);
+   setOperationAction(ISD::INTRINSIC_W_CHAIN, MVT::Other, Custom);
+}
+
+MachineBasicBlock *
+gen_target_lowering::EmitInstrWithCustomInserter(MachineInstr * MI,
+                                                 MachineBasicBlock * BB) const
+{
+   /*const TargetInstrInfo * TII = getTargetMachine().getInstrInfo();*/
+   MachineRegisterInfo & MRI = BB->getParent()->getRegInfo();
+   MachineBasicBlock::iterator I = MI;
+
+   switch (MI->getOpcode()) {
+   default:
+      return gen_target_lowering::EmitInstrWithCustomInserter(MI, BB);
+   case gen::MOV_MRF_F:
+      lower_mov_mrf_f(MI, *BB, I, MRI);
+      break;
+   }
+
+   return BB;
+}
+
+void
+gen_target_lowering::lower_mov_mrf_f(MachineInstr *MI,
+                                     MachineBasicBlock &BB,
+                                     MachineBasicBlock::iterator I,
+                                     MachineRegisterInfo &MRI) const
+{
+   assert(!"FINISHME");
 }
 
 SDValue
@@ -65,13 +95,20 @@ gen_target_lowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
                                  const SmallVectorImpl<SDValue> &OutVals,
                                  DebugLoc DL, SelectionDAG &DAG) const
 {
-   /* FINISHME: No clue. */
+   assert(!"FINISHME: What's supposed to go here?");
    return Chain;
 }
 
 SDValue
 gen_target_lowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const
 {
+   switch (Op.getOpcode()) {
+   default:
+      Op.getNode()->dump();
+      assert(!"Custom lowering code for this instruction is not implemented yet!");
+      break;
+   }
+
    return Op;
 }
 

@@ -33,6 +33,7 @@
 #include "gen_register_info.h"
 #include "gen_subtarget.h"
 #include "gen_instr_info.h"
+#include "gen_intrinsic_info.h"
 
 using namespace llvm;
 
@@ -55,6 +56,7 @@ public:
    gen_instr_info *instr_info;
    gen_target_lowering *target_lowering;
    gen_frame_lowering frame_lowering;
+   gen_intrinsic_info intrinsic_info;
 
    virtual const genSubtarget *getSubtargetImpl() const
    {

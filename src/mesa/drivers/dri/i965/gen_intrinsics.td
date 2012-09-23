@@ -21,25 +21,12 @@
  * IN THE SOFTWARE.
  */
 
-include "llvm/Target/Target.td"
+let TargetPrefix = "gen", isTarget = 1 in {
+   def int_gen_MOV_MRF_F : Intrinsic <[], [llvm_i32_ty, llvm_float_ty], []>;
 
-def gen_instr_info : InstrInfo {}
-
-class Proc<string Name, list<SubtargetFeature> Features>
-   : Processor<Name, NoItineraries, Features>;
-
-def feature_gen6 : SubtargetFeature<"gen6", "gen", "6",
-    "Enable gen6 features">;
-def feature_gen7 : SubtargetFeature<"gen7", "gen", "7",
-    "Enable gen7 features">;
-
-def : Proc<"gen6", [feature_gen6]>;
-def : Proc<"gen7", [feature_gen7]>;
-
-def gen : Target {
-   let InstructionSet = gen_instr_info;
+   def int_gen_FB_WRITE : Intrinsic <
+      [],
+      [llvm_i32_ty],
+      []
+   >;
 }
-
-include "gen_intrinsics.td"
-include "gen_register_info.td"
-include "gen_instr_info.td"

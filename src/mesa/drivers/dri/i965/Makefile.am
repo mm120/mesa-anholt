@@ -60,6 +60,8 @@ libi965_llvm_la_SOURCES = \
 	gen_frame_lowering.h \
 	gen_instr_info.cpp \
 	gen_instr_info.h \
+	gen_intrinsic_info.cpp \
+	gen_intrinsic_info.h \
 	gen_isel_dag_to_dag.cpp \
 	gen_mc_asm_info.cpp \
 	gen_mc_asm_info.h \
@@ -87,6 +89,7 @@ BUILT_SOURCES = \
 	gen_code_emitter.h.inc \
 	gen_dag_isel.h.inc \
 	gen_instr_info.h.inc \
+	gen_intrinsics.h.inc \
 	gen_register_info.h.inc \
 	gen_subtarget_info.h.inc
 
@@ -102,6 +105,8 @@ gen_dag_isel.h.inc: *.td
 	$(TABLEGEN) -gen-dag-isel gen.td -o $@ || (rm -f $@; exit 1)
 gen_instr_info.h.inc: *.td
 	$(TABLEGEN) -gen-instr-info gen.td -o $@ || (rm -f $@; exit 1)
+gen_intrinsics.h.inc: *.td
+	$(TABLEGEN) -gen-tgt-intrinsic gen.td -o $@ || (rm -f $@; exit 1)
 gen_register_info.h.inc: *.td
 	$(TABLEGEN) -gen-register-info gen.td -o $@ || (rm -f $@; exit 1)
 gen_subtarget_info.h.inc: *.td

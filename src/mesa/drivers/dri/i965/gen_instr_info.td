@@ -45,20 +45,30 @@ class arith<bits<7> opcode_val, dag outs, dag ins, string asmstr, list<dag> patt
 
 def STUB_LOAD : arith<0,
     (outs fgrfs:$dst), (ins igrfs:$offset),
-    "stub_load $offset, $dst", [(set fgrfs:$dst, (load igrfs:$offset))]>;
+    "stub_load $offset, $dst",
+    [(set fgrfs:$dst, (load igrfs:$offset))]>;
 
 def STUB_STORE : arith<0,
     (outs), (ins fgrfs:$dst, igrfs:$offset),
-    "stub_store $offset, $dst", [(store fgrfs:$dst, igrfs:$offset)]>;
+    "stub_store $offset, $dst",
+    [(store fgrfs:$dst, igrfs:$offset)]>;
 
 def ADD : arith<64,
     (outs grfs:$dst), (ins grfs:$src1, grfs:$src2),
-    "add $src1, $src2, $dst", [(set grfs:$dst, (fadd grfs:$src1, grfs:$src2))]>;
+    "add $src1, $src2, $dst",
+    [(set grfs:$dst, (fadd grfs:$src1, grfs:$src2))]>;
 
 def MUL : arith<65,
     (outs grfs:$dst), (ins grfs:$src1, grfs:$src2),
-    "mul $src1, $src2, $dst", [(set grfs:$dst, (fmul grfs:$src1, grfs:$src2))]>;
+    "mul $src1, $src2, $dst",
+    [(set grfs:$dst, (fmul grfs:$src1, grfs:$src2))]>;
 
 def MOV : arith<1,
     (outs grfs:$dst), (ins grfs:$src),
-    "mov $src, $dst", []>;
+    "mov $src, $dst",
+    []>;
+
+def MOV_MRF_F : arith<1,
+    (outs), (ins i32imm:$src0, grfs:$src1),
+    "mov.mrf m$src0, $src1",
+    [(int_gen_MOV_MRF_F imm:$src0, grfs:$src1)]>;

@@ -31,6 +31,9 @@ class gen_target_lowering : public TargetLowering
 public:
    gen_target_lowering(TargetMachine &tm);
 
+   virtual MachineBasicBlock *EmitInstrWithCustomInserter(MachineInstr * MI,
+                                                          MachineBasicBlock * BB) const;
+
    virtual SDValue LowerFormalArguments(SDValue Chain, CallingConv::ID CallConv,
                                         bool isVarArg,
                                         const SmallVectorImpl<ISD::InputArg> &Ins,
@@ -44,4 +47,9 @@ public:
                                DebugLoc DL, SelectionDAG &DAG) const;
 
    virtual SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const;
+
+   void lower_mov_mrf_f(MachineInstr *MI,
+                        MachineBasicBlock &BB,
+                        MachineBasicBlock::iterator I,
+                        MachineRegisterInfo &MRI) const;
 };

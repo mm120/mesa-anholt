@@ -54,6 +54,8 @@ glthread_allocate_batch(struct gl_context *ctx)
 static void
 glthread_unmarshal_batch(struct gl_context *ctx, struct glthread_batch *batch)
 {
+   _glapi_set_dispatch(ctx->CurrentServerDispatch);
+
    free(batch->buffer);
    free(batch);
 }
@@ -187,6 +189,7 @@ _mesa_glthread_flush_batch(struct gl_context *ctx)
     */
    if (false) {
       glthread_unmarshal_batch(ctx, batch);
+      _glapi_set_dispatch(ctx->CurrentClientDispatch);
       return;
    }
 

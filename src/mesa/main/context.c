@@ -1031,7 +1031,7 @@ _mesa_initialize_context(struct gl_context *ctx,
    if (!ctx->OutsideBeginEnd)
       goto fail;
    ctx->Exec = ctx->OutsideBeginEnd;
-   ctx->CurrentDispatch = ctx->OutsideBeginEnd;
+   ctx->CurrentClientDispatch = ctx->CurrentServerDispatch = ctx->OutsideBeginEnd;
 
    ctx->FragmentProgram._MaintainTexEnvProgram
       = (_mesa_getenv("MESA_TEX_PROG") != NULL);
@@ -1191,6 +1191,7 @@ _mesa_free_context_data( struct gl_context *ctx )
    /* free dispatch tables */
    free(ctx->Exec);
    free(ctx->Save);
+   free(ctx->MarshalExec);
 
    /* Shared context state (display lists, textures, etc) */
    _mesa_reference_shared_state(ctx, &ctx->Shared, NULL);
@@ -1493,7 +1494,7 @@ _mesa_make_current( struct gl_context *newCtx,
       _glapi_set_dispatch(NULL);  /* none current */
    }
    else {
-      _glapi_set_dispatch(newCtx->CurrentDispatch);
+      _glapi_set_dispatch(newCtx->CurrentClientDispatch);
 
       if (drawBuffer && readBuffer) {
          ASSERT(_mesa_is_winsys_fbo(drawBuffer));
@@ -1627,19 +1628,19 @@ _mesa_get_current_context( void )
 /**
  * Get context's current API dispatch table.
  *
- * It'll either be the immediate-mode execute dispatcher or the display list
- * compile dispatcher.
+ * It'll either be the immediate-mode execute dispatcher, the display list
+ * compile dispatcher, or the thread marshalling dispatcher.
  * 
  * \param ctx GL context.
  *
  * \return pointer to dispatch_table.
  *
- * Simply returns __struct gl_contextRec::CurrentDispatch.
+ * Simply returns __struct gl_contextRec::CurrentClientDispatch.
  */
 struct _glapi_table *
 _mesa_get_dispatch(struct gl_context *ctx)
 {
-   return ctx->CurrentDispatch;
+   return ctx->CurrentClientDispatch;
 }
 
 /*@}*/

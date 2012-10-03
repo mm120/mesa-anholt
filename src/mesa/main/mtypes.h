@@ -3406,7 +3406,27 @@ struct gl_context
    gl_api API;
    struct _glapi_table *Save;	/**< Display list save functions */
    struct _glapi_table *Exec;	/**< Execute functions */
-   struct _glapi_table *CurrentDispatch;  /**< == Save or Exec !! */
+
+   /**
+    * Dispatch table used to marshal API calls from the client program to a
+    * separate server thread.  NULL if API calls are not being marshalled to
+    * another thread.
+    */
+   struct _glapi_table *MarshalExec;
+
+   /**
+    * Dispatch table currently in use for performing API calls.  == Save or
+    * Exec.
+    */
+   struct _glapi_table *CurrentServerDispatch;
+
+   /**
+    * Dispatch table currently in use for fielding API calls from the client
+    * program.  If API calls are being marshalled to another thread, this ==
+    * MarshalExec.  Otherwise it == CurrentServerDispatch.
+    */
+   struct _glapi_table *CurrentClientDispatch;
+
    /*@}*/
 
    struct glthread_state *GLThread;

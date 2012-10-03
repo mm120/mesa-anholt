@@ -111,6 +111,9 @@ _mesa_initialize_context( struct gl_context *ctx,
                           struct gl_context *share_list,
                           const struct dd_function_table *driverFunctions);
 
+extern void
+_mesa_enable_multithreading(struct gl_context *ctx);
+
 extern struct gl_context *
 _mesa_create_context(gl_api api,
                      const struct gl_config *visual,

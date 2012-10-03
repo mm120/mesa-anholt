@@ -103,6 +103,7 @@
 #include "light.h"
 #include "lines.h"
 #include "macros.h"
+#include "marshal.h"
 #include "matrix.h"
 #include "multisample.h"
 #include "pixel.h"
@@ -1006,6 +1007,15 @@ _mesa_initialize_context(struct gl_context *ctx,
    ctx->FirstTimeCurrent = GL_TRUE;
 
    return GL_TRUE;
+}
+
+
+void
+_mesa_enable_multithreading(struct gl_context *ctx)
+{
+   ctx->MarshalExec = _mesa_create_marshal_table(ctx);
+   if (ctx->MarshalExec)
+      ctx->CurrentClientDispatch = ctx->MarshalExec;
 }
 
 

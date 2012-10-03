@@ -588,9 +588,11 @@ vec4_visitor::generate_scratch_write(vec4_instruction *inst,
    generate_oword_dual_block_offsets(brw_message_reg(inst->base_mrf + 1),
 				     index);
 
-   brw_MOV(p,
-	   retype(brw_message_reg(inst->base_mrf + 2), BRW_REGISTER_TYPE_D),
-	   retype(src, BRW_REGISTER_TYPE_D));
+   if (src.file != BRW_ARCHITECTURE_REGISTER_FILE || src.nr != BRW_ARF_NULL) {
+      brw_MOV(p,
+              retype(brw_message_reg(inst->base_mrf + 2), BRW_REGISTER_TYPE_D),
+              retype(src, BRW_REGISTER_TYPE_D));
+   }
 
    uint32_t msg_type;
 

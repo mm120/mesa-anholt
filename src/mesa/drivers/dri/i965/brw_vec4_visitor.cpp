@@ -2458,26 +2458,65 @@ vec4_visitor::emit_scratch_read(vec4_instruction *inst,
 }
 
 /**
- * Emits an instruction after @inst to store the value to be written
+ * Emits an instruction sequence after @inst to store the value to be written
  * to @orig_dst to scratch space at @base_offset, from @temp.
+ *
+ * We emit a separate MOV to set up the scratch write's data payload, because
+ * it allows compute-to-MRF to coalesce it out on hardware where there is no
+ * implied MRF write available in SEND instructions (gen6+).
  *
  * @base_offset is measured in 32-byte units (the size of a register).
  */
 void
 vec4_visitor::emit_scratch_write(vec4_instruction *inst,
-				 src_reg temp, dst_reg orig_dst,
 				 int base_offset)
 {
-   int reg_offset = base_offset + orig_dst.reg_offset;
-   src_reg index = get_scratch_offset(inst, orig_dst.reladdr, reg_offset);
+   int reg_offset = base_offset + inst->dst.reg_offset;
+   src_reg index = get_scratch_offset(inst, inst->dst.reladdr, reg_offset);
 
+   /* Usually, the scratch write could be set up by *inst writing to our MRF,
+    * However, some instructions can't write to MRFs, such as math or anything
+    * using a SEND message, so we use a temporary and rely on
+    * opt_compute_to_mrf().
+    *
+    * We have to be careful in MOVing from our temporary result register.  If
+    * we swizzle from channels of the temporary that weren't initialized, it
+    * will confuse live interval analysis, which will make spilling fail to
+    * make progress.
+    */
+   src_reg temp = src_reg(this, glsl_type::vec4_type);
+   temp.type = inst->dst.type;
+   int first_writemask_chan = ffs(inst->dst.writemask) - 1;
+   int swizzles[4];
+   for (int i = 0; i < 4; i++)
+      if (inst->dst.writemask & (1 << i))
+         swizzles[i] = i;
+      else
+         swizzles[i] = first_writemask_chan;
+   temp.swizzle = BRW_SWIZZLE4(swizzles[0], swizzles[1],
+                               swizzles[2], swizzles[3]);
+
+   /* Construct the scratch write SEND message. */
    dst_reg dst = dst_reg(brw_writemask(brw_vec8_grf(0, 0),
-				       orig_dst.writemask));
-   vec4_instruction *write = SCRATCH_WRITE(dst, temp, index);
+				       inst->dst.writemask));
+   vec4_instruction *write = SCRATCH_WRITE(dst, src_reg(), index);
    write->predicate = inst->predicate;
    write->ir = inst->ir;
    write->annotation = inst->annotation;
+
+   dst_reg mrf = dst_reg(MRF, write->base_mrf + 2, glsl_type::vec4_type,
+                         inst->dst.writemask);
+   mrf.type = inst->dst.type;
+   /* Add our scratch write instruction sequence. (note that insert_after()
+    * means we push them in the opposite of the logical_order)
+    */
    inst->insert_after(write);
+   inst->insert_after(MOV(mrf, src_reg(temp)));
+
+   inst->dst.file = temp.file;
+   inst->dst.reg = temp.reg;
+   inst->dst.reg_offset = temp.reg_offset;
+   inst->dst.reladdr = NULL;
 }
 
 /**
@@ -2532,14 +2571,7 @@ vec4_visitor::move_grf_array_access_to_scratch()
       current_annotation = inst->annotation;
 
       if (inst->dst.file == GRF && scratch_loc[inst->dst.reg] != -1) {
-	 src_reg temp = src_reg(this, glsl_type::vec4_type);
-
-	 emit_scratch_write(inst, temp, inst->dst, scratch_loc[inst->dst.reg]);
-
-	 inst->dst.file = temp.file;
-	 inst->dst.reg = temp.reg;
-	 inst->dst.reg_offset = temp.reg_offset;
-	 inst->dst.reladdr = NULL;
+	 emit_scratch_write(inst, scratch_loc[inst->dst.reg]);
       }
 
       for (int i = 0 ; i < 3; i++) {

@@ -119,10 +119,12 @@ submit_batch(struct gl_context *ctx)
          _mesa_threadpool_queue_task(ctx->Shared->MarshalThreadPool,
                                      consume_command_queue, ctx);
    } else {
-      /* If we aren't using actual threads, execute the commands
-       * immediately.
+      /* If we aren't using actual threads, execute the commands immediately.
+       * Note that consume_command_queue() changes the dispatch table so we'll
+       * need to restore it when it returns.
        */
       consume_command_queue(ctx);
+      _glapi_set_dispatch(ctx->CurrentClientDispatch);
    }
 }
 
@@ -166,6 +168,7 @@ consume_command_queue(void *data)
    size_t pos;
 
    _glapi_set_context(ctx);
+   _glapi_set_dispatch(ctx->CurrentServerDispatch);
    ctx->Driver.SetBackgroundContext(ctx);
 
    _glthread_LOCK_MUTEX(ctx->Marshal.Mutex);

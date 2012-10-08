@@ -862,6 +862,8 @@ vec4_visitor::dump_instruction(vec4_instruction *inst)
    printf(", ");
 
    for (int i = 0; i < 3; i++) {
+      bool print_swizzle = true;
+
       switch (inst->src[i].file) {
       case GRF:
          printf("vgrf%d", inst->src[i].reg);
@@ -875,6 +877,23 @@ vec4_visitor::dump_instruction(vec4_instruction *inst)
       case BAD_FILE:
          printf("(null)");
          break;
+      case IMM:
+         print_swizzle = false;
+         switch (inst->src[i].type) {
+         case BRW_REGISTER_TYPE_F:
+            printf("%ff", inst->src[i].imm.f);
+            break;
+         case BRW_REGISTER_TYPE_D:
+            printf("%dd", inst->src[i].imm.i);
+            break;
+         case BRW_REGISTER_TYPE_UD:
+            printf("%uud", inst->src[i].imm.i);
+            break;
+         default:
+            printf("???");
+            break;
+         }
+         break;
       default:
          printf("???");
          break;
@@ -883,10 +902,12 @@ vec4_visitor::dump_instruction(vec4_instruction *inst)
       if (inst->src[i].reg_offset)
          printf(".%d", inst->src[i].reg_offset);
 
-      static const char *chans[4] = {"x", "y", "z", "w"};
-      printf(".");
-      for (int c = 0; c < 4; c++) {
-         printf(chans[BRW_GET_SWZ(inst->src[i].swizzle, c)]);
+      if (print_swizzle) {
+         static const char *chans[4] = {"x", "y", "z", "w"};
+         printf(".");
+         for (int c = 0; c < 4; c++) {
+            printf(chans[BRW_GET_SWZ(inst->src[i].swizzle, c)]);
+         }
       }
 
       if (i < 3)

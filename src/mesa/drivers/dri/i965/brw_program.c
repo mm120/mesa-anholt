@@ -256,6 +256,63 @@ brw_get_scratch_bo(struct intel_context *intel,
    }
 }
 
+#define EXTRA_OPCODE_NAME_DEF(e, s) [e - 128] = s
+
+static const char *extra_opcode_names[] = {
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_FB_WRITE, "fb_write"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_RCP, "rcp"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_RSQ, "rsq"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_SQRT, "sqrt"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_EXP2, "exp2"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_LOG2, "log2"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_POW, "pow"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_INT_QUOTIENT, "quot"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_INT_REMAINDER, "rem"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_SIN, "sin"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_COS, "cos"),
+
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_TEX, "tex"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_TXD, "txd"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_TXF, "txf"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_TXL, "txl"),
+   EXTRA_OPCODE_NAME_DEF(SHADER_OPCODE_TXS, "txs"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_TXB, "txb"),
+
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_DDX, "ddx"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_DDY, "ddy"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_PIXEL_X, "pixel_x"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_PIXEL_Y, "pixel_y"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_CINTERP, "cinterp"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_LINTERP, "linterp"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_DISCARD, "discard"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_SPILL, "spill"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_UNSPILL, "unspill"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_PULL_CONSTANT_LOAD, "pull_const_load"),
+   EXTRA_OPCODE_NAME_DEF(FS_OPCODE_MOV_DISPATCH_TO_FLAGS,
+                         "mov_dispatch_to_flags"),
+
+   EXTRA_OPCODE_NAME_DEF(VS_OPCODE_URB_WRITE, "urb_write"),
+   EXTRA_OPCODE_NAME_DEF(VS_OPCODE_SCRATCH_READ, "scratch_read"),
+   EXTRA_OPCODE_NAME_DEF(VS_OPCODE_SCRATCH_WRITE, "scratch_write"),
+   EXTRA_OPCODE_NAME_DEF(VS_OPCODE_PULL_CONSTANT_LOAD, "pull_const_load"),
+};
+
+const char *
+brw_get_opcode_name(struct brw_context *brw, enum opcode op)
+{
+   if (op < ARRAY_SIZE(opcode_descs) &&
+       opcode_descs[op].name) {
+      return opcode_descs[op].name;
+   } else if (op >= 128 &&
+              op - 128 < ARRAY_SIZE(extra_opcode_names) &&
+              extra_opcode_names[op - 128]) {
+      return extra_opcode_names[op - 128];
+   } else {
+      return ralloc_asprintf(brw, "op%d", op);
+   }
+}
+
+
 void brwInitFragProgFuncs( struct dd_function_table *functions )
 {
    assert(functions->ProgramStringNotify == _tnl_program_string); 

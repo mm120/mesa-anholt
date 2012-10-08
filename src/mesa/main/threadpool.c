@@ -53,9 +53,9 @@ threadpool_worker(void *data)
       /* Call the task's work func. */
       pthread_mutex_unlock(&pool->m);
       task->work(task->data);
+      pthread_mutex_lock(&pool->m);
       task->finished = GL_TRUE;
       pthread_cond_broadcast(&task->finish);
-      pthread_mutex_lock(&pool->m);
    }
 
    pthread_mutex_unlock(&pool->m);

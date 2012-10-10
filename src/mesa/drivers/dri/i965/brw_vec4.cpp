@@ -829,17 +829,43 @@ vec4_visitor::split_virtual_grfs()
    this->live_intervals_valid = false;
 }
 
+static void
+dump_register_type(int type)
+{
+   switch (type) {
+   case BRW_REGISTER_TYPE_F:
+      printf(":f");
+      break;
+   case BRW_REGISTER_TYPE_UD:
+      printf(":u");
+      break;
+   case BRW_REGISTER_TYPE_D:
+      printf(":d");
+      break;
+   default:
+      printf(":?");
+      break;
+   }
+}
+
 void
 vec4_visitor::dump_instruction(vec4_instruction *inst)
 {
    printf("%s ", brw_get_opcode_name(brw, inst->opcode));
 
+   int writemask = inst->dst.writemask;
+   int type = inst->dst.type;
    switch (inst->dst.file) {
    case GRF:
       printf("vgrf%d.%d", inst->dst.reg, inst->dst.reg_offset);
       break;
    case MRF:
       printf("m%d", inst->dst.reg);
+      break;
+   case HW_REG:
+      printf("hwreg");
+      writemask = inst->dst.fixed_hw_reg.dw1.bits.writemask;
+      type = inst->dst.fixed_hw_reg.type;
       break;
    case BAD_FILE:
       printf("(null)");
@@ -848,22 +874,43 @@ vec4_visitor::dump_instruction(vec4_instruction *inst)
       printf("???");
       break;
    }
-   if (inst->dst.writemask != WRITEMASK_XYZW) {
+   if (writemask != WRITEMASK_XYZW) {
       printf(".");
-      if (inst->dst.writemask & 1)
+      if (writemask & 1)
          printf("x");
-      if (inst->dst.writemask & 2)
+      if (writemask & 2)
          printf("y");
-      if (inst->dst.writemask & 4)
+      if (writemask & 4)
          printf("z");
-      if (inst->dst.writemask & 8)
+      if (writemask & 8)
          printf("w");
    }
+   dump_register_type(type);
    printf(", ");
 
-   for (int i = 0; i < 3; i++) {
+   int num_args;
+   switch (inst->opcode) {
+   case VS_OPCODE_SCRATCH_WRITE:
+      num_args = 2;
+      break;
+   case VS_OPCODE_SCRATCH_READ:
+      num_args = 1;
+      break;
+   case VS_OPCODE_URB_WRITE:
+      num_args = 0;
+      break;
+   default:
+      if (inst->opcode < ARRAY_SIZE(opcode_descs))
+         num_args = opcode_descs[inst->opcode].nsrc;
+      else
+         num_args = 3;
+   }
+
+   for (int i = 0; i < num_args; i++) {
       bool print_swizzle = true;
 
+      int type = inst->src[i].type;
+      int swizzle = inst->src[i].swizzle;
       switch (inst->src[i].file) {
       case GRF:
          printf("vgrf%d", inst->src[i].reg);
@@ -874,12 +921,17 @@ vec4_visitor::dump_instruction(vec4_instruction *inst)
       case UNIFORM:
          printf("u%d", inst->src[i].reg);
          break;
+      case HW_REG:
+         printf("hw_reg");
+         swizzle = inst->src[i].fixed_hw_reg.dw1.bits.swizzle;
+         type = inst->src[i].fixed_hw_reg.type;
+         break;
       case BAD_FILE:
          printf("(null)");
          break;
       case IMM:
          print_swizzle = false;
-         switch (inst->src[i].type) {
+         switch (type) {
          case BRW_REGISTER_TYPE_F:
             printf("%ff", inst->src[i].imm.f);
             break;
@@ -902,13 +954,15 @@ vec4_visitor::dump_instruction(vec4_instruction *inst)
       if (inst->src[i].reg_offset)
          printf(".%d", inst->src[i].reg_offset);
 
-      if (print_swizzle) {
+      if (print_swizzle && swizzle != BRW_SWIZZLE_XYZW) {
          static const char *chans[4] = {"x", "y", "z", "w"};
          printf(".");
          for (int c = 0; c < 4; c++) {
             printf(chans[BRW_GET_SWZ(inst->src[i].swizzle, c)]);
          }
       }
+
+      dump_register_type(type);
 
       if (i < 3)
          printf(", ");

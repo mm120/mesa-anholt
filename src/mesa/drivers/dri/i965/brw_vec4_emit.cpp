@@ -813,7 +813,10 @@ vec4_visitor::run()
 
    setup_payload();
 
-   if (false) {
+   printf("before\n");
+   dump_instructions();
+
+   if (true) {
       /* Debug of register spilling: Go spill everything. */
       const int grf_count = virtual_grf_count;
       float spill_costs[virtual_grf_count];
@@ -825,6 +828,8 @@ vec4_visitor::run()
          spill_reg(i);
       }
    }
+   printf("after\n");
+   dump_instructions();
 
    while (!reg_allocate()) {
       if (failed)

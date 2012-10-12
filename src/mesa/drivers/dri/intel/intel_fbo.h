@@ -160,6 +160,9 @@ intel_renderbuffer_tile_offsets(struct intel_renderbuffer *irb,
 				uint32_t *tile_x,
 				uint32_t *tile_y);
 
+struct intel_mipmap_tree *
+intel_get_rb_mt(struct intel_renderbuffer *irb);
+
 struct intel_region*
 intel_get_rb_region(struct gl_framebuffer *fb, GLuint attIndex);
 

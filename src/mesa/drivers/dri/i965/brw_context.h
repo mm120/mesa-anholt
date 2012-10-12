@@ -1136,6 +1136,16 @@ void brw_get_depthstencil_tile_masks(struct intel_mipmap_tree *depth_mt,
                                      uint32_t *out_tile_mask_y);
 void brw_workaround_depthstencil_alignment(struct brw_context *brw);
 
+void
+brw_get_depthstencil_tile_offsets(struct brw_context *brw,
+                                  struct intel_renderbuffer **out_depth_irb,
+                                  uint32_t *out_depth_offset,
+                                  struct intel_renderbuffer **out_stencil_irb,
+                                  uint32_t *out_stencil_offset,
+                                  struct intel_mipmap_tree **out_hiz_mt,
+                                  uint32_t *out_hiz_offset,
+                                  uint32_t *out_tile_x, uint32_t *out_tile_y);
+
 /*======================================================================
  * brw_queryobj.c
  */

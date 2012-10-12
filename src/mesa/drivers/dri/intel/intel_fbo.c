@@ -59,16 +59,27 @@
 static struct gl_renderbuffer *
 intel_new_renderbuffer(struct gl_context * ctx, GLuint name);
 
+struct intel_mipmap_tree *
+intel_get_rb_mt(struct intel_renderbuffer *irb)
+{
+   if (!irb)
+      return NULL;
+
+   struct intel_mipmap_tree *mt = irb->mt;
+   if (mt->stencil_mt)
+      mt = mt->stencil_mt;
+
+   return mt;
+}
+
 struct intel_region*
 intel_get_rb_region(struct gl_framebuffer *fb, GLuint attIndex)
 {
    struct intel_renderbuffer *irb = intel_get_renderbuffer(fb, attIndex);
-   if (irb && irb->mt) {
-      if (attIndex == BUFFER_STENCIL && irb->mt->stencil_mt)
-	 return irb->mt->stencil_mt->region;
-      else
-	 return irb->mt->region;
-   } else
+   struct intel_mipmap_tree *mt = intel_get_rb_mt(irb);
+   if (mt)
+      return mt->region;
+   else
       return NULL;
 }
 

@@ -33,7 +33,38 @@
 #include "ir_visitor.h"
 #include "ir_variable_refcount.h"
 #include "glsl_types.h"
+#include "main/open_hash_table.h"
 
+static bool
+pointer_key_compare(const void *a, const void *b)
+{
+   return a == b;
+}
+
+/* We could do better. */
+static uint32_t
+pointer_hash(void *a)
+{
+   return (uintptr_t)a;
+}
+
+ir_variable_refcount_visitor::ir_variable_refcount_visitor()
+{
+   this->mem_ctx = ralloc_context(NULL);
+   this->ht = _mesa_open_hash_table_create(pointer_key_compare);
+}
+
+static void
+free_entry(struct open_hash_entry *entry)
+{
+   free(entry->data);
+}
+
+ir_variable_refcount_visitor::~ir_variable_refcount_visitor()
+{
+   ralloc_free(this->mem_ctx);
+   _mesa_open_hash_table_destroy(this->ht, free_entry);
+}
 
 // constructor
 ir_variable_refcount_entry::ir_variable_refcount_entry(ir_variable *var)
@@ -50,15 +81,17 @@ ir_variable_refcount_entry *
 ir_variable_refcount_visitor::get_variable_entry(ir_variable *var)
 {
    assert(var);
-   foreach_iter(exec_list_iterator, iter, this->variable_list) {
-      ir_variable_refcount_entry *entry = (ir_variable_refcount_entry *)iter.get();
-      if (entry->var == var)
-	 return entry;
-   }
 
-   ir_variable_refcount_entry *entry = new(mem_ctx) ir_variable_refcount_entry(var);
+   struct open_hash_entry *e = _mesa_open_hash_table_search(this->ht,
+							    pointer_hash(var),
+							    var);
+   if (e)
+      return (ir_variable_refcount_entry *)e->data;
+
+   ir_variable_refcount_entry *entry = new ir_variable_refcount_entry(var);
    assert(entry->referenced_count == 0);
-   this->variable_list.push_tail(entry);
+   _mesa_open_hash_table_insert(this->ht, pointer_hash(var), var, entry);
+
    return entry;
 }
 

@@ -28,6 +28,10 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct open_hash_entry {
 	uint32_t hash;
 	const void *key;
@@ -68,3 +72,7 @@ _mesa_open_hash_table_random_entry(struct open_hash_table *ht,
 
 uint32_t _mesa_fnv1_hash_string(const void *key);
 bool _mesa_string_key_equals(const void *a, const void *b);
+
+#ifdef __cplusplus
+} /* extern C */
+#endif

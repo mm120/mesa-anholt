@@ -1975,6 +1975,7 @@ AC_CONFIG_FILES([configs/current
 		src/mesa/drivers/x11/Makefile
 		src/mesa/libdricore/Makefile
 		src/mesa/main/tests/Makefile
+		src/mesa/main/tests/open_hash_table/Makefile
 		src/mesa/x86-64/Makefile
 		src/mesa/x86/Makefile])
 

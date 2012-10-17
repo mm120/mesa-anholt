@@ -52,6 +52,7 @@ MAIN_FILES = \
 	$(SRCDIR)main/hash.c \
 	$(SRCDIR)main/hint.c \
 	$(SRCDIR)main/histogram.c \
+	$(SRCDIR)main/open_hash_table.c \
 	$(SRCDIR)main/image.c \
 	$(SRCDIR)main/imports.c \
 	$(SRCDIR)main/light.c \

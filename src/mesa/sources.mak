@@ -249,6 +249,7 @@ STATETRACKER_FILES = \
 PROGRAM_FILES = \
 	$(SRCDIR)program/arbprogparse.c \
 	$(SRCDIR)program/chaining_hash_table.c \
+	$(SRCDIR)program/hash_table.c \
 	$(SRCDIR)program/program.c \
 	$(SRCDIR)program/program_parse_extra.c \
 	$(SRCDIR)program/prog_cache.c \

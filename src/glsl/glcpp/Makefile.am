@@ -26,6 +26,7 @@ AM_CFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/src/mapi \
 	-I$(top_srcdir)/src/mesa/ \
+	-I$(top_srcdir)/src/glsl/ \
 	$(LIBRARY_INCLUDES) \
 	$(DEFINES) \
 	$(LIBRARY_DEFINES) \
@@ -45,6 +46,7 @@ libglcpp_la_SOURCES = \
 glcpp_SOURCES = \
 	../ralloc.c \
 	$(top_srcdir)/src/mesa/program/chaining_hash_table.c \
+	$(top_srcdir)/src/mesa/program/hash_table.c \
 	glcpp.c
 
 glcpp_LDADD = libglcpp.la

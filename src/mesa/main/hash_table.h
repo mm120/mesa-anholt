@@ -25,6 +25,7 @@
  *
  */
 
+#include <sys/types.h>
 #include <inttypes.h>
 #include <stdbool.h>
 

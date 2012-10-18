@@ -21,7 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "hash_table.h"
+#include "main/hash_table.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,25 +40,26 @@ string_to_uint_map_dtor(struct string_to_uint_map *);
 #endif
 
 #ifdef __cplusplus
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+#include <limits.h>
+
 /**
  * Map from a string (name) to an unsigned integer value
- *
- * \note
- * Because of the way this class interacts with the \c hash_table
- * implementation, values of \c UINT_MAX cannot be stored in the map.
  */
 struct string_to_uint_map {
 public:
    string_to_uint_map()
    {
-      this->ht = hash_table_ctor(0, hash_table_string_hash,
-				 hash_table_string_compare);
+      this->ht = _mesa_hash_table_create(NULL,
+                                         _mesa_key_string_equal);
    }
 
    ~string_to_uint_map()
    {
-      hash_table_call_foreach(this->ht, delete_key, NULL);
-      hash_table_dtor(this->ht);
+      clear();
+      _mesa_hash_table_destroy(this->ht, NULL);
    }
 
    /**
@@ -66,8 +67,11 @@ public:
     */
    void clear()
    {
-      hash_table_call_foreach(this->ht, delete_key, NULL);
-      hash_table_clear(this->ht);
+      struct hash_entry *entry;
+      hash_table_foreach(this->ht, entry) {
+         free((void *)entry->key);
+         _mesa_hash_table_remove(this->ht, entry);
+      }
    }
 
    /**
@@ -82,47 +86,28 @@ public:
     */
    bool get(unsigned &value, const char *key)
    {
-      const intptr_t v =
-	 (intptr_t) hash_table_find(this->ht, (const void *) key);
+      struct hash_entry *entry;
+      entry = _mesa_hash_table_search(this->ht, _mesa_hash_string(key), key);
+      if (!entry)
+         return false;
 
-      if (v == 0)
-	 return false;
-
-      value = (unsigned)(v - 1);
+      value = (uintptr_t)entry->data;
       return true;
    }
 
    void put(unsigned value, const char *key)
    {
-      /* The low-level hash table structure returns NULL if key is not in the
-       * hash table.  However, users of this map might want to store zero as a
-       * valid value in the table.  Bias the value by +1 so that a
-       * user-specified zero is stored as 1.  This enables ::get to tell the
-       * difference between a user-specified zero (returned as 1 by
-       * hash_table_find) and the key not in the table (returned as 0 by
-       * hash_table_find).
-       *
-       * The net effect is that we can't store UINT_MAX in the table.  This is
-       * because UINT_MAX+1 = 0.
-       */
-      assert(value != UINT_MAX);
-      char *dup_key = strdup(key);
-      bool result = hash_table_replace(this->ht,
-				       (void *) (intptr_t) (value + 1),
-				       dup_key);
-      if (result)
-	 free(dup_key);
+      uint32_t hash = _mesa_hash_string(key);
+      struct hash_entry *entry;
+
+      entry = _mesa_hash_table_search(this->ht, hash, key);
+      if (!entry) {
+         key = strdup(key);
+         _mesa_hash_table_insert(this->ht, hash, key, (void *)(uintptr_t)value);
+      }
    }
 
 private:
-   static void delete_key(const void *key, void *data, void *closure)
-   {
-      (void) data;
-      (void) closure;
-
-      free((char *)key);
-   }
-
    struct hash_table *ht;
 };
 #endif /* __cplusplus */

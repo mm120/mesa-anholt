@@ -127,6 +127,7 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
 	program/chaining_hash_table.c \
+	program/hash_table.c \
 	program/symbol_table.c
 
 LOCAL_MODULE := libmesa_glsl_utils
@@ -142,6 +143,7 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
 	program/chaining_hash_table.c \
+	program/hash_table.c \
 	program/symbol_table.c
 
 LOCAL_MODULE := libmesa_glsl_utils

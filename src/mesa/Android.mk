@@ -126,7 +126,7 @@ endif # MESA_BUILD_CLASSIC
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	program/hash_table.c \
+	program/chaining_hash_table.c \
 	program/symbol_table.c
 
 LOCAL_MODULE := libmesa_glsl_utils
@@ -141,7 +141,7 @@ include $(BUILD_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	program/hash_table.c \
+	program/chaining_hash_table.c \
 	program/symbol_table.c
 
 LOCAL_MODULE := libmesa_glsl_utils

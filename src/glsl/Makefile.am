@@ -52,7 +52,7 @@ libglslcommon_la_LIBADD = glcpp/libglcpp.la
 
 # common sources for builtin_compiler and glsl_compiler
 GLSL2_SOURCES = \
-	$(top_srcdir)/src/mesa/program/hash_table.c \
+	$(top_srcdir)/src/mesa/program/chaining_hash_table.c \
 	$(top_srcdir)/src/mesa/program/symbol_table.c \
 	$(GLSL_COMPILER_CXX_FILES)
 
@@ -68,7 +68,7 @@ glsl_compiler_SOURCES = \
 glsl_compiler_LDADD = libglsl.la
 
 glsl_test_SOURCES = \
-	$(top_srcdir)/src/mesa/program/hash_table.c \
+	$(top_srcdir)/src/mesa/program/chaining_hash_table.c \
 	$(top_srcdir)/src/mesa/program/symbol_table.c \
 	$(GLSL_SRCDIR)/standalone_scaffolding.cpp \
 	test.cpp \

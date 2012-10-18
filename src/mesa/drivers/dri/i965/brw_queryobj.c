@@ -268,7 +268,7 @@ brw_begin_query(struct gl_context *ctx, struct gl_query_object *q)
       query->first_index = -1;
       query->last_index = -1;
 
-      brw->query.obj = query;
+      brw->query[QUERY_SAMPLES].obj = query;
       intel->stats_wm++;
       break;
 
@@ -320,11 +320,11 @@ brw_end_query(struct gl_context *ctx, struct gl_query_object *q)
       if (query->bo) {
 	 brw_emit_query_end(brw);
 
-	 drm_intel_bo_unreference(brw->query.bo);
-	 brw->query.bo = NULL;
+	 drm_intel_bo_unreference(brw->query[QUERY_SAMPLES].bo);
+	 brw->query[QUERY_SAMPLES].bo = NULL;
       }
 
-      brw->query.obj = NULL;
+      brw->query[QUERY_SAMPLES].obj = NULL;
 
       intel->stats_wm--;
       break;
@@ -398,39 +398,50 @@ brw_emit_query_begin(struct brw_context *brw)
 {
    struct intel_context *intel = &brw->intel;
    struct gl_context *ctx = &intel->ctx;
-   struct brw_query_object *query = brw->query.obj;
 
-   /* Skip if we're not doing any queries, or we've emitted the start. */
-   if (!query || brw->query.begin_emitted)
-      return;
+   for (enum query_types i = 0; i < QUERY_TYPE_COUNT; i++) {
+      struct brw_query_object *query = brw->query[i].obj;
 
-   /* Get a new query BO if we're going to need it. */
-   if (brw->query.bo == NULL ||
-       brw->query.index * 2 + 1 >= 4096 / sizeof(uint64_t)) {
-      drm_intel_bo_unreference(brw->query.bo);
-      brw->query.bo = NULL;
+      if (!query)
+         continue;
 
-      brw->query.bo = drm_intel_bo_alloc(intel->bufmgr, "query", 4096, 1);
+      if (brw->query[i].begin_emitted)
+         continue;
 
-      /* clear target buffer */
-      drm_intel_bo_map(brw->query.bo, true);
-      memset((char *)brw->query.bo->virtual, 0, 4096);
-      drm_intel_bo_unmap(brw->query.bo);
+      /* Get a new query BO if we're going to need it. */
+      if (brw->query[i].bo == NULL ||
+          brw->query[i].index * 2 + 1 >= 4096 / sizeof(uint64_t)) {
+         drm_intel_bo_unreference(brw->query[i].bo);
+         brw->query[i].bo = NULL;
 
-      brw->query.index = 0;
+         brw->query[i].bo = drm_intel_bo_alloc(intel->bufmgr, "query", 4096, 1);
+
+         /* clear target buffer */
+         drm_intel_bo_map(brw->query[i].bo, true);
+         memset((char *)brw->query[i].bo->virtual, 0, 4096);
+         drm_intel_bo_unmap(brw->query[i].bo);
+
+         brw->query[i].index = 0;
+      }
+
+      switch (i) {
+      case QUERY_SAMPLES:
+         write_depth_count(intel, brw->query[i].bo, brw->query[i].index * 2);
+         break;
+      default:
+         assert(!"not reached");
+      }
+
+      if (query->bo != brw->query[i].bo) {
+         if (query->bo != NULL)
+            brw_queryobj_get_results(ctx, query);
+         drm_intel_bo_reference(brw->query[i].bo);
+         query->bo = brw->query[i].bo;
+         query->first_index = brw->query[i].index;
+      }
+      query->last_index = brw->query[i].index;
+      brw->query[i].begin_emitted = true;
    }
-
-   write_depth_count(intel, brw->query.bo, brw->query.index * 2);
-
-   if (query->bo != brw->query.bo) {
-      if (query->bo != NULL)
-	 brw_queryobj_get_results(ctx, query);
-      drm_intel_bo_reference(brw->query.bo);
-      query->bo = brw->query.bo;
-      query->first_index = brw->query.index;
-   }
-   query->last_index = brw->query.index;
-   brw->query.begin_emitted = true;
 }
 
 /** Called at batchbuffer flush to get an ending PS_DEPTH_COUNT */
@@ -439,13 +450,21 @@ brw_emit_query_end(struct brw_context *brw)
 {
    struct intel_context *intel = &brw->intel;
 
-   if (!brw->query.begin_emitted)
-      return;
+   for (enum query_types i = 0; i < QUERY_TYPE_COUNT; i++) {
+      if (!brw->query[i].begin_emitted)
+         continue;
 
-   write_depth_count(intel, brw->query.bo, brw->query.index * 2 + 1);
+      switch (i) {
+      case QUERY_SAMPLES:
+         write_depth_count(intel, brw->query[i].bo, brw->query[i].index * 2 + 1);
+         break;
+      default:
+         assert(!"not reached");
+      }
 
-   brw->query.begin_emitted = false;
-   brw->query.index++;
+      brw->query[i].begin_emitted = false;
+      brw->query[i].index++;
+   }
 }
 
 static uint64_t

@@ -737,6 +737,11 @@ struct brw_query_object {
    int last_index;
 };
 
+enum query_types {
+   QUERY_SAMPLES,
+   QUERY_TIME_ELAPSED,
+   QUERY_TYPE_COUNT,
+};
 
 /**
  * brw_context is derived from intel_context.
@@ -1053,12 +1058,18 @@ struct brw_context
       uint32_t vp_offset;
    } cc;
 
-   struct {
+   /**
+    * For each type of query that requires tracking in the hardware per
+    * batchbuffer, keep a BO that accumulates query results and a position to
+    * store the next query result.
+    */
+   struct active_query {
       struct brw_query_object *obj;
       drm_intel_bo *bo;
       int index;
       bool begin_emitted;
-   } query;
+   } query[QUERY_TYPE_COUNT];
+
    /* Used to give every program string a unique id
     */
    GLuint program_id;

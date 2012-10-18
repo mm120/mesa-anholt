@@ -155,10 +155,14 @@ brw_queryobj_get_results(struct gl_context *ctx,
    results = query->bo->virtual;
    switch (query->Base.Target) {
    case GL_TIME_ELAPSED_EXT:
-      if (intel->gen >= 6)
-	 query->Base.Result += 80 * (results[1] - results[0]);
-      else
-	 query->Base.Result += 1000 * ((results[1] >> 32) - (results[0] >> 32));
+      for (i = query->first_index; i <= query->last_index; i++) {
+         if (intel->gen >= 6)
+            query->Base.Result += 80 * (results[i * 2 + 1] -
+                                        results[i * 2]);
+         else
+            query->Base.Result += 1000 * ((results[i * 2 + 1] >> 32) -
+                                          (results[i * 2] >> 32));
+      }
       break;
 
    case GL_TIMESTAMP:
@@ -255,22 +259,24 @@ brw_begin_query(struct gl_context *ctx, struct gl_query_object *q)
 
    switch (query->Base.Target) {
    case GL_TIME_ELAPSED_EXT:
-      drm_intel_bo_unreference(query->bo);
-      query->bo = drm_intel_bo_alloc(intel->bufmgr, "timer query", 4096, 4096);
-      write_timestamp(intel, query->bo, 0);
-      break;
-
    case GL_ANY_SAMPLES_PASSED:
-   case GL_SAMPLES_PASSED_ARB:
+   case GL_SAMPLES_PASSED_ARB: {
+      struct active_query *active_query;
+      if (query->Base.Target == GL_TIME_ELAPSED_EXT)
+         active_query = &brw->query[QUERY_TIME_ELAPSED];
+      else
+         active_query = &brw->query[QUERY_SAMPLES];
+
       /* Reset our driver's tracking of query state. */
       drm_intel_bo_unreference(query->bo);
       query->bo = NULL;
       query->first_index = -1;
       query->last_index = -1;
 
-      brw->query[QUERY_SAMPLES].obj = query;
+      active_query->obj = query;
       intel->stats_wm++;
       break;
+   }
 
    case GL_PRIMITIVES_GENERATED:
       /* We don't actually query the hardware for this value; we keep track of
@@ -309,14 +315,18 @@ brw_end_query(struct gl_context *ctx, struct gl_query_object *q)
       drm_intel_bo_unreference(query->bo);
       query->bo = drm_intel_bo_alloc(intel->bufmgr, "timer query",
 				     4096, 4096);
-      /* FALLTHROUGH */
-
-   case GL_TIME_ELAPSED_EXT:
       write_timestamp(intel, query->bo, 1);
       break;
 
+   case GL_TIME_ELAPSED_EXT:
    case GL_ANY_SAMPLES_PASSED:
-   case GL_SAMPLES_PASSED_ARB:
+   case GL_SAMPLES_PASSED_ARB: {
+      struct active_query *active_query;
+      if (query->Base.Target == GL_TIME_ELAPSED_EXT)
+         active_query = &brw->query[QUERY_TIME_ELAPSED];
+      else
+         active_query = &brw->query[QUERY_SAMPLES];
+
       if (query->bo) {
 	 brw_emit_query_end(brw);
 
@@ -324,10 +334,11 @@ brw_end_query(struct gl_context *ctx, struct gl_query_object *q)
 	 brw->query[QUERY_SAMPLES].bo = NULL;
       }
 
-      brw->query[QUERY_SAMPLES].obj = NULL;
+      active_query->obj = NULL;
 
       intel->stats_wm--;
       break;
+   }
 
    case GL_PRIMITIVES_GENERATED:
       /* We don't actually query the hardware for this value; we keep track of
@@ -428,6 +439,9 @@ brw_emit_query_begin(struct brw_context *brw)
       case QUERY_SAMPLES:
          write_depth_count(intel, brw->query[i].bo, brw->query[i].index * 2);
          break;
+      case QUERY_TIME_ELAPSED:
+         write_timestamp(intel, brw->query[i].bo, brw->query[i].index * 2);
+         break;
       default:
          assert(!"not reached");
       }
@@ -457,6 +471,9 @@ brw_emit_query_end(struct brw_context *brw)
       switch (i) {
       case QUERY_SAMPLES:
          write_depth_count(intel, brw->query[i].bo, brw->query[i].index * 2 + 1);
+         break;
+      case QUERY_TIME_ELAPSED:
+         write_timestamp(intel, brw->query[i].bo, brw->query[i].index * 2 + 1);
          break;
       default:
          assert(!"not reached");

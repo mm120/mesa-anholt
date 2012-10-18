@@ -29,7 +29,7 @@
 #include "main/context.h"
 #include "ir.h"
 #include "ir_uniform.h"
-#include "program/hash_table.h"
+#include "program/string_to_uint_map.h"
 #include "../glsl/program.h"
 #include "../glsl/ir_uniform.h"
 #include "main/shaderapi.h"

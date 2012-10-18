@@ -27,7 +27,7 @@
 #include "glsl_types.h"
 #include "ir_visitor.h"
 #include "../glsl/program.h"
-#include "program/hash_table.h"
+#include "program/string_to_uint_map.h"
 #include "ir_uniform.h"
 
 extern "C" {

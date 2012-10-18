@@ -32,7 +32,7 @@
 #include "glsl_symbol_table.h"
 #include "ir.h"
 #include "shaderobj.h"
-#include "program/hash_table.h"
+#include "program/string_to_uint_map.h"
 #include "../glsl/program.h"
 
 extern "C" {

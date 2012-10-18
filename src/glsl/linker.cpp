@@ -69,6 +69,7 @@
 #include "ir.h"
 #include "program.h"
 #include "program/hash_table.h"
+#include "program/string_to_uint_map.h"
 #include "linker.h"
 #include "ir_optimization.h"
 

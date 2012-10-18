@@ -45,7 +45,7 @@
 
 #include "main/mtypes.h"
 #include "main/shaderobj.h"
-#include "program/hash_table.h"
+#include "program/string_to_uint_map.h"
 
 extern "C" {
 #include "main/shaderapi.h"

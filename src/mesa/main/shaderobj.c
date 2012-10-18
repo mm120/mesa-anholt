@@ -38,7 +38,7 @@
 #include "main/uniforms.h"
 #include "program/program.h"
 #include "program/prog_parameter.h"
-#include "program/hash_table.h"
+#include "program/string_to_uint_map.h"
 #include "ralloc.h"
 
 /**********************************************************************/

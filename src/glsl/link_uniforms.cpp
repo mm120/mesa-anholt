@@ -26,7 +26,7 @@
 #include "linker.h"
 #include "ir_uniform.h"
 #include "glsl_symbol_table.h"
-#include "program/hash_table.h"
+#include "program/string_to_uint_map.h"
 #include "program.h"
 
 static inline unsigned int

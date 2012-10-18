@@ -23,11 +23,11 @@
 
 /**
  * \file string_to_uint_map.cpp
- * \brief Dumb wrapprs so that C code can create and destroy maps.
- *
+` *
  * \author Ian Romanick <ian.d.romanick@intel.com>
  */
 #include "hash_table.h"
+#include "string_to_uint_map.h"
 
 extern "C" struct string_to_uint_map *
 string_to_uint_map_ctor()

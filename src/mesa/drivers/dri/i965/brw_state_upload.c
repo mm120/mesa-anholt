@@ -290,12 +290,12 @@ void brw_destroy_state( struct brw_context *brw )
 /***********************************************************************
  */
 
-static GLuint check_state( const struct brw_state_flags *a,
-			   const struct brw_state_flags *b )
+static bool
+check_state(const struct brw_state_flags *a, const struct brw_state_flags *b)
 {
    return ((a->mesa & b->mesa) |
 	   (a->brw & b->brw) |
-	   (a->cache & b->cache)) != 0;
+	   (a->cache & b->cache));
 }
 
 static void accumulate_state( struct brw_state_flags *a,

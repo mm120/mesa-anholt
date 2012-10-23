@@ -474,12 +474,12 @@ i915_emit_state(struct intel_context *intel)
          }
       ADVANCE_BATCH();
       if (i915->last_sampler &&
-	  memcmp(intel->batch.map + i915->last_sampler,
-		 intel->batch.map + unwind,
-		 (2 + nr*3)*sizeof(int)) == 0)
-	  intel->batch.used = unwind;
+          memcmp(intel->batch.map + i915->last_sampler,
+                 intel->batch.map + unwind,
+                 (2 + nr*3)*sizeof(int)) == 0)
+         intel->batch.used = unwind;
       else
-	  i915->last_sampler = unwind;
+         i915->last_sampler = unwind;
    }
 
    if (dirty & I915_UPLOAD_CONSTANTS) {

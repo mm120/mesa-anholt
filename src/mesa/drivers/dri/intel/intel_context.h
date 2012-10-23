@@ -241,7 +241,7 @@ struct intel_context
    struct
    {
       GLuint id;
-      uint32_t start_ptr; /**< for i8xx */
+      uint32_t *prim_packet_header; /**< for i8xx */
       uint32_t primitive;	/**< Current hardware primitive type */
       void (*flush) (struct intel_context *);
       drm_intel_bo *vb_bo;

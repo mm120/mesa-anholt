@@ -429,6 +429,50 @@ brw_print_dirty_count(struct dirty_bit_map *bit_map, int32_t bits)
    }
 }
 
+/* Debug version of the upload loop which enforces various sanity checks on
+ * the state flags which are generated and checked to help ensure state atoms
+ * are ordered correctly in the list.
+ */
+static void
+brw_debug_upload_state(struct brw_context *brw, struct brw_state_flags *state)
+{
+   static int dirty_count = 0;
+   struct brw_state_flags examined, prev;
+   memset(&examined, 0, sizeof(examined));
+   prev = *state;
+
+   for (int i = 0; i < brw->num_atoms; i++) {
+      const struct brw_tracked_state *atom = brw->atoms[i];
+      struct brw_state_flags generated;
+
+      if (check_state(state, &atom->dirty)) {
+         atom->emit(brw);
+      }
+
+      accumulate_state(&examined, &atom->dirty);
+
+      /* generated = (prev ^ state)
+       * if (examined & generated)
+       *     fail;
+       */
+      xor_states(&generated, &prev, state);
+      assert(!check_state(&examined, &generated));
+      prev = *state;
+   }
+
+   if (unlikely(INTEL_DEBUG & DEBUG_STATE)) {
+      brw_update_dirty_count(mesa_bits, state->mesa);
+      brw_update_dirty_count(brw_bits, state->brw);
+      brw_update_dirty_count(cache_bits, state->cache);
+      if (dirty_count++ % 1000 == 0) {
+	 brw_print_dirty_count(mesa_bits, state->mesa);
+	 brw_print_dirty_count(brw_bits, state->brw);
+	 brw_print_dirty_count(cache_bits, state->cache);
+	 fprintf(stderr, "\n");
+      }
+   }
+}
+
 /***********************************************************************
  * Emit all state:
  */
@@ -438,7 +482,6 @@ void brw_upload_state(struct brw_context *brw)
    struct intel_context *intel = &brw->intel;
    struct brw_state_flags *state = &brw->state.dirty;
    int i;
-   static int dirty_count = 0;
 
    state->mesa |= brw->intel.NewGLState;
    brw->intel.NewGLState = 0;
@@ -465,32 +508,7 @@ void brw_upload_state(struct brw_context *brw)
    intel_check_front_buffer_rendering(intel);
 
    if (unlikely(INTEL_DEBUG)) {
-      /* Debug version which enforces various sanity checks on the
-       * state flags which are generated and checked to help ensure
-       * state atoms are ordered correctly in the list.
-       */
-      struct brw_state_flags examined, prev;      
-      memset(&examined, 0, sizeof(examined));
-      prev = *state;
-
-      for (i = 0; i < brw->num_atoms; i++) {
-	 const struct brw_tracked_state *atom = brw->atoms[i];
-	 struct brw_state_flags generated;
-
-	 if (check_state(state, &atom->dirty)) {
-	    atom->emit(brw);
-	 }
-
-	 accumulate_state(&examined, &atom->dirty);
-
-	 /* generated = (prev ^ state)
-	  * if (examined & generated)
-	  *     fail;
-	  */
-	 xor_states(&generated, &prev, state);
-	 assert(!check_state(&examined, &generated));
-	 prev = *state;
-      }
+      brw_debug_upload_state(brw, state);
    }
    else {
       for (i = 0; i < brw->num_atoms; i++) {
@@ -499,18 +517,6 @@ void brw_upload_state(struct brw_context *brw)
 	 if (check_state(state, &atom->dirty)) {
 	    atom->emit(brw);
 	 }
-      }
-   }
-
-   if (unlikely(INTEL_DEBUG & DEBUG_STATE)) {
-      brw_update_dirty_count(mesa_bits, state->mesa);
-      brw_update_dirty_count(brw_bits, state->brw);
-      brw_update_dirty_count(cache_bits, state->cache);
-      if (dirty_count++ % 1000 == 0) {
-	 brw_print_dirty_count(mesa_bits, state->mesa);
-	 brw_print_dirty_count(brw_bits, state->brw);
-	 brw_print_dirty_count(cache_bits, state->cache);
-	 fprintf(stderr, "\n");
       }
    }
 

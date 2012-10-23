@@ -261,7 +261,7 @@ struct i915_context
 
    struct i915_hw_state state;
    uint32_t last_draw_offset;
-   GLuint last_sampler;
+   void *last_sampler;
 };
 
 

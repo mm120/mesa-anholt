@@ -529,7 +529,7 @@ _intel_flush(struct gl_context *ctx, const char *file, int line)
 
    intel_flush_rendering_to_batch(ctx);
 
-   if (intel->batch.used)
+   if (intel->batch.next != intel->batch.map)
       _intel_batchbuffer_flush(intel, file, line);
 }
 

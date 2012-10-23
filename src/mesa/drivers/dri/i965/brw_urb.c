@@ -225,6 +225,7 @@ const struct brw_tracked_state brw_recalculate_urb_fence = {
 
 void brw_upload_urb_fence(struct brw_context *brw)
 {
+   struct intel_context *intel = &brw->intel;
    struct brw_urb_fence uf;
    memset(&uf, 0, sizeof(uf));
 
@@ -249,11 +250,8 @@ void brw_upload_urb_fence(struct brw_context *brw)
    uf.bits1.cs_fence  = brw->urb.size;
 
    /* erratum: URB_FENCE must not cross a 64byte cacheline */
-   if ((brw->intel.batch.used & 15) > 12) {
-      int pad = 16 - (brw->intel.batch.used & 15);
-      do
-	 brw->intel.batch.map[brw->intel.batch.used++] = MI_NOOP;
-      while (--pad);
+   while ((intel_batchbuffer_offset(intel) & 63) > 48) {
+      *(intel->batch.next++) = MI_NOOP;
    }
 
    BRW_BATCH_STRUCT(brw, &uf);

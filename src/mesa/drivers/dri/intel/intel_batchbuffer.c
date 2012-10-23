@@ -37,7 +37,7 @@ intel_batchbuffer_reset(struct intel_context *intel);
 
 struct cached_batch_item {
    struct cached_batch_item *next;
-   uint16_t header;
+   void *header;
    uint16_t size;
 };
 
@@ -85,15 +85,15 @@ intel_batchbuffer_reset(struct intel_context *intel)
 					intel->maxBatchSize, 4096);
 
    intel->batch.reserved_space = BATCH_RESERVED;
-   intel->batch.state_batch_offset = intel->batch.bo->size;
-   intel->batch.used = 0;
+   intel->batch.state_batch = (void *)intel->batch.map + intel->batch.bo->size;
+   intel->batch.next = intel->batch.map;
    intel->batch.needs_sol_reset = false;
 }
 
 void
 intel_batchbuffer_save_state(struct intel_context *intel)
 {
-   intel->batch.saved.used = intel->batch.used;
+   intel->batch.saved.next = intel->batch.next;
    intel->batch.saved.reloc_count =
       drm_intel_gem_bo_get_reloc_count(intel->batch.bo);
 }
@@ -103,7 +103,7 @@ intel_batchbuffer_reset_to_saved(struct intel_context *intel)
 {
    drm_intel_gem_bo_clear_relocs(intel->batch.bo, intel->batch.saved.reloc_count);
 
-   intel->batch.used = intel->batch.saved.used;
+   intel->batch.next = intel->batch.saved.next;
 
    /* Cached batch state is dead, since we just cleared some unknown part of the
     * batchbuffer.  Assume that the caller resets any other state necessary.
@@ -136,7 +136,7 @@ do_batch_dump(struct intel_context *intel)
       drm_intel_decode_set_batch_pointer(decode,
 					 batch->bo->virtual,
 					 batch->bo->offset,
-					 batch->used);
+                                         intel->batch.next - intel->batch.map);
    } else {
       fprintf(stderr,
 	      "WARNING: failed to map batchbuffer (%s), "
@@ -145,7 +145,7 @@ do_batch_dump(struct intel_context *intel)
       drm_intel_decode_set_batch_pointer(decode,
 					 batch->map,
 					 batch->bo->offset,
-					 batch->used);
+                                         intel->batch.next - intel->batch.map);
    }
 
    drm_intel_decode(decode);
@@ -168,12 +168,14 @@ do_flush_locked(struct intel_context *intel)
    struct intel_batchbuffer *batch = &intel->batch;
    int ret = 0;
 
-   ret = drm_intel_bo_subdata(batch->bo, 0, 4*batch->used, batch->map);
-   if (ret == 0 && batch->state_batch_offset != batch->bo->size) {
-      ret = drm_intel_bo_subdata(batch->bo,
-				 batch->state_batch_offset,
-				 batch->bo->size - batch->state_batch_offset,
-				 (char *)batch->map + batch->state_batch_offset);
+   int batch_size = intel_batchbuffer_offset(intel);
+   ret = drm_intel_bo_subdata(batch->bo, 0, batch_size, batch->map);
+
+   int state_batch_start = ((char *)batch->state_batch - (char *)batch->map);
+   int state_batch_size = batch->bo->size - state_batch_start;
+   if (ret == 0 && state_batch_size != 0) {
+      ret = drm_intel_bo_subdata(batch->bo, state_batch_start, state_batch_size,
+				 batch->state_batch);
    }
 
    if (!intel->intelScreen->no_hw) {
@@ -192,11 +194,11 @@ do_flush_locked(struct intel_context *intel)
          if (unlikely(INTEL_DEBUG & DEBUG_AUB) && intel->vtbl.annotate_aub)
             intel->vtbl.annotate_aub(intel);
 	 if (intel->hw_ctx == NULL || batch->is_blit) {
-	    ret = drm_intel_bo_mrb_exec(batch->bo, 4 * batch->used, NULL, 0, 0,
+	    ret = drm_intel_bo_mrb_exec(batch->bo, batch_size, NULL, 0, 0,
 					flags);
 	 } else {
 	    ret = drm_intel_gem_bo_context_exec(batch->bo, intel->hw_ctx,
-						4 * batch->used, flags);
+						batch_size, flags);
 	 }
       }
    }
@@ -219,7 +221,7 @@ _intel_batchbuffer_flush(struct intel_context *intel,
 {
    int ret;
 
-   if (intel->batch.used == 0)
+   if (intel->batch.next != intel->batch.map)
       return 0;
 
    if (intel->first_post_swapbuffers_batch == NULL) {
@@ -228,8 +230,8 @@ _intel_batchbuffer_flush(struct intel_context *intel,
    }
 
    if (unlikely(INTEL_DEBUG & DEBUG_BATCH))
-      fprintf(stderr, "%s:%d: Batchbuffer flush with %db used\n", file, line,
-	      4*intel->batch.used);
+      fprintf(stderr, "%s:%d: Batchbuffer flush with %ldb used\n", file, line,
+	      (char *)intel->batch.next - (char *)intel->batch.map);
 
    intel->batch.reserved_space = 0;
 
@@ -238,7 +240,7 @@ _intel_batchbuffer_flush(struct intel_context *intel,
 
    /* Mark the end of the buffer. */
    intel_batchbuffer_emit_dword(intel, MI_BATCH_BUFFER_END);
-   if (intel->batch.used & 1) {
+   if (intel_batchbuffer_offset(intel) & 4) {
       /* Round batchbuffer usage to 2 DWORDs. */
       intel_batchbuffer_emit_dword(intel, MI_NOOP);
    }
@@ -273,7 +275,8 @@ intel_batchbuffer_emit_reloc(struct intel_context *intel,
 {
    int ret;
 
-   ret = drm_intel_bo_emit_reloc(intel->batch.bo, 4*intel->batch.used,
+   ret = drm_intel_bo_emit_reloc(intel->batch.bo,
+                                 intel_batchbuffer_offset(intel),
 				 buffer, delta,
 				 read_domains, write_domain);
    assert(ret == 0);
@@ -298,7 +301,8 @@ intel_batchbuffer_emit_reloc_fenced(struct intel_context *intel,
 {
    int ret;
 
-   ret = drm_intel_bo_emit_reloc_fence(intel->batch.bo, 4*intel->batch.used,
+   ret = drm_intel_bo_emit_reloc_fence(intel->batch.bo,
+                                       intel_batchbuffer_offset(intel),
 				       buffer, delta,
 				       read_domains, write_domain);
    assert(ret == 0);
@@ -320,23 +324,23 @@ intel_batchbuffer_data(struct intel_context *intel,
 {
    assert((bytes & 3) == 0);
    intel_batchbuffer_require_space(intel, bytes, is_blit);
-   __memcpy(intel->batch.map + intel->batch.used, data, bytes);
-   intel->batch.used += bytes >> 2;
+   __memcpy(intel->batch.next, data, bytes);
+   intel->batch.next += bytes >> 2;
 }
 
 void
 intel_batchbuffer_cached_advance(struct intel_context *intel)
 {
    struct cached_batch_item **prev = &intel->batch.cached_items, *item;
-   uint32_t sz = (intel->batch.used - intel->batch.emit) * sizeof(uint32_t);
-   uint32_t *start = intel->batch.map + intel->batch.emit;
+   uint32_t sz = (char *)intel->batch.next - (char *)intel->batch.begin;
+   uint32_t *start = intel->batch.begin;
    uint16_t op = *start >> 16;
 
    while (*prev) {
       uint32_t *old;
 
       item = *prev;
-      old = intel->batch.map + item->header;
+      old = item->header;
       if (op == *old >> 16) {
 	 if (item->size == sz && memcmp(old, start, sz) == 0) {
 	    if (prev != &intel->batch.cached_items) {
@@ -344,7 +348,7 @@ intel_batchbuffer_cached_advance(struct intel_context *intel)
 	       item->next = intel->batch.cached_items;
 	       intel->batch.cached_items = item;
 	    }
-	    intel->batch.used = intel->batch.emit;
+	    intel->batch.next = intel->batch.begin;
 	    return;
 	 }
 
@@ -362,7 +366,7 @@ intel_batchbuffer_cached_advance(struct intel_context *intel)
 
 emit:
    item->size = sz;
-   item->header = intel->batch.emit;
+   item->header = intel->batch.begin;
 }
 
 /**

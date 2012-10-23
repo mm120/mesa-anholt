@@ -87,7 +87,7 @@ brw_annotate_aub(struct intel_context *intel)
    drm_intel_aub_annotation annotations[annotation_count];
    int a = 0;
    make_annotation(&annotations[a++], AUB_TRACE_TYPE_BATCH, 0,
-                   4*intel->batch.used);
+                   intel_batchbuffer_offset(intel));
    for (int i = brw->state_batch_count; i-- > 0; ) {
       uint32_t type = brw->state_batch_list[i].type;
       uint32_t start_offset = brw->state_batch_list[i].offset;
@@ -124,26 +124,26 @@ brw_state_batch(struct brw_context *brw,
 		uint32_t *out_offset)
 {
    struct intel_batchbuffer *batch = &brw->intel.batch;
-   uint32_t offset;
+   uint32_t offset = (char *)batch->state_batch - (char *)batch->map;
 
    assert(size < batch->bo->size);
-   offset = ROUND_DOWN_TO(batch->state_batch_offset - size, alignment);
+   offset = ROUND_DOWN_TO(offset - size, alignment);
 
-   /* If allocating from the top would wrap below the batchbuffer, or
-    * if the batch's used space (plus the reserved pad) collides with our
-    * space, then flush and try again.
+   /* If we would collide with the batch (plus its reserved padding), then
+    * flush and try again.
     */
-   if (batch->state_batch_offset < size ||
-       offset < 4*batch->used + batch->reserved_space) {
+   if ((void *)batch->state_batch <
+       (void *)batch->next + batch->reserved_space) {
       intel_batchbuffer_flush(&brw->intel);
-      offset = ROUND_DOWN_TO(batch->state_batch_offset - size, alignment);
+      offset = ROUND_DOWN_TO(((char *)batch->state_batch -
+                              (char *)batch->map) - size, alignment);
    }
 
-   batch->state_batch_offset = offset;
+   batch->state_batch = (void *)batch->map + offset;
 
    if (unlikely(INTEL_DEBUG & (DEBUG_BATCH | DEBUG_AUB)))
       brw_track_state_batch(brw, type, offset, size);
 
    *out_offset = offset;
-   return batch->map + (offset>>2);
+   return batch->state_batch;
 }

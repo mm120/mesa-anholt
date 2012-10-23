@@ -177,7 +177,7 @@ intelDRI2Flush(__DRIdrawable *drawable)
    intel_downsample_for_dri2_flush(intel, drawable);
    intel->need_throttle = true;
 
-   if (intel->batch.used)
+   if (intel->batch.next != intel->batch.map)
       intel_batchbuffer_flush(intel);
 
    if (INTEL_DEBUG & DEBUG_AUB) {

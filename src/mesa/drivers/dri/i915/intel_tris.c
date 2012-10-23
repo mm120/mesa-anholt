@@ -64,15 +64,14 @@ static void intelRasterPrimitive(struct gl_context * ctx, GLenum rprim,
 static void
 intel_flush_inline_primitive(struct intel_context *intel)
 {
-   GLuint vertex_dwords = (&intel->batch.map[intel->batch.used] -
-                           intel->prim.prim_packet_header);
+   GLuint vertex_dwords = intel->batch.next - intel->prim.prim_packet_header;
 
    assert(intel->prim.primitive != ~0);
 
 /*    printf("/\n"); */
 
    if (vertex_dwords < 2) {
-      intel->batch.used = intel->prim.prim_packet_header - intel->batch.map;
+      intel->batch.next = intel->prim.prim_packet_header;
    } else {
       *intel->prim.prim_packet_header = (_3DPRIMITIVE |
                                          intel->prim.primitive |
@@ -99,7 +98,7 @@ static void intel_start_inline(struct intel_context *intel, uint32_t prim)
     */
    BEGIN_BATCH(1);
 
-   intel->prim.prim_packet_header = &intel->batch.map[intel->batch.used];
+   intel->prim.prim_packet_header = intel->batch.next;
    intel->prim.primitive = prim;
    intel->prim.flush = intel_flush_inline_primitive;
 
@@ -132,8 +131,8 @@ static GLuint *intel_extend_inline(struct intel_context *intel, GLuint dwords)
 
    intel->vtbl.assert_not_dirty(intel);
 
-   ptr = intel->batch.map + intel->batch.used;
-   intel->batch.used += dwords;
+   ptr = intel->batch.next;
+   intel->batch.next += dwords;
 
    return ptr;
 }

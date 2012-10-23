@@ -71,6 +71,12 @@ static INLINE uint32_t float_as_int(float f)
    return fi.d;
 }
 
+static inline uint32_t
+intel_batchbuffer_offset(struct intel_context *intel)
+{
+   return (char *)intel->batch.next - (char *)intel->batch.map;
+}
+
 /* Inline functions - might actually be better off with these
  * non-inlined.  Certainly better off switching all command packets to
  * be passed as structs rather than dwords, but that's a little bit of
@@ -79,8 +85,8 @@ static INLINE uint32_t float_as_int(float f)
 static INLINE unsigned
 intel_batchbuffer_space(struct intel_context *intel)
 {
-   return (intel->batch.state_batch_offset - intel->batch.reserved_space)
-      - intel->batch.used*4;
+   return ((char *)intel->batch.state_batch -
+           (char *)intel->batch.next) - intel->batch.reserved_space;
 }
 
 
@@ -90,7 +96,7 @@ intel_batchbuffer_emit_dword(struct intel_context *intel, GLuint dword)
 #ifdef DEBUG
    assert(intel_batchbuffer_space(intel) >= 4);
 #endif
-   intel->batch.map[intel->batch.used++] = dword;
+   *(intel->batch.next++) = dword;
 }
 
 static INLINE void
@@ -105,7 +111,8 @@ intel_batchbuffer_require_space(struct intel_context *intel,
 {
 
    if (intel->gen >= 6 &&
-       intel->batch.is_blit != is_blit && intel->batch.used) {
+       intel->batch.is_blit != is_blit &&
+       intel->batch.next != intel->batch.map) {
       intel_batchbuffer_flush(intel);
    }
 
@@ -123,7 +130,7 @@ intel_batchbuffer_begin(struct intel_context *intel, int n, bool is_blit)
 {
    intel_batchbuffer_require_space(intel, n * 4, is_blit);
 
-   intel->batch.emit = intel->batch.used;
+   intel->batch.begin = intel->batch.next;
 #ifdef DEBUG
    intel->batch.total = n;
 #endif
@@ -134,7 +141,7 @@ intel_batchbuffer_advance(struct intel_context *intel)
 {
 #ifdef DEBUG
    struct intel_batchbuffer *batch = &intel->batch;
-   unsigned int _n = batch->used - batch->emit;
+   unsigned int _n = batch->next - batch->begin;
    assert(batch->total != 0);
    if (_n != batch->total) {
       fprintf(stderr, "ADVANCE_BATCH: %d of %d dwords emitted\n",

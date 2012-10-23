@@ -127,17 +127,19 @@ struct intel_batchbuffer {
 
    struct cached_batch_item *cached_items;
 
-   uint16_t emit, total;
-   uint16_t used, reserved_space;
+   uint16_t total;
+   uint16_t reserved_space;
+   uint32_t *begin; /** Value of next pointer at intel_batchbuffer_begin() */
+   uint32_t *next; /** Next location for a batch dword to be stored at. */
+   void *state_batch;
    uint32_t map[8192];
 #define BATCH_SZ (8192*sizeof(uint32_t))
 
-   uint32_t state_batch_offset;
    bool is_blit;
    bool needs_sol_reset;
 
    struct {
-      uint16_t used;
+      uint32_t *next;
       int reloc_count;
    } saved;
 };

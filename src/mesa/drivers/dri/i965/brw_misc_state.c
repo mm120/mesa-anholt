@@ -387,9 +387,12 @@ brw_workaround_depthstencil_alignment(struct brw_context *brw)
    if (rebase_depth) {
       intel_renderbuffer_move_to_temp(intel, depth_irb);
 
-      if (stencil_irb && stencil_irb->mt == depth_mt) {
+      if (stencil_irb == depth_irb)
+         rebase_stencil = false;
+      else if (stencil_irb && stencil_irb->mt == depth_mt) {
          intel_miptree_reference(&stencil_irb->mt, depth_irb->mt);
          intel_renderbuffer_set_draw_offset(stencil_irb);
+         rebase_stencil = false;
       }
    }
    if (rebase_stencil) {

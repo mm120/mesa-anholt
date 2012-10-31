@@ -671,6 +671,68 @@ intel_miptree_get_image_offset(struct intel_mipmap_tree *mt,
 }
 
 static void
+intel_miptree_copy_slice_sw(struct intel_context *intel,
+                            struct intel_mipmap_tree *dst_mt,
+                            struct intel_mipmap_tree *src_mt,
+                            int level,
+                            int slice,
+                            int width,
+                            int height)
+{
+   void *src, *dst;
+   int src_stride, dst_stride;
+   int cpp = dst_mt->cpp;
+
+   /* If we're mapping separate stencil, the format we get mapped is not
+    * mt->format!
+    */
+   if (dst_mt->stencil_mt) {
+      if (dst_mt->format == MESA_FORMAT_Z32_FLOAT)
+         cpp = 8;
+      else {
+         assert(dst_mt->format == MESA_FORMAT_X8_Z24);
+         assert(cpp == 4);
+      }
+   }
+
+   intel_miptree_map(intel, src_mt,
+                     level, slice,
+                     0, 0,
+                     width, height,
+                     GL_MAP_READ_BIT,
+                     &src, &src_stride);
+
+   intel_miptree_map(intel, dst_mt,
+                     level, slice,
+                     0, 0,
+                     width, height,
+                     GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT,
+                     &dst, &dst_stride);
+
+   DBG("sw blit %s mt %p %p/%d -> %s mt %p %p/%d (%dx%d)\n",
+       _mesa_get_format_name(src_mt->format),
+       src_mt, src, src_stride,
+       _mesa_get_format_name(dst_mt->format),
+       dst_mt, dst, dst_stride,
+       width, height);
+
+   int row_size = cpp * width;
+   if (src_stride == row_size &&
+       dst_stride == row_size) {
+      memcpy(dst, src, row_size * height);
+   } else {
+      for (int i = 0; i < height; i++) {
+         memcpy(dst, src, row_size);
+         dst += dst_stride;
+         src += src_stride;
+      }
+   }
+
+   intel_miptree_unmap(intel, dst_mt, level, slice);
+   intel_miptree_unmap(intel, src_mt, level, slice);
+}
+
+static void
 intel_miptree_copy_slice(struct intel_context *intel,
 			 struct intel_mipmap_tree *dst_mt,
 			 struct intel_mipmap_tree *src_mt,
@@ -682,12 +744,31 @@ intel_miptree_copy_slice(struct intel_context *intel,
    gl_format format = src_mt->format;
    uint32_t width = src_mt->level[level].width;
    uint32_t height = src_mt->level[level].height;
+   int slice;
+
+   if (face > 0)
+      slice = face;
+   else
+      slice = depth;
 
    assert(depth < src_mt->level[level].depth);
+   assert(src_mt->format == dst_mt->format);
 
    if (dst_mt->compressed) {
       height = ALIGN(height, dst_mt->align_h) / dst_mt->align_h;
       width = ALIGN(width, dst_mt->align_w);
+   }
+
+   /* If it's a packed depth/stencil buffer with separate stencil, we want to
+    * just map the depth/stencil miptree and copy both depth and stencil
+    * across in one go.
+    */
+   if (src_mt->stencil_mt) {
+      intel_miptree_copy_slice_sw(intel,
+                                  dst_mt, src_mt,
+                                  level, slice,
+                                  width, height);
+      return;
    }
 
    uint32_t dst_x, dst_y, src_x, src_y;
@@ -716,25 +797,9 @@ intel_miptree_copy_slice(struct intel_context *intel,
 
       fallback_debug("miptree validate blit for %s failed\n",
 		     _mesa_get_format_name(format));
-      void *dst = intel_region_map(intel, dst_mt->region, GL_MAP_WRITE_BIT);
-      void *src = intel_region_map(intel, src_mt->region, GL_MAP_READ_BIT);
 
-      _mesa_copy_rect(dst,
-		      dst_mt->cpp,
-		      dst_mt->region->pitch,
-		      dst_x, dst_y,
-		      width, height,
-		      src, src_mt->region->pitch,
-		      src_x, src_y);
-
-      intel_region_unmap(intel, dst_mt->region);
-      intel_region_unmap(intel, src_mt->region);
-   }
-
-   if (src_mt->stencil_mt) {
-      intel_miptree_copy_slice(intel,
-                               dst_mt->stencil_mt, src_mt->stencil_mt,
-                               level, face, depth);
+      intel_miptree_copy_slice_sw(intel, dst_mt, src_mt, level, slice,
+                                  width, height);
    }
 }
 

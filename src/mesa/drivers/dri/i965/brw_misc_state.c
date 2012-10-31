@@ -390,6 +390,7 @@ brw_workaround_depthstencil_alignment(struct brw_context *brw)
       if (stencil_irb == depth_irb)
          rebase_stencil = false;
       else if (stencil_irb && stencil_irb->mt == depth_mt) {
+         assert(stencil_irb->mt_level == depth_irb->mt_level);
          intel_miptree_reference(&stencil_irb->mt, depth_irb->mt);
          intel_renderbuffer_set_draw_offset(stencil_irb);
          rebase_stencil = false;
@@ -399,6 +400,7 @@ brw_workaround_depthstencil_alignment(struct brw_context *brw)
       intel_renderbuffer_move_to_temp(intel, stencil_irb);
 
       if (depth_irb && depth_irb->mt == stencil_mt) {
+         assert(stencil_irb->mt_level == depth_irb->mt_level);
          intel_miptree_reference(&depth_irb->mt, stencil_irb->mt);
          intel_renderbuffer_set_draw_offset(depth_irb);
       }

@@ -329,15 +329,27 @@ brw_workaround_depthstencil_alignment(struct brw_context *brw)
    struct intel_renderbuffer *stencil_irb = intel_get_renderbuffer(fb, BUFFER_STENCIL);
    struct intel_mipmap_tree *depth_mt = NULL;
    struct intel_mipmap_tree *stencil_mt = NULL;
+   unsigned int stencil_draw_x = 0, stencil_draw_y = 0;
+   int stencil_tile_x, stencil_tile_y;
 
    if (depth_irb)
       depth_mt = depth_irb->mt;
-   if (stencil_irb)
+   if (stencil_irb) {
       stencil_mt = stencil_irb->mt;
+
+      struct intel_mipmap_tree *real_stencil_mt;
+      intel_get_stencil_rb_draw_offsets(stencil_irb,
+                                        &real_stencil_mt,
+                                        &stencil_draw_x,
+                                        &stencil_draw_y);
+   }
 
    uint32_t tile_mask_x, tile_mask_y;
    brw_get_depthstencil_tile_masks(depth_mt, stencil_mt,
                                    &tile_mask_x, &tile_mask_y);
+
+   stencil_tile_x = stencil_draw_x & tile_mask_x;
+   stencil_tile_y = stencil_draw_y & tile_mask_y;
 
    if (depth_irb) {
       uint32_t depth_tile_x = depth_irb->draw_x & tile_mask_x;
@@ -356,9 +368,6 @@ brw_workaround_depthstencil_alignment(struct brw_context *brw)
       }
 
       if (stencil_irb) {
-         int stencil_tile_x = stencil_irb->draw_x & tile_mask_x;
-         int stencil_tile_y = stencil_irb->draw_y & tile_mask_y;
-
          /* If the two don't match up, then we need to move them to a
           * temporary so that the x/y draw offsets will end up being 0.
           */
@@ -372,9 +381,6 @@ brw_workaround_depthstencil_alignment(struct brw_context *brw)
 
    /* If we have (just) stencil, check it for ignored low bits as well */
    if (stencil_irb) {
-      uint32_t stencil_tile_x = stencil_irb->draw_x & tile_mask_x;
-      uint32_t stencil_tile_y = stencil_irb->draw_y & tile_mask_y;
-
       if (stencil_tile_x & 7 || stencil_tile_y & 7)
          rebase_stencil = true;
 

@@ -122,7 +122,6 @@ intel_get_renderbuffer(struct gl_framebuffer *fb, gl_buffer_index attIndex)
    return intel_renderbuffer(rb);
 }
 
-
 static INLINE gl_format
 intel_rb_format(const struct intel_renderbuffer *rb)
 {
@@ -149,6 +148,12 @@ intel_flip_renderbuffers(struct gl_framebuffer *fb);
 
 void
 intel_renderbuffer_set_draw_offset(struct intel_renderbuffer *irb);
+
+void
+intel_get_stencil_rb_draw_offsets(struct intel_renderbuffer *irb,
+                                  struct intel_mipmap_tree **out_mt,
+                                  unsigned int *out_draw_x,
+                                  unsigned int *out_draw_y);
 
 void
 intel_renderbuffer_fine_offset_masks(struct intel_renderbuffer *irb,

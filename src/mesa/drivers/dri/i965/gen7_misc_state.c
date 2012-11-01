@@ -41,6 +41,7 @@ static void emit_depthbuffer(struct brw_context *brw)
    struct intel_mipmap_tree *depth_mt = NULL,
 			    *stencil_mt = NULL,
 			    *hiz_mt = NULL;
+   unsigned int stencil_draw_x, stencil_draw_y;
 
    if (drb)
       depth_mt = drb->mt;
@@ -48,13 +49,9 @@ static void emit_depthbuffer(struct brw_context *brw)
    if (depth_mt)
       hiz_mt = depth_mt->hiz_mt;
 
-   if (srb) {
-      stencil_mt = srb->mt;
-      if (stencil_mt->stencil_mt)
-	 stencil_mt = stencil_mt->stencil_mt;
-
-      assert(stencil_mt->format == MESA_FORMAT_S8);
-   }
+   intel_get_stencil_rb_draw_offsets(srb, &stencil_mt,
+                                     &stencil_draw_x, &stencil_draw_y);
+   assert(!stencil_mt || stencil_mt->format == MESA_FORMAT_S8);
 
    uint32_t tile_mask_x, tile_mask_y;
    brw_get_depthstencil_tile_masks(depth_mt, stencil_mt,
@@ -69,12 +66,12 @@ static void emit_depthbuffer(struct brw_context *brw)
       tile_y = drb->draw_y & tile_mask_y;
 
       if (stencil_mt) {
-         assert((srb->draw_x & tile_mask_x) == tile_x);
-         assert((srb->draw_y & tile_mask_y) == tile_y);
+         assert((stencil_draw_x & tile_mask_x) == tile_x);
+         assert((stencil_draw_y & tile_mask_y) == tile_y);
       }
-   } else if (stencil_mt) {
-      tile_x = srb->draw_x & tile_mask_x;
-      tile_y = srb->draw_y & tile_mask_y;
+   } else {
+      tile_x = stencil_draw_x & tile_mask_x;
+      tile_y = stencil_draw_y & tile_mask_y;
    }
 
    /* According to the Sandy Bridge PRM, volume 2 part 1, pp326-327
@@ -191,8 +188,8 @@ static void emit_depthbuffer(struct brw_context *brw)
        * that the region is untiled; in fact it's W tiled.
        */
       uint32_t stencil_offset =
-         (srb->draw_y & ~tile_mask_y) * stencil_mt->region->pitch +
-         (srb->draw_x & ~tile_mask_x) * 64;
+         (stencil_draw_y & ~tile_mask_y) * stencil_mt->region->pitch +
+         (stencil_draw_x & ~tile_mask_x) * 64;
 
       BEGIN_BATCH(3);
       OUT_BATCH(GEN7_3DSTATE_STENCIL_BUFFER << 16 | (3 - 2));

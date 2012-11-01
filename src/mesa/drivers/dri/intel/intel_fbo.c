@@ -546,6 +546,38 @@ intel_renderbuffer_set_draw_offset(struct intel_renderbuffer *irb)
    irb->draw_y = dst_y;
 }
 
+/** Returns the miptree and draw offset for rendering to a stencil renderbuffer.
+ *
+ * There is a miptree and a draw offset in the intel_renderbuffer, but in the
+ * case of a packed depth/stencil texture attachment and separate stencil
+ * hardware, we have to look up the relevant slice of the separate stencil
+ * miptree.
+ */
+void
+intel_get_stencil_rb_draw_offsets(struct intel_renderbuffer *irb,
+                                  struct intel_mipmap_tree **out_mt,
+                                  unsigned int *out_draw_x,
+                                  unsigned int *out_draw_y)
+{
+   if (!irb) {
+      *out_mt = NULL;
+      *out_draw_x = 0;
+      *out_draw_y = 0;
+   } else if (irb->mt->stencil_mt) {
+      *out_mt = irb->mt->stencil_mt;
+      intel_miptree_get_image_offset(irb->mt->stencil_mt,
+                                     irb->mt_level,
+                                     irb->mt_layer,
+                                     out_draw_x,
+                                     out_draw_y);
+   } else {
+      *out_mt = irb->mt;
+      *out_draw_x = irb->draw_x;
+      *out_draw_y = irb->draw_y;
+   }
+}
+
+
 /**
  * Rendering to tiled buffers requires that the base address of the
  * buffer be aligned to a page boundary.  We generally render to

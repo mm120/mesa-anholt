@@ -2424,11 +2424,18 @@
         <glx rop="139" handcode="client"/>
     </function>
 
-    <function name="Finish" offset="216" es1="1.0" es2="2.0">
+    <function name="Finish" offset="216" es1="1.0" es2="2.0" marshal="sync">
         <glx sop="108" handcode="true"/>
     </function>
 
-    <function name="Flush" offset="217" es1="1.0" es2="2.0">
+    <!-- TODO: Flush is marshalled synchronously as a temporary hack
+    since we don't yet have a hook into SwapBuffers.
+
+    NOTE: when we remove this hack, we'll still have to handle Flush
+    specially to ensure that it causes all previous commands to get
+    delivered to the server thread.
+    -->
+    <function name="Flush" offset="217" es1="1.0" es2="2.0" marshal="sync">
         <glx sop="142" handcode="true"/>
     </function>
 
@@ -2662,21 +2669,21 @@
         <glx sop="110" handcode="client"/>
     </function>
 
-    <function name="PixelMapfv" offset="251" deprecated="3.1">
+    <function name="PixelMapfv" offset="251" deprecated="3.1" marshal="sync">
         <param name="map" type="GLenum"/>
         <param name="mapsize" type="GLsizei" counter="true"/>
         <param name="values" type="const GLfloat *" count="mapsize"/>
         <glx rop="168" large="true"/>
     </function>
 
-    <function name="PixelMapuiv" offset="252" deprecated="3.1">
+    <function name="PixelMapuiv" offset="252" deprecated="3.1" marshal="sync">
         <param name="map" type="GLenum"/>
         <param name="mapsize" type="GLsizei" counter="true"/>
         <param name="values" type="const GLuint *" count="mapsize"/>
         <glx rop="169" large="true"/>
     </function>
 
-    <function name="PixelMapusv" offset="253" deprecated="3.1">
+    <function name="PixelMapusv" offset="253" deprecated="3.1" marshal="sync">
         <param name="map" type="GLenum"/>
         <param name="mapsize" type="GLsizei" counter="true"/>
         <param name="values" type="const GLushort *" count="mapsize"/>
@@ -3207,7 +3214,7 @@
     <enum name="CLIENT_ALL_ATTRIB_BITS"                   value="0xFFFFFFFF"/>
 
     <function name="ArrayElement" offset="306" deprecated="3.1"
-              exec="dynamic">
+              exec="dynamic" marshal="draw">
         <param name="i" type="GLint"/>
         <glx handcode="true"/>
     </function>
@@ -3227,7 +3234,7 @@
     </function>
 
     <function name="DrawArrays" offset="310" es1="1.0" es2="2.0"
-              exec="dynamic">
+              exec="dynamic" marshal="draw">
         <param name="mode" type="GLenum"/>
         <param name="first" type="GLint"/>
         <param name="count" type="GLsizei"/>
@@ -3235,7 +3242,7 @@
     </function>
 
     <function name="DrawElements" offset="311" es1="1.0" es2="2.0"
-              exec="dynamic">
+              exec="dynamic" marshal="draw">
         <param name="mode" type="GLenum"/>
         <param name="count" type="GLsizei"/>
         <param name="type" type="GLenum"/>
@@ -3794,7 +3801,7 @@
     </function>
 
     <function name="DrawRangeElements" offset="338" es2="3.0"
-              exec="dynamic">
+              exec="dynamic" marshal="draw">
         <param name="mode" type="GLenum"/>
         <param name="start" type="GLuint"/>
         <param name="end" type="GLuint"/>
@@ -4822,7 +4829,7 @@
         <glx handcode="true"/>
     </function>
 
-    <function name="MultiDrawArrays" offset="assign">
+    <function name="MultiDrawArrays" offset="assign" marshal="draw">
         <param name="mode" type="GLenum"/>
         <param name="first" type="const GLint *"/>
         <param name="count" type="const GLsizei *"/>
@@ -8244,7 +8251,7 @@
   <enum name="MAX_VERTEX_STREAMS"             value="0x8E71"/>
 
   <function name="DrawTransformFeedbackStream" offset="assign"
-            exec="dynamic">
+            exec="dynamic" marshal="draw">
     <param name="mode" type="GLenum"/>
     <param name="id" type="GLuint"/>
     <param name="stream" type="GLuint"/>
@@ -8281,14 +8288,14 @@
 
 <category name="GL_ARB_transform_feedback_instanced" number="109">
   <function name="DrawTransformFeedbackInstanced" offset="assign"
-            exec="dynamic">
+            exec="dynamic" marshal="draw">
     <param name="mode" type="GLenum"/>
     <param name="id" type="GLuint"/>
     <param name="primcount" type="GLsizei"/>
   </function>
 
   <function name="DrawTransformFeedbackStreamInstanced" offset="assign"
-            exec="dynamic">
+            exec="dynamic" marshal="draw">
     <param name="mode" type="GLenum"/>
     <param name="id" type="GLuint"/>
     <param name="stream" type="GLuint"/>
@@ -10149,7 +10156,7 @@
     </function>
 
     <function name="MultiDrawElementsEXT" offset="assign" es1="1.0" es2="2.0"
-              exec="dynamic">
+              exec="dynamic" marshal="draw">
         <param name="mode" type="GLenum"/>
         <param name="count" type="const GLsizei *"/>
         <param name="type" type="GLenum"/>
@@ -11160,7 +11167,8 @@
 </category>
 
 <category name="GL_IBM_multimode_draw_arrays" number="200">
-    <function name="MultiModeDrawArraysIBM" offset="assign" static_dispatch="false">
+    <function name="MultiModeDrawArraysIBM" offset="assign"
+              static_dispatch="false" marshal="draw">
         <param name="mode" type="const GLenum *"/>
         <param name="first" type="const GLint *"/>
         <param name="count" type="const GLsizei *"/>
@@ -11169,7 +11177,8 @@
         <glx handcode="true" ignore="true"/>
     </function>
 
-    <function name="MultiModeDrawElementsIBM" offset="assign" static_dispatch="false">
+    <function name="MultiModeDrawElementsIBM" offset="assign"
+              static_dispatch="false" marshal="draw">
         <param name="mode" type="const GLenum *"/>
         <param name="count" type="const GLsizei *"/>
         <param name="type" type="GLenum"/>

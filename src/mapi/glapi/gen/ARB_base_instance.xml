@@ -9,7 +9,7 @@
 <category name="GL_ARB_base_instance" number="107">
 
   <function name="DrawArraysInstancedBaseInstance" offset="assign"
-            exec="dynamic">
+            exec="dynamic" marshal="draw">
     <param name="mode" type="GLenum"/>
     <param name="first" type="GLint"/>
     <param name="count" type="GLsizei"/>
@@ -18,7 +18,7 @@
   </function>
 
   <function name="DrawElementsInstancedBaseInstance" offset="assign"
-            exec="dynamic">
+            exec="dynamic" marshal="draw">
     <param name="mode" type="GLenum"/>
     <param name="count" type="GLsizei"/>
     <param name="type" type="GLenum"/>
@@ -28,7 +28,7 @@
   </function>
 
   <function name="DrawElementsInstancedBaseVertexBaseInstance" offset="assign"
-            exec="dynamic">
+            exec="dynamic" marshal="draw">
     <param name="mode" type="GLenum"/>
     <param name="count" type="GLsizei"/>
     <param name="type" type="GLenum"/>

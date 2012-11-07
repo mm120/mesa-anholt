@@ -88,6 +88,8 @@ main_sources = [
     'main/imports.c',
     'main/light.c',
     'main/lines.c',
+    'main/marshal.c',
+    'main/marshal_generated.c'
     'main/matrix.c',
     'main/mipmap.c',
     'main/mm.c',
@@ -448,6 +450,22 @@ env.CodeGenerate(
 env.CodeGenerate(
     target = 'main/api_exec.c',
     script = GLAPI + 'gen/gl_genexec.py',
+    source = GLAPI + 'gen/gl_and_es_API.xml',
+    command = python_cmd + ' $SCRIPT -f $SOURCE > $TARGET'
+    )
+
+# The marshal_generated.c file is generated from the GL/ES API.xml file
+env.CodeGenerate(
+    target = 'main/marshal_generated.c',
+    script = GLAPI + 'gen/gl_marshal.py',
+    source = GLAPI + 'gen/gl_and_es_API.xml',
+    command = python_cmd + ' $SCRIPT -f $SOURCE > $TARGET'
+    )
+
+# The marshal_generated.h file is generated from the GL/ES API.xml file
+env.CodeGenerate(
+    target = 'main/marshal_generated.h',
+    script = GLAPI + 'gen/gl_marshal_h.py',
     source = GLAPI + 'gen/gl_and_es_API.xml',
     command = python_cmd + ' $SCRIPT -f $SOURCE > $TARGET'
     )

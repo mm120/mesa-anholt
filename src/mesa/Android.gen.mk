@@ -110,6 +110,18 @@ $(intermediates)/main/api_exec.c: PRIVATE_XML := -f $(glapi)/gl_and_es_API.xml
 $(intermediates)/main/api_exec.c: $(dispatch_deps)
 	$(call es-gen)
 
+$(intermediates)/main/marshal_generated.c: PRIVATE_SCRIPT := $(MESA_PYTHON2) $(glapi)/gl_marshal.py
+$(intermediates)/main/marshal_generated.c: PRIVATE_XML := -f $(glapi)/gl_and_es_API.xml
+
+$(intermediates)/main/marshal_generated.c: $(dispatch_deps)
+	$(call es-gen)
+
+$(intermediates)/main/marshal_generated.h: PRIVATE_SCRIPT := $(MESA_PYTHON2) $(glapi)/gl_marshal_h.py
+$(intermediates)/main/marshal_generated.h: PRIVATE_XML := -f $(glapi)/gl_and_es_API.xml
+
+$(intermediates)/main/marshal_generated.h: $(dispatch_deps)
+	$(call es-gen)
+
 GET_HASH_GEN := $(LOCAL_PATH)/main/get_hash_generator.py
 GET_HASH_GEN_FLAGS := $(patsubst %,-a %,$(MESA_ENABLED_APIS))
 

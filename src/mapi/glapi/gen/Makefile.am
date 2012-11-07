@@ -48,6 +48,8 @@ BUILT_SOURCES = \
 	$(MESA_GLAPI_ASM_OUTPUTS) \
 	$(MESA_DIR)/main/enums.c \
 	$(MESA_DIR)/main/api_exec.c \
+	$(MESA_DIR)/main/marshal_generated.c \
+	$(MESA_DIR)/main/marshal_generated.h \
 	$(MESA_DIR)/main/dispatch.h \
 	$(MESA_DIR)/main/remap_helper.h \
 	$(MESA_GLX_DIR)/indirect.c \
@@ -214,6 +216,12 @@ $(MESA_DIR)/main/enums.c: gl_enums.py $(COMMON)
 	$(PYTHON_GEN) $< -f $(srcdir)/gl_and_es_API.xml > $@
 
 $(MESA_DIR)/main/api_exec.c: gl_genexec.py $(COMMON)
+	$(PYTHON_GEN) $< -f $(srcdir)/gl_and_es_API.xml > $@
+
+$(MESA_DIR)/main/marshal_generated.c: gl_marshal.py marshal_XML.py $(COMMON)
+	$(PYTHON_GEN) $< -f $(srcdir)/gl_and_es_API.xml > $@
+
+$(MESA_DIR)/main/marshal_generated.h: gl_marshal_h.py marshal_XML.py $(COMMON)
 	$(PYTHON_GEN) $< -f $(srcdir)/gl_and_es_API.xml > $@
 
 $(MESA_DIR)/main/dispatch.h: gl_table.py $(COMMON)

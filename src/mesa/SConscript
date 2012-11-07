@@ -437,6 +437,21 @@ env.CodeGenerate(
     command = python_cmd + ' $SCRIPT -f $SOURCE > $TARGET'
     )
 
+# The marshal_generated.c file is generated from the GL/ES API.xml file
+env.CodeGenerate(
+    target = 'main/marshal_generated.c',
+    script = GLAPI + 'gen/gl_marshal.py',
+    source = GLAPI + 'gen/gl_and_es_API.xml',
+    command = python_cmd + ' $SCRIPT -f $SOURCE > $TARGET'
+    )
+
+# The marshal_generated.h file is generated from the GL/ES API.xml file
+env.CodeGenerate(
+    target = 'main/marshal_generated.h',
+    script = GLAPI + 'gen/gl_marshal_h.py',
+    source = GLAPI + 'gen/gl_and_es_API.xml',
+    command = python_cmd + ' $SCRIPT -f $SOURCE > $TARGET'
+    )
 
 def write_git_sha1_h_file(filename):
     """Mesa looks for a git_sha1.h file at compile time in order to display

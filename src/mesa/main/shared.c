@@ -41,6 +41,7 @@
 #include "set.h"
 #include "shaderobj.h"
 #include "syncobj.h"
+#include "threadpool.h"
 
 
 /**
@@ -118,6 +119,8 @@ _mesa_alloc_shared_state(struct gl_context *ctx)
    shared->RenderBuffers = _mesa_NewHashTable();
 
    shared->SyncObjects = _mesa_set_create(NULL, _mesa_key_pointer_equal);
+
+   shared->MarshalThreadPool = _mesa_threadpool_create();
 
    return shared;
 }
@@ -356,6 +359,8 @@ free_shared_state(struct gl_context *ctx, struct gl_shared_state *shared)
 
    _glthread_DESTROY_MUTEX(shared->Mutex);
    _glthread_DESTROY_MUTEX(shared->TexMutex);
+
+   _mesa_threadpool_destroy(shared->MarshalThreadPool);
 
    free(shared);
 }

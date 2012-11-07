@@ -938,6 +938,13 @@ _mesa_initialize_context(struct gl_context *ctx,
    /* setup the API dispatch tables with all nop functions */
    ctx->Exec = _mesa_alloc_dispatch_table(_gloffset_COUNT);
 
+   /* Setup thread marshalling data structures.  TODO: can we rely on
+    * uninitialized members being zero-initialized?
+    * TODO: do appropriate things on context destroy.
+    */
+   ctx->Marshal.Shared.BatchQueueTail = &ctx->Marshal.Shared.BatchQueue;
+   _glthread_INIT_MUTEX(ctx->Marshal.Mutex);
+
    if (!ctx->Exec) {
       _mesa_reference_shared_state(ctx, &ctx->Shared, NULL);
       return GL_FALSE;

@@ -2575,6 +2575,11 @@ struct gl_shared_state
    GLuint TextureStateStamp;	        /**< state notification for shared tex */
    /*@}*/
 
+   /**
+    * Thread pool for deferred execution of GL commands.
+    */
+   struct threadpool *MarshalThreadPool;
+
    /** Default buffer object for vertex arrays that aren't in VBOs */
    struct gl_buffer_object *NullBufferObj;
 
@@ -3386,6 +3391,56 @@ struct gl_uniform_buffer_binding
    GLboolean AutomaticSize;
 };
 
+struct gl_context_marshal
+{
+   /**
+    * Mutex protecting data that is shared between threads.
+    */
+   _glthread_Mutex Mutex;
+
+   /**
+    * Information that is shared between threads (and hence usually needs to
+    * be accessed while holding Mutex).
+    */
+   struct {
+      /**
+       * Singly-linked list of command batches that are awaiting execution by
+       * a thread pool task.  NULL if empty.
+       */
+      struct gl_context_marshal_batch *BatchQueue;
+
+      /**
+       * Tail pointer for appending batches to the end of BatchQueue.  If the
+       * queue is empty, this points to BatchQueue.
+       */
+      struct gl_context_marshal_batch **BatchQueueTail;
+
+      /**
+       * If Task (see below) is non-null, this boolean indicates whether the
+       * task has decided to exit its execution loop.  If this value is
+       * GL_FALSE, then the task is guaranteed ot notice any batches added to
+       * BatchQueue.  Undefined if Task is null.
+       *
+       * Note that we can't use Task->finished, since that doesn't get set to
+       * GL_TRUE until *after* the task exits, so there is a brief period
+       * where it is GL_FALSE but the task won't notice any further batches
+       * added to BatchQueue.
+       */
+      GLboolean TaskComplete;
+   } Shared;
+
+   /**
+    * Batch containing commands that are being prepared for insertion into
+    * Shared.BatchQueue.  NULL if there are no such commands.
+    */
+   struct gl_context_marshal_batch *BatchPrep;
+
+   /**
+    * Task that is currently executing commands, if any.
+    */
+   struct threadpool_task *Task;
+};
+
 /**
  * Mesa rendering context.
  *
@@ -3408,6 +3463,8 @@ struct gl_context
    struct _glapi_table *Exec;	/**< Execute functions */
    struct _glapi_table *CurrentDispatch;  /**< == Save or Exec !! */
    /*@}*/
+
+   struct gl_context_marshal Marshal;
 
    struct gl_config Visual;
    struct gl_framebuffer *DrawBuffer;	/**< buffer for writing */

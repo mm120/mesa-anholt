@@ -32,6 +32,7 @@
 #include "main/fbobject.h"
 #include "main/framebuffer.h"
 #include "main/imports.h"
+#include "main/marshal.h"
 #include "main/points.h"
 #include "main/renderbuffer.h"
 
@@ -868,6 +869,14 @@ intelMakeCurrent(__DRIcontext * driContextPriv,
       intel = (struct intel_context *) driContextPriv->driverPrivate;
    else
       intel = NULL;
+
+   /* HACK: if we're marshalling, we need to synchronize with the server
+    * thread so that any pending drawing gets finished before we switch
+    * drawables around.
+    */
+   if (curCtx && curCtx->MarshalExec != NULL) {
+      _mesa_marshal_synchronize(curCtx);
+   }
 
    /* According to the glXMakeCurrent() man page: "Pending commands to
     * the previous context, if any, are flushed before it is released."

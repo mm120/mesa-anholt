@@ -7,6 +7,7 @@
 #include "main/bufferobj.h"
 #include "main/context.h"
 #include "main/formats.h"
+#include "main/marshal.h"
 #include "main/pbo.h"
 #include "main/renderbuffer.h"
 #include "main/texcompress.h"
@@ -296,6 +297,10 @@ intelSetTexBuffer2(__DRIcontext *pDRICtx, GLint target,
    struct gl_texture_image *texImage;
    int level = 0, internalFormat = 0;
    gl_format texFormat = MESA_FORMAT_NONE;
+
+   /* HACK: synchronize with marshal thread */
+   if (ctx->MarshalExec)
+      _mesa_marshal_synchronize(ctx);
 
    texObj = _mesa_get_current_tex_object(ctx, target);
    intelObj = intel_texture_object(texObj);

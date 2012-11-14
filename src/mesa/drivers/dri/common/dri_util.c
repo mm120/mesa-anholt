@@ -72,6 +72,8 @@ setupLoaderExtensions(__DRIscreen *psp,
 	    psp->dri2.image = (__DRIimageLookupExtension *) extensions[i];
 	if (strcmp(extensions[i]->name, __DRI_USE_INVALIDATE) == 0)
 	    psp->dri2.useInvalidate = (__DRIuseInvalidateExtension *) extensions[i];
+        if (strcmp(extensions[i]->name, __DRI_BACKGROUND_CALLABLE) == 0)
+            psp->dri2.backgroundCallable = (__DRIbackgroundCallableExtension *) extensions[i];
     }
 }
 

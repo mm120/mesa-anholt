@@ -161,6 +161,7 @@ struct __DRIscreenRec {
 	__DRIdri2LoaderExtension *loader;
 	__DRIimageLookupExtension *image;
 	__DRIuseInvalidateExtension *useInvalidate;
+        __DRIbackgroundCallableExtension *backgroundCallable;
     } dri2;
 
     driOptionCache optionInfo;

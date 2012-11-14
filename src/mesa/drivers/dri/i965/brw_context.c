@@ -36,6 +36,7 @@
 #include "main/simple_list.h"
 #include "main/version.h"
 #include "main/vtxfmt.h"
+#include "main/glthread.h"
 
 #include "vbo/vbo_context.h"
 
@@ -427,6 +428,12 @@ brwCreateContext(int api,
 
    _mesa_initialize_dispatch_tables(ctx);
    _mesa_initialize_vbo_vtxfmt(ctx);
+
+   if (driContextPriv->driScreenPriv->dri2.backgroundCallable &&
+       driQueryOptionb(&intel->optionCache, "glthread")) {
+      /* Loader supports multithreading, and so do we. */
+      _mesa_glthread_init(ctx);
+   }
 
    return true;
 }

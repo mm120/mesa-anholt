@@ -58,6 +58,22 @@
  * Mesa's Driver Functions
  ***************************************/
 
+static void brw_set_background_context(struct gl_context *ctx)
+{
+   struct intel_context *intel = intel_context(ctx);
+   __DRIcontext *driContext = intel->driContext;
+   __DRIscreen *driScreen = driContext->driScreenPriv;
+   __DRIbackgroundCallableExtension *backgroundCallable
+      = driScreen->dri2.backgroundCallable;
+
+   /* Note: Mesa will only call this function if we've called
+    * _mesa_enable_multithreading().  We only do that if the loader exposed
+    * the __DRI_BACKGROUND_CALLABLE extension.  So we know that
+    * backgroundCallable is not NULL.
+    */
+   backgroundCallable->setBackgroundContext(driContext->loaderPrivate);
+}
+
 static void brwInitDriverFunctions(struct intel_screen *screen,
 				   struct dd_function_table *functions)
 {
@@ -72,6 +88,8 @@ static void brwInitDriverFunctions(struct intel_screen *screen,
       functions->EndTransformFeedback = gen7_end_transform_feedback;
    else
       functions->EndTransformFeedback = brw_end_transform_feedback;
+
+   functions->SetBackgroundContext = brw_set_background_context;
 }
 
 bool

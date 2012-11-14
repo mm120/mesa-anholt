@@ -91,6 +91,7 @@ main_sources = [
     'main/imports.c',
     'main/light.c',
     'main/lines.c',
+    'main/marshal.c',
     'main/marshal_generated.c',
     'main/matrix.c',
     'main/mipmap.c',

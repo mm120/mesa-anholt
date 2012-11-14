@@ -31,6 +31,7 @@
 
 
 #include "main/api_exec.h"
+#include "main/context.h"
 #include "main/imports.h"
 #include "main/macros.h"
 #include "main/simple_list.h"
@@ -411,6 +412,11 @@ brwCreateContext(int api,
 
    _mesa_initialize_exec_table(ctx);
    _mesa_initialize_vbo_vtxfmt(ctx);
+
+   if (driContextPriv->driScreenPriv->dri2.backgroundCallable) {
+      /* Loader supports multithreading, and so do we. */
+      _mesa_enable_multithreading(ctx);
+   }
 
    return true;
 }

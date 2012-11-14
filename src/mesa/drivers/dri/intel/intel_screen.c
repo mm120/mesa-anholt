@@ -33,6 +33,7 @@
 #include "main/renderbuffer.h"
 #include "main/hash.h"
 #include "main/fbobject.h"
+#include "main/marshal.h"
 #include "main/mfeatures.h"
 #include "main/version.h"
 #include "swrast/s_renderbuffer.h"
@@ -576,6 +577,22 @@ intel_from_planar(__DRIimage *parent, int plane, void *loaderPrivate)
     return image;
 }
 
+static void
+intel_synchronize_threads()
+{
+   GET_CURRENT_CONTEXT(ctx);
+   _mesa_marshal_synchronize(ctx);
+}
+
+static void
+intel_queue_threaded_op(__DRImultithreadedQueueCallback callback,
+                        size_t size, const void *data)
+{
+   /* TODO: implement actual queueing behaviour. */
+   intel_synchronize_threads();
+   (*callback)(size, data);
+}
+
 static struct __DRIimageExtensionRec intelImageExtension = {
     .base = { __DRI_IMAGE, 5 },
 
@@ -590,11 +607,18 @@ static struct __DRIimageExtensionRec intelImageExtension = {
     .fromPlanar                         = intel_from_planar
 };
 
+static __DRImultithreadedExtension intelMultithreadedExtension = {
+   { __DRI_MULTITHREADED, __DRI_MULTITHREADED_VERSION },
+   intel_synchronize_threads,
+   intel_queue_threaded_op,
+};
+
 static const __DRIextension *intelScreenExtensions[] = {
     &intelTexBufferExtension.base,
     &intelFlushExtension.base,
     &intelImageExtension.base,
     &dri2ConfigQueryExtension.base,
+    &intelMultithreadedExtension.base,
     NULL
 };
 

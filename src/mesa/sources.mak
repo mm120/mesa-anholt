@@ -58,6 +58,7 @@ MAIN_FILES = \
 	$(SRCDIR)main/imports.c \
 	$(SRCDIR)main/light.c \
 	$(SRCDIR)main/lines.c \
+	$(SRCDIR)main/marshal.c \
 	$(SRCDIR)main/marshal_generated.c \
 	$(SRCDIR)main/marshal_generated.h \
 	$(SRCDIR)main/matrix.c \

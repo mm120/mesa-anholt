@@ -52,7 +52,7 @@ struct marshal_cmd_base
    uint16_t cmd_size;
 };
 
-struct marshal_cmd_ShaderSourceARB;
+struct marshal_cmd_ShaderSource;
 
 
 struct _glapi_table *
@@ -60,6 +60,10 @@ _mesa_create_marshal_table(const struct gl_context *ctx);
 
 size_t
 _mesa_unmarshal_dispatch_cmd(struct gl_context *ctx, const void *cmd);
+
+void GLAPIENTRY
+_mesa_marshal_ShaderSource(GLuint shader, GLsizei count,
+                           const GLchar * const *string, const GLint *length);
 
 void
 _mesa_marshal_synchronize(struct gl_context *ctx);
@@ -73,8 +77,8 @@ _mesa_allocate_command_in_queue(struct gl_context *ctx,
                                 size_t size_bytes);
 
 void
-_mesa_unmarshal_ShaderSourceARB(struct gl_context *ctx,
-                                const struct marshal_cmd_ShaderSourceARB *cmd);
+_mesa_unmarshal_ShaderSource(struct gl_context *ctx,
+                             const struct marshal_cmd_ShaderSource *cmd);
 
 
 #endif /* MARSHAL_H */

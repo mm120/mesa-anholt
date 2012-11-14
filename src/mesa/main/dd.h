@@ -829,6 +829,25 @@ struct dd_function_table {
     * This should be equivalent to glGetInteger64v(GL_TIMESTAMP);
     */
    uint64_t (*GetTimestamp)(struct gl_context *ctx);
+
+   /**
+    * Indicate that this thread is being used by Mesa as a background drawing
+    * thread for the given GL context.
+    *
+    * If this function is called more than once from any given thread, each
+    * subsequent call overrides the context that was passed in the previous
+    * call.  Mesa takes advantage of this to re-use a background thread to
+    * perform drawing on behalf of multiple contexts.
+    *
+    * Mesa may sometimes call this function from a non-background thread
+    * (i.e. a thread that has already been bound to a context using
+    * __DriverAPIRec::MakeCurrent()); when this happens, ctx will be equal to
+    * the context that is bound to this thread.
+    *
+    * Mesa will only call this function if _mesa_enable_multithreading() has
+    * been called on a given context.
+    */
+   void (*SetBackgroundContext)(struct gl_context *ctx);
 };
 
 

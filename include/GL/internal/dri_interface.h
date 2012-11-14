@@ -1140,4 +1140,99 @@ struct __DRIrobustnessExtensionRec {
    __DRIextension base;
 };
 
+/**
+ * Multithreaded screen extension.
+ *
+ * Drivers expose this extension to indicate that they are capable of
+ * deferring drawing operations to background threads.  Drivers must not
+ * actually defer drawing operations to background threads unless the loader
+ * exposes the extension __DRI_BACKGROUND_CALLABLE.
+ *
+ * Note that a driver that exposes this extension is not required to defer
+ * drawing operations to background threads--it may, at its discretion,
+ * execute some or all drawing operations synchronously, including operations
+ * requested by __DRImultithreadedExtensionRec::QueueThreadedOp().
+ */
+#define __DRI_MULTITHREADED "DRI_Multithreaded"
+#define __DRI_MULTITHREADED_VERSION 1
+
+/**
+ * Type of callback functions used by
+ * __DRImultithreadedExtensionRec::QueueThreadedOp()
+ */
+typedef void (*__DRImultithreadedQueueCallback)(size_t size, const void *data);
+
+typedef struct __DRImultithreadedExtensionRec __DRImultithreadedExtension;
+struct __DRImultithreadedExtensionRec {
+   __DRIextension base;
+
+   /**
+    * If the driver has deferred any drawing operations for the currently
+    * bound context to background threads, wait until they have all completed
+    * before returning.  The loader can use this call to ensure that
+    * background drawing has completed before performing a non-thread-safe
+    * action.
+    */
+   void (*SynchronizeThreads)();
+
+   /**
+    * Queue a callback function to be called from a background thread.  The
+    * driver will call the callback in the proper sequence relative to drawing
+    * operations and other callbacks.  The loader can use this function to
+    * cause its own operations (e.g. SwapBuffers) to occur in the correct
+    * sequence relative to drawing operations.
+    *
+    * This call may return immediately, or it may wait until some or all
+    * pending drawing operations have completed (possibly including the
+    * requested callback).
+    *
+    * \param data points to arbitrary data that should be sent to the
+    * callback, and \param size is the size of the data.  The driver is not
+    * guaranteed to pass this exact data pointer through to the callback--it
+    * may pass a pointer to its private copy of the data.  Caller may safely
+    * re-use the memory pointed to by data immediately upon return.
+    */
+   void (*QueueThreadedOp)(__DRImultithreadedQueueCallback callback,
+                           size_t size, const void *data);
+};
+
+/**
+ * Background callable loader extension.
+ *
+ * Loaders expose this extension to indicate to drivers that they are capable
+ * of handling callbacks from the driver's background drawing threads.
+ */
+#define __DRI_BACKGROUND_CALLABLE "DRI_BackgroundCallable"
+#define __DRI_BACKGROUND_CALLABLE_VERSION 1
+
+typedef struct __DRIbackgroundCallableExtensionRec __DRIbackgroundCallableExtension;
+struct __DRIbackgroundCallableExtensionRec {
+   __DRIextension base;
+
+   /**
+    * Indicate that this thread is being used by the driver as a background
+    * drawing thread which may make callbacks to the loader.
+    *
+    * \param loaderPrivate is the value that was passed to to the driver when
+    * the context was created.  This can be used by the loader to identify
+    * which context any callbacks are associated with.
+    *
+    * If this function is called more than once from any given thread, each
+    * subsequent call overrides the loaderPrivate data that was passed in the
+    * previous call.  The driver can take advantage of this to re-use a
+    * background thread to perform drawing on behalf of multiple contexts.
+    *
+    * It is permissible for the driver to call this function from a
+    * non-background thread (i.e. a thread that has already been bound to a
+    * context using __DRIcoreExtensionRec::bindContext()); when this happens,
+    * the \c loaderPrivate pointer must be equal to the pointer that was
+    * passed to the driver when the currently bound context was created.
+    *
+    * This call should execute quickly enough that the driver can call it with
+    * impunity whenever a background thread starts performing drawing
+    * operations (e.g. it should just set a thread-local variable).
+    */
+   void (*SetBackgroundContext)(void *loaderPrivate);
+};
+
 #endif

@@ -2435,7 +2435,7 @@
     specially to ensure that it causes all previous commands to get
     delivered to the server thread.
     -->
-    <function name="Flush" offset="217" es1="1.0" es2="2.0" marshal="sync">
+    <function name="Flush" offset="217" es1="1.0" es2="2.0" marshal="custom">
         <glx sop="142" handcode="true"/>
     </function>
 

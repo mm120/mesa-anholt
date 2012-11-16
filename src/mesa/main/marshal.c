@@ -217,6 +217,39 @@ _mesa_marshal_synchronize(struct gl_context *ctx)
 }
 
 
+struct marshal_cmd_Flush
+{
+   struct marshal_cmd_base cmd_base;
+};
+
+
+void
+_mesa_unmarshal_Flush(struct gl_context *ctx,
+                      const struct marshal_cmd_Flush *cmd)
+{
+   CALL_Flush(ctx->CurrentServerDispatch, ());
+}
+
+
+void GLAPIENTRY
+_mesa_marshal_Flush(void)
+{
+   GET_CURRENT_CONTEXT(ctx);
+   struct marshal_cmd_Flush *cmd =
+      _mesa_allocate_command_in_queue(ctx, DISPATCH_CMD_Flush,
+                                      sizeof(struct marshal_cmd_Flush));
+   (void) cmd;
+   _mesa_post_marshal_hook(ctx);
+
+   /* Flush() needs to be handled specially.  In addition to telling the
+    * background thread to flush, we need to ensure that our own buffer is
+    * submitted to the background thread so that it will complete in a finite
+    * amount of time.
+    */
+   submit_batch(ctx);
+}
+
+
 struct marshal_cmd_ShaderSource
 {
    struct marshal_cmd_base cmd_base;

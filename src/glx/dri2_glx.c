@@ -831,6 +831,9 @@ dri2SwapBuffers(__GLXDRIdrawable *pdraw, int64_t target_msc, int64_t divisor,
              glFlush();
           }
 
+          if (psc->multithreaded)
+             psc->multithreaded->SynchronizeThreads();
+
           if (psc->f) {
              struct glx_context *gc = __glXGetCurrentContext();
 

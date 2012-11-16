@@ -53,6 +53,7 @@ struct marshal_cmd_base
 };
 
 struct marshal_cmd_ShaderSource;
+struct marshal_cmd_Flush;
 
 
 struct _glapi_table *
@@ -64,6 +65,9 @@ _mesa_unmarshal_dispatch_cmd(struct gl_context *ctx, const void *cmd);
 void GLAPIENTRY
 _mesa_marshal_ShaderSource(GLuint shader, GLsizei count,
                            const GLchar * const *string, const GLint *length);
+
+void GLAPIENTRY
+_mesa_marshal_Flush(void);
 
 void
 _mesa_marshal_synchronize(struct gl_context *ctx);
@@ -79,6 +83,10 @@ _mesa_allocate_command_in_queue(struct gl_context *ctx,
 void
 _mesa_unmarshal_ShaderSource(struct gl_context *ctx,
                              const struct marshal_cmd_ShaderSource *cmd);
+
+void
+_mesa_unmarshal_Flush(struct gl_context *ctx,
+                      const struct marshal_cmd_Flush *cmd);
 
 
 #endif /* MARSHAL_H */

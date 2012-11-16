@@ -571,6 +571,10 @@ __dri2CopySubBuffer(__GLXDRIdrawable *pdraw, int x, int y,
          glFlush();
       }
 
+      /* TODO: how do we know this screen corresponds to the current context? */
+      if (psc->multithreaded)
+         psc->multithreaded->SynchronizeThreads();
+
       if (psc->f) {
          (*psc->f->flush) (priv->driDrawable);
       }

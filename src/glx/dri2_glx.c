@@ -90,6 +90,7 @@ struct dri2_screen {
    const __DRI2configQueryExtension *config;
    const __DRItexBufferExtension *texBuffer;
    const __DRI2throttleExtension *throttle;
+   const __DRImultithreadedExtension *multithreaded;
    const __DRIconfig **driver_configs;
 
    void *driver;
@@ -1104,6 +1105,9 @@ dri2BindExtensions(struct dri2_screen *psc, const __DRIextension **extensions)
 
       if (((strcmp(extensions[i]->name, __DRI2_THROTTLE) == 0)))
 	 psc->throttle = (__DRI2throttleExtension *) extensions[i];
+
+      if (((strcmp(extensions[i]->name, __DRI_MULTITHREADED) == 0)))
+         psc->multithreaded = (__DRImultithreadedExtension *) extensions[i];
 
       /* DRI2 version 3 is also required because
        * GLX_ARB_create_context_robustness requires GLX_ARB_create_context.

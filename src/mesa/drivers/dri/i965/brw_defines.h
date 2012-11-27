@@ -665,6 +665,8 @@ enum opcode {
    SHADER_OPCODE_TXS,
    FS_OPCODE_TXB,
 
+   SHADER_OPCODE_SHADER_TIME_ADD,
+
    FS_OPCODE_DDX,
    FS_OPCODE_DDY,
    FS_OPCODE_PIXEL_X,
@@ -729,6 +731,8 @@ enum opcode {
 #define BRW_ARF_CONTROL               0x80
 #define BRW_ARF_NOTIFICATION_COUNT    0x90
 #define BRW_ARF_IP                    0xA0
+#define BRW_ARF_TDR                   0xB0
+#define BRW_ARF_TIMESTAMP             0xC0
 
 #define BRW_MRF_COMPR4			(1 << 7)
 
@@ -956,7 +960,21 @@ enum brw_message_target {
 #define BRW_SCRATCH_SPACE_SIZE_1M     10
 #define BRW_SCRATCH_SPACE_SIZE_2M     11
 
-
+#define BRW_AOP_AND                   1
+#define BRW_AOP_OR                    2
+#define BRW_AOP_XOR                   3
+#define BRW_AOP_MOV                   4
+#define BRW_AOP_INC                   5
+#define BRW_AOP_DEC                   6
+#define BRW_AOP_ADD                   7
+#define BRW_AOP_SUB                   8
+#define BRW_AOP_REVSUB                9
+#define BRW_AOP_IMAX                  10
+#define BRW_AOP_IMIN                  11
+#define BRW_AOP_UMAX                  12
+#define BRW_AOP_UMIN                  13
+#define BRW_AOP_CMPWR                 14
+#define BRW_AOP_PREDEC                15
 
 
 #define CMD_URB_FENCE                 0x6000

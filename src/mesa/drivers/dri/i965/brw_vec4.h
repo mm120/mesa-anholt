@@ -302,6 +302,8 @@ public:
    int uniform_vector_size[MAX_UNIFORMS];
    int uniforms;
 
+   src_reg shader_start_time;
+
    struct hash_table *variable_ht;
 
    bool run(void);
@@ -434,6 +436,9 @@ public:
    void emit_urb_slot(int mrf, int vert_result);
    void emit_urb_writes(void);
 
+   void emit_shader_time_begin();
+   void emit_shader_time_end();
+
    src_reg get_scratch_offset(vec4_instruction *inst,
 			      src_reg *reladdr, int reg_offset);
    src_reg get_pull_constant_offset(vec4_instruction *inst,
@@ -451,6 +456,8 @@ public:
 
    bool try_emit_sat(ir_expression *ir);
    void resolve_ud_negate(src_reg *reg);
+
+   src_reg get_timestamp();
 
    bool process_move_condition(ir_rvalue *ir);
 

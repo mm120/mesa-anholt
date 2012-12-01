@@ -420,16 +420,18 @@ GLboolean
 ra_select(struct ra_graph *g)
 {
    int i;
+   int last_reg = 0;
 
    while (g->stack_count != 0) {
-      unsigned int r;
+      unsigned int r = -1;
       int n = g->stack[g->stack_count - 1];
       struct ra_class *c = g->regs->classes[g->nodes[n].class];
 
       /* Find the lowest-numbered reg which is not used by a member
        * of the graph adjacent to us.
        */
-      for (r = 0; r < g->regs->count; r++) {
+      for (int asdf = 0; asdf < g->regs->count; asdf++) {
+         r = (asdf + last_reg) % g->regs->count;
 	 if (!c->regs[r])
 	    continue;
 
@@ -451,6 +453,8 @@ ra_select(struct ra_graph *g)
       g->nodes[n].reg = r;
       g->nodes[n].in_stack = GL_FALSE;
       g->stack_count--;
+
+      last_reg = r;
    }
 
    return GL_TRUE;

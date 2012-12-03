@@ -1074,23 +1074,42 @@ void
 vec4_visitor::emit_shader_time_end()
 {
    current_annotation = "shader time end";
+   src_reg shader_end_time = get_timestamp();
+
+   emit_shader_time_write(ST_VS, shader_start_time, shader_end_time);
+}
+
+void
+vec4_visitor::emit_shader_time_write(enum shader_time_shader_type type,
+                                     src_reg start, src_reg end)
+{
    /* Choose an index in the buffer and set up tracking information for our
     * printouts.
     */
    int shader_time_index = brw->shader_time.num_entries++;
    assert(shader_time_index <= brw->shader_time.max_entries);
-   brw->shader_time.types[shader_time_index] = ST_VS;
+   brw->shader_time.types[shader_time_index] = type;
    if (prog) {
       _mesa_reference_shader_program(ctx,
                                      &brw->shader_time.programs[shader_time_index],
                                      prog);
    }
 
+   /* Check that there weren't any timestamp reset events. */
+
+   src_reg reset_start = start;
+   start.swizzle = SWIZZLE_ZZZZ;
+   src_reg reset_end = end;
+   end.swizzle = SWIZZLE_ZZZZ;
+   vec4_instruction *test = emit(OR(dst_null_d(), reset_start, reset_end));
+   test->conditional_mod = BRW_CONDITIONAL_Z;
+
+   emit(IF(BRW_PREDICATE_NORMAL));
+
    /* Take the current timestamp and get the delta. */
-   src_reg shader_end_time = get_timestamp();
-   shader_start_time.negate = true;
+   start.negate = true;
    dst_reg diff = dst_reg(this, glsl_type::uint_type);
-   emit(ADD(diff, shader_start_time, shader_end_time));
+   emit(ADD(diff, shader_start_time, end));
 
    /* If there were no instructions between the two timestamp gets, the diff
     * is 2 cycles.  Remove that overhead, so I can forget about that when
@@ -1112,6 +1131,8 @@ vec4_visitor::emit_shader_time_end()
    inst = emit(SHADER_OPCODE_SHADER_TIME_ADD);
    inst->base_mrf = base_mrf;
    inst->mlen = 2;
+
+   emit(BRW_OPCODE_ENDIF);
 }
 
 bool

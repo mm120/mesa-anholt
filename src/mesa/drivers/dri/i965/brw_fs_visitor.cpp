@@ -1613,6 +1613,49 @@ fs_visitor::emit_if_gen6(ir_if *ir)
    inst->predicate = BRW_PREDICATE_NORMAL;
 }
 
+static void
+try_if_to_cond_mov(exec_list *instructions)
+{
+   int instr_count = 0;
+
+   fs_inst *endif_inst = (fs_inst *)instructions->get_tail();
+   assert(endif_inst->opcode == BRW_OPCODE_ENDIF);
+
+   for (fs_inst *inst = (fs_inst *)endif_inst->prev;
+        inst;
+        inst = (fs_inst *)inst->prev) {
+      switch (inst->opcode) {
+      case BRW_OPCODE_MOV:
+      case BRW_OPCODE_ADD:
+      case BRW_OPCODE_MUL:
+      case BRW_OPCODE_MAD:
+         if (inst->predicate)
+            return;
+         break;
+      case BRW_OPCODE_IF: {
+         fs_inst *if_inst = inst;
+
+         if (!if_inst->predicate)
+            return;
+
+         for (inst = (fs_inst *)if_inst->next;
+              (fs_inst *)inst != endif_inst;
+              inst = (fs_inst *)inst->next) {
+            inst->predicate = if_inst->predicate;
+         }
+         if_inst->remove();
+         endif_inst->remove();
+         return;
+      }
+      default:
+         return;
+      }
+
+      if (instr_count++ > 4)
+         return;
+   }
+}
+
 void
 fs_visitor::visit(ir_if *ir)
 {
@@ -1652,6 +1695,8 @@ fs_visitor::visit(ir_if *ir)
    }
 
    emit(BRW_OPCODE_ENDIF);
+
+   try_if_to_cond_mov(&instructions);
 }
 
 void

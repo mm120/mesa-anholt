@@ -825,6 +825,15 @@ fs_generator::generate_code(exec_list *instructions)
       }
       dst = brw_reg_from_fs_reg(&inst->dst);
 
+      brw_set_predicate_control(p, BRW_PREDICATE_NONE);
+
+
+      if (inst->predicate) {
+      for (int i = 0; i < 5; i++) {
+      brw_MOV(p, brw_null_reg(), brw_vec8_grf(0, 0));
+   }
+   }
+
       brw_set_conditionalmod(p, inst->conditional_mod);
       brw_set_predicate_control(p, inst->predicate);
       brw_set_predicate_inverse(p, inst->predicate_inverse);

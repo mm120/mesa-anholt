@@ -1047,10 +1047,15 @@ vec4_visitor::get_timestamp()
 {
    assert(intel->gen >= 7);
 
-   src_reg ts = src_reg(retype(brw_vec1_reg(BRW_ARCHITECTURE_REGISTER_FILE,
-                                            BRW_ARF_TIMESTAMP,
-                                            0),
-                               BRW_REGISTER_TYPE_UD));
+   src_reg ts = src_reg(brw_reg(BRW_ARCHITECTURE_REGISTER_FILE,
+                                BRW_ARF_TIMESTAMP,
+                                0,
+                                BRW_REGISTER_TYPE_UD,
+                                BRW_VERTICAL_STRIDE_0,
+                                BRW_WIDTH_4,
+                                BRW_HORIZONTAL_STRIDE_4,
+                                BRW_SWIZZLE_XYZW,
+                                WRITEMASK_XYZW));
 
    dst_reg dst = dst_reg(this, glsl_type::uvec4_type);
 
@@ -1097,11 +1102,18 @@ vec4_visitor::emit_shader_time_write(enum shader_time_shader_type type,
 
    /* Check that there weren't any timestamp reset events. */
 
-   src_reg reset_start = start;
-   start.swizzle = SWIZZLE_ZZZZ;
    src_reg reset_end = end;
-   end.swizzle = SWIZZLE_ZZZZ;
-   vec4_instruction *test = emit(OR(dst_null_d(), reset_start, reset_end));
+   reset_end.swizzle = BRW_SWIZZLE_ZZZZ;
+
+
+   //dst_reg asdf = dst_reg(this, glsl_type::uint_type);
+   //emit(AND(asdf, reset_end, src_reg(1u)));
+/*
+   src_reg reset_start = start;
+   reset_start.swizzle = BRW_SWIZZLE_ZZZZ;
+*/
+
+   vec4_instruction *test = emit(AND(dst_null_d(), reset_end, src_reg(1u)));
    test->conditional_mod = BRW_CONDITIONAL_Z;
 
    emit(IF(BRW_PREDICATE_NORMAL));
@@ -1109,7 +1121,7 @@ vec4_visitor::emit_shader_time_write(enum shader_time_shader_type type,
    /* Take the current timestamp and get the delta. */
    start.negate = true;
    dst_reg diff = dst_reg(this, glsl_type::uint_type);
-   emit(ADD(diff, shader_start_time, end));
+   emit(ADD(diff, start, end));
 
    /* If there were no instructions between the two timestamp gets, the diff
     * is 2 cycles.  Remove that overhead, so I can forget about that when

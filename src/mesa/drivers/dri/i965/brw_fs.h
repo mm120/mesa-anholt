@@ -505,6 +505,10 @@ private:
    void generate_uniform_pull_constant_load(fs_inst *inst, struct brw_reg dst,
                                             struct brw_reg index,
                                             struct brw_reg offset);
+   void generate_uniform_pull_constant_load_gen7(fs_inst *inst,
+                                                 struct brw_reg dst,
+                                                 struct brw_reg surf_index,
+                                                 struct brw_reg offset);
    void generate_varying_pull_constant_load(fs_inst *inst, struct brw_reg dst,
                                             struct brw_reg index);
    void generate_varying_pull_constant_load_gen7(fs_inst *inst,
@@ -512,6 +516,10 @@ private:
                                                  struct brw_reg index,
                                                  struct brw_reg offset);
    void generate_mov_dispatch_to_flags();
+   void generate_set_global_offset(fs_inst *inst,
+                                   struct brw_reg dst,
+                                   struct brw_reg src,
+                                   struct brw_reg offset);
 
    struct brw_context *brw;
    struct intel_context *intel;

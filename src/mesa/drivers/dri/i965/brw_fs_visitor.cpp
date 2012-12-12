@@ -1678,9 +1678,104 @@ fs_visitor::emit_if_gen6(ir_if *ir)
    inst->predicate = BRW_PREDICATE_NORMAL;
 }
 
+/* Try to turn this code:
+ *
+ * if (a < b)
+ *   discard;
+ *
+ * into:
+ * +f0.1 CMP.ge.f0.1 a b
+ *
+ * In this way, we'only channels that failed the if expression will still have
+ * their pixel bits set in f0.1.
+ */
+bool
+fs_visitor::try_emit_if_discard(ir_if *ir)
+{
+   if (ir->then_instructions.is_empty() ||
+       !ir->else_instructions.is_empty())
+      return false;
+
+   ir_discard *discard =
+      ((ir_instruction *)ir->then_instructions.get_head())->as_discard();
+   if (!discard)
+      return false;
+
+   if (discard != ir->then_instructions.get_tail())
+      return false;
+
+   if (discard->condition)
+      return false;
+
+   ir_expression *expr = ir->condition->as_expression();
+   if (!expr)
+      return false;
+
+   fs_reg op[2];
+   uint32_t cond = 0;
+   /* Note that we're trying to produce the opposite condition code from the
+    * expression, since we're trying to turn off (discard) channels in f0.1.
+    */
+   switch (expr->operation) {
+   case ir_binop_greater:
+      cond = BRW_CONDITIONAL_LE;
+      break;
+   case ir_binop_gequal:
+      cond = BRW_CONDITIONAL_L;
+      break;
+   case ir_binop_less:
+      cond = BRW_CONDITIONAL_GE;
+      break;
+   case ir_binop_lequal:
+      cond = BRW_CONDITIONAL_G;
+      break;
+   case ir_binop_equal:
+   case ir_binop_all_equal:
+      cond = BRW_CONDITIONAL_NZ;
+      break;
+   case ir_binop_nequal:
+   case ir_binop_any_nequal:
+      cond = BRW_CONDITIONAL_Z;
+      break;
+   default:
+      return false;
+   }
+
+   for (unsigned int i = 0; i < expr->get_num_operands(); i++) {
+      assert(expr->operands[i]->type->is_scalar());
+
+      expr->operands[i]->accept(this);
+      op[i] = this->result;
+      resolve_bool_comparison(expr->operands[i], &op[i]);
+   }
+
+   fs_inst *inst = emit(CMP(reg_null_d, op[0], op[1], cond));
+   inst->predicate = BRW_PREDICATE_NORMAL;
+   inst->flag_subreg = 1;
+
+   if (intel->gen >= 6) {
+      /* For performance, after a discard, jump to the end of the shader.
+       * However, many people will do foliage by discarding based on a
+       * texture's alpha mask, and then continue on to texture with the
+       * remaining pixels.  To avoid trashing the derivatives for those
+       * texture samples, we'll only jump if all of the pixels in the subspan
+       * have been discarded.
+       */
+      fs_inst *discard_jump = emit(FS_OPCODE_DISCARD_JUMP);
+      discard_jump->flag_subreg = 1;
+      discard_jump->predicate = BRW_PREDICATE_ALIGN1_ANY4H;
+      discard_jump->predicate_inverse = true;
+   }
+
+   return true;
+}
+
 void
 fs_visitor::visit(ir_if *ir)
 {
+   if (try_emit_if_discard(ir))
+      return;
+
    if (intel->gen < 6 && dispatch_width == 16) {
       fail("Can't support (non-uniform) control flow on 16-wide\n");
    }

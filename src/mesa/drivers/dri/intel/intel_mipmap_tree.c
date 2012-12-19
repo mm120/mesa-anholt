@@ -372,6 +372,7 @@ intel_miptree_create(struct intel_context *intel,
                      GLuint num_samples,
                      bool force_y_tiling)
 {
+   struct gl_context *ctx = &intel->ctx;
    struct intel_mipmap_tree *mt;
    gl_format tex_format = format;
    gl_format etc_format = MESA_FORMAT_NONE;
@@ -379,10 +380,11 @@ intel_miptree_create(struct intel_context *intel,
 
    switch (format) {
    case MESA_FORMAT_ETC1_RGB8:
-      format = MESA_FORMAT_RGBX8888_REV;
-      break;
    case MESA_FORMAT_ETC2_RGB8:
-      format = MESA_FORMAT_RGBX8888_REV;
+      if (ctx->Mesa_DXTn)
+         format = MESA_FORMAT_RGB_DXT1;
+      else
+         format = MESA_FORMAT_RGB_FXT1;
       break;
    case MESA_FORMAT_ETC2_SRGB8:
    case MESA_FORMAT_ETC2_SRGB8_ALPHA8_EAC:
@@ -1565,9 +1567,6 @@ intel_miptree_map_etc(struct intel_context *intel,
                       unsigned int slice)
 {
    assert(mt->etc_format != MESA_FORMAT_NONE);
-   if (mt->etc_format == MESA_FORMAT_ETC1_RGB8) {
-      assert(mt->format == MESA_FORMAT_RGBX8888_REV);
-   }
 
    assert(map->mode & GL_MAP_WRITE_BIT);
    assert(map->mode & GL_MAP_INVALIDATE_RANGE_BIT);
@@ -1585,6 +1584,7 @@ intel_miptree_unmap_etc(struct intel_context *intel,
                         unsigned int level,
                         unsigned int slice)
 {
+   struct gl_context *ctx = &intel->ctx;
    uint32_t image_x;
    uint32_t image_y;
    intel_miptree_get_image_offset(mt, level, slice, &image_x, &image_y);
@@ -1596,14 +1596,42 @@ intel_miptree_unmap_etc(struct intel_context *intel,
                 + image_y * mt->region->pitch
                 + image_x * mt->region->cpp;
 
-   if (mt->etc_format == MESA_FORMAT_ETC1_RGB8)
+   if (mt->format == MESA_FORMAT_RGB_DXT1 ||
+       mt->format == MESA_FORMAT_RGB_FXT1) {
+      unsigned int bw, bh;
+      _mesa_get_format_block_size(mt->etc_format, &bw, &bh);
+
+      int rgba_temp_w = ALIGN(map->w, bw);
+      int rgba_temp_h = ALIGN(map->h, bh);
+      void *rgba_temp = malloc(_mesa_format_image_size(MESA_FORMAT_RGBA8888,
+                                                       rgba_temp_w, rgba_temp_h, 1));
+      int rgba_stride = _mesa_format_row_stride(MESA_FORMAT_RGBA8888,
+                                                rgba_temp_w);
+      if (mt->etc_format == MESA_FORMAT_ETC1_RGB8) {
+         _mesa_etc1_unpack_rgba8888(rgba_temp, rgba_stride,
+                                    map->ptr, map->stride,
+                                    map->w, map->h);
+      } else {
+         _mesa_unpack_etc2_format(rgba_temp, rgba_stride,
+                                  map->ptr, map->stride,
+                                  map->w, map->h, mt->etc_format);
+      }
+      _mesa_texstore(ctx, 2, GL_RGB,
+                     mt->format,
+                     mt->region->pitch, &dst,
+                     map->w, map->h, 1,
+                     GL_RGBA, GL_UNSIGNED_BYTE, rgba_temp,
+                     &ctx->DefaultPacking);
+      free(rgba_temp);
+   } else if (mt->etc_format == MESA_FORMAT_ETC1_RGB8) {
       _mesa_etc1_unpack_rgba8888(dst, mt->region->pitch,
                                  map->ptr, map->stride,
                                  map->w, map->h);
-   else
+   } else {
       _mesa_unpack_etc2_format(dst, mt->region->pitch,
                                map->ptr, map->stride,
                                map->w, map->h, mt->etc_format);
+   }
 
    intel_miptree_unmap_raw(intel, mt);
    free(map->buffer);

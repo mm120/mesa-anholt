@@ -3243,7 +3243,7 @@
     </function>
 
     <function name="DrawElements" offset="311" es1="1.0" es2="2.0"
-              exec="dynamic" marshal="draw">
+              exec="dynamic" marshal="custom">
         <param name="mode" type="GLenum"/>
         <param name="count" type="GLsizei"/>
         <param name="type" type="GLenum"/>

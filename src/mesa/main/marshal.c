@@ -338,3 +338,65 @@ _mesa_marshal_ShaderSource(GLuint shader, GLsizei count,
    }
    free(length_tmp);
 }
+
+
+/* DrawElements when marshalled synchronously */
+static void GLAPIENTRY
+_mesa_marshal_DrawElements_sync(GLenum mode, GLsizei count, GLenum type,
+                                const GLvoid * indices)
+{
+   GET_CURRENT_CONTEXT(ctx);
+   _mesa_marshal_synchronize(ctx);
+   /*SYNC_EXECUTE_HOOK(DrawElements);*/
+   CALL_DrawElements(ctx->CurrentServerDispatch, (mode, count, type, indices));
+}
+
+/* DrawElements when marshalled asynchronously */
+struct marshal_cmd_DrawElements
+{
+   struct marshal_cmd_base cmd_base;
+   GLenum mode;
+   GLsizei count;
+   GLenum type;
+   const GLvoid * indices;
+};
+
+void
+_mesa_unmarshal_DrawElements(struct gl_context *ctx,
+                             const struct marshal_cmd_DrawElements *cmd)
+{
+   const GLenum mode = cmd->mode;
+   const GLsizei count = cmd->count;
+   const GLenum type = cmd->type;
+   const const GLvoid * indices = cmd->indices;
+   CALL_DrawElements(ctx->CurrentServerDispatch, (mode, count, type, indices));
+}
+
+void GLAPIENTRY
+_mesa_marshal_DrawElements(GLenum mode, GLsizei count, GLenum type,
+                           const GLvoid * indices)
+{
+   GET_CURRENT_CONTEXT(ctx);
+
+   /* In legacy GL, attribute pointers (glVertexPointer, etc.) could point at
+    * bare user memory, in which case we would have to actually copy their
+    * memory at the moment of this draw call.  Just do it synchronously for
+    * those types of contexts to avoid all that logic.
+    */
+   if (ctx->API != API_OPENGL_CORE &&
+       ctx->API != API_OPENGLES2) {
+      _mesa_marshal_DrawElements_sync(mode, count, type, indices);
+      return;
+   }
+
+   /*ASYNC_MARSHAL_HOOK(DrawElements);*/
+   size_t cmd_size = sizeof(struct marshal_cmd_DrawElements);
+   struct marshal_cmd_DrawElements *cmd =
+      _mesa_allocate_command_in_queue(ctx, DISPATCH_CMD_DrawElements, cmd_size);
+   cmd->mode = mode;
+   cmd->count = count;
+   cmd->type = type;
+   cmd->indices = indices;
+   _mesa_post_marshal_hook(ctx);
+}
+

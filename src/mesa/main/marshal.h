@@ -54,7 +54,7 @@ struct marshal_cmd_base
 
 struct marshal_cmd_ShaderSource;
 struct marshal_cmd_Flush;
-
+struct marshal_cmd_DrawElements;
 
 struct _glapi_table *
 _mesa_create_marshal_table(const struct gl_context *ctx);
@@ -88,5 +88,12 @@ void
 _mesa_unmarshal_Flush(struct gl_context *ctx,
                       const struct marshal_cmd_Flush *cmd);
 
+void GLAPIENTRY
+_mesa_marshal_DrawElements(GLenum mode, GLsizei count, GLenum type,
+                           const GLvoid * indices);
+
+void
+_mesa_unmarshal_DrawElements(struct gl_context *ctx,
+                             const struct marshal_cmd_DrawElements *cmd);
 
 #endif /* MARSHAL_H */

@@ -91,6 +91,7 @@ _mesa_post_marshal_hook(struct gl_context *ctx)
 
 struct marshal_cmd_ShaderSource;
 struct marshal_cmd_Flush;
+struct marshal_cmd_DrawElements;
 
 void GLAPIENTRY
 _mesa_marshal_ShaderSource(GLuint shader, GLsizei count,
@@ -106,5 +107,13 @@ _mesa_marshal_Flush(void);
 void
 _mesa_unmarshal_Flush(struct gl_context *ctx,
                       const struct marshal_cmd_Flush *cmd);
+
+void GLAPIENTRY
+_mesa_marshal_DrawElements(GLenum mode, GLsizei count, GLenum type,
+                           const GLvoid * indices);
+
+void
+_mesa_unmarshal_DrawElements(struct gl_context *ctx,
+                             const struct marshal_cmd_DrawElements *cmd);
 
 #endif /* MARSHAL_H */

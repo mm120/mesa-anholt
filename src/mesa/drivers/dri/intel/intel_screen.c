@@ -178,6 +178,12 @@ intel_dri2_flush_with_flags(__DRIcontext *cPriv,
    if (!intel)
       return;
 
+   /* This entrypoint is called from the loader in the main thread, so we need
+    * to make sure any worker thread is done before we do anything to the
+    * context.
+    */
+   _mesa_marshal_synchronize(ctx);
+
    if (flags & __DRI2_FLUSH_DRAWABLE)
       intel_downsample_for_dri2_flush(intel, dPriv);
 

@@ -1483,8 +1483,17 @@ _mesa_make_current( struct gl_context *newCtx,
    if (curCtx && 
       (curCtx->WinSysDrawBuffer || curCtx->WinSysReadBuffer) &&
        /* make sure this context is valid for flushing */
-      curCtx != newCtx)
+      curCtx != newCtx) {
+
+      /* HACK: it's possible that next time the context becomes current it
+       * will have different drawables.  So if we're marshalling, we need to
+       * synchronize with the server thread so that any pending drawing gets
+       * finished before we switch drawables around.
+       */
+      _mesa_glthread_finish(curCtx);
+
       _mesa_flush(curCtx);
+   }
 
    /* We used to call _glapi_check_multithread() here.  Now do it in drivers */
    _glapi_set_context((void *) newCtx);

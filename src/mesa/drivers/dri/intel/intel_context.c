@@ -32,6 +32,7 @@
 #include "main/fbobject.h"
 #include "main/framebuffer.h"
 #include "main/imports.h"
+#include "main/glthread.h"
 #include "main/points.h"
 #include "main/renderbuffer.h"
 
@@ -967,6 +968,13 @@ intelMakeCurrent(__DRIcontext * driContextPriv,
       intel = (struct intel_context *) driContextPriv->driverPrivate;
    else
       intel = NULL;
+
+   /* This entrypoint is called from the loader in the main thread, so we need
+    * to make sure any worker thread is done before we do anything to the
+    * context (such as changing its drawable).
+    */
+   if (curCtx)
+      _mesa_glthread_finish(curCtx);
 
    /* According to the glXMakeCurrent() man page: "Pending commands to
     * the previous context, if any, are flushed before it is released."

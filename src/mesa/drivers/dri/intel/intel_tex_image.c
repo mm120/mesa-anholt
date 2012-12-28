@@ -7,6 +7,7 @@
 #include "main/bufferobj.h"
 #include "main/context.h"
 #include "main/formats.h"
+#include "main/glthread.h"
 #include "main/pbo.h"
 #include "main/renderbuffer.h"
 #include "main/texcompress.h"
@@ -331,6 +332,12 @@ intelSetTexBuffer2(__DRIcontext *pDRICtx, GLint target,
    int level = 0, internalFormat = 0;
    gl_format texFormat = MESA_FORMAT_NONE;
 
+   /* This entrypoint is called from the loader in the main thread, so we need
+    * to make sure any worker thread is done before we do anything to the
+    * context.
+    */
+   _mesa_glthread_finish(ctx);
+
    texObj = _mesa_get_current_tex_object(ctx, target);
    intelObj = intel_texture_object(texObj);
 
@@ -390,6 +397,12 @@ intel_image_target_texture_2d(struct gl_context *ctx, GLenum target,
    struct intel_context *intel = intel_context(ctx);
    __DRIscreen *screen;
    __DRIimage *image;
+
+   /* This entrypoint is called from the loader in the main thread, so we need
+    * to make sure any worker thread is done before we do anything to the
+    * context.
+    */
+   _mesa_glthread_finish(ctx);
 
    screen = intel->intelScreen->driScrnPriv;
    image = screen->dri2.image->lookupEGLImage(screen, image_handle,

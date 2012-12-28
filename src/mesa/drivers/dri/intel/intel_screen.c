@@ -36,6 +36,7 @@
 #include "main/fbobject.h"
 #include "main/mfeatures.h"
 #include "main/version.h"
+#include "main/marshal.h"
 #include "swrast/s_renderbuffer.h"
 
 #include "utils.h"
@@ -178,6 +179,12 @@ intelDRI2Flush(__DRIdrawable *drawable)
    struct intel_context *intel = intel_context(ctx);
    if (intel == NULL)
       return;
+
+   /* This entrypoint is called from the loader in the main thread, so we need
+    * to make sure any worker thread is done before we do anything to the
+    * context.
+    */
+   _mesa_glthread_finish(ctx);
 
    if (intel->gen < 4)
       INTEL_FIREVERTICES(intel);
@@ -394,8 +401,11 @@ intel_create_image_from_renderbuffer(__DRIcontext *context,
 {
    __DRIimage *image;
    struct intel_context *intel = context->driverPrivate;
+   struct gl_context *ctx = &intel->ctx;
    struct gl_renderbuffer *rb;
    struct intel_renderbuffer *irb;
+
+   _mesa_glthread_finish(ctx);
 
    rb = _mesa_lookup_renderbuffer(&intel->ctx, renderbuffer);
    if (!rb) {

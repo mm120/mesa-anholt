@@ -301,6 +301,11 @@ intel_flush_front(struct gl_context *ctx)
 	  * front buffer rendering once we get there.
 	  */
 	 intel->front_buffer_dirty = false;
+
+         /* Since we called the loader in this case (and had flushed on our
+          * own), it doesn't call back to us to tell us to throttle.
+          */
+         intel->need_throttle = true;
       }
    }
 }
@@ -429,16 +434,13 @@ intel_prepare_render(struct intel_context *intel)
     * don't get too many swaps outstanding for apps that are GPU-heavy
     * but not CPU-heavy.
     *
-    * We're using intelDRI2Flush (called from the loader before
-    * swapbuffer) and glFlush (for front buffer rendering) as the
-    * indicator that a frame is done and then throttle when we get
-    * here as we prepare to render the next frame.  At this point for
-    * round trips for swap/copy and getting new buffers are done and
-    * we'll spend less time waiting on the GPU.
+    * The intel_dri2_flush_with_flags() hook from the loader lets us
+    * know when we should throttle for a swapbuffers, and we also flag
+    * it when we've flushed to the front buffer.
     *
     * Unfortunately, we don't have a handle to the batch containing
     * the swap, and getting our hands on that doesn't seem worth it,
-    * so we just us the first batch we emitted after the last swap.
+    * so we just use the first batch we emitted after the last swap.
     */
    if (intel->need_throttle && intel->first_post_swapbuffers_batch) {
       drm_intel_bo_wait_rendering(intel->first_post_swapbuffers_batch);
@@ -539,12 +541,8 @@ _intel_flush(struct gl_context *ctx, const char *file, int line)
 static void
 intel_glFlush(struct gl_context *ctx)
 {
-   struct intel_context *intel = intel_context(ctx);
-
    intel_flush(ctx);
    intel_flush_front(ctx);
-   if (intel->is_front_buffer_rendering)
-      intel->need_throttle = true;
 }
 
 void

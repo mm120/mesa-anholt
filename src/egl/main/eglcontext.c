@@ -448,7 +448,7 @@ _eglQueryContext(_EGLDriver *drv, _EGLDisplay *dpy, _EGLContext *c,
  *
  * Note that the context may be NULL.
  */
-static _EGLContext *
+_EGLContext *
 _eglBindContextToThread(_EGLContext *ctx, _EGLThreadInfo *t)
 {
    EGLint apiIndex;

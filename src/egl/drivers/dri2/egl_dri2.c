@@ -41,6 +41,20 @@
 
 #include "egl_dri2.h"
 
+static void
+dri_set_background_context(void *loaderPrivate)
+{
+   _EGLContext *ctx = _eglGetCurrentContext();
+   _EGLThreadInfo *t = _eglGetCurrentThread();
+
+   _eglBindContextToThread(ctx, t);
+}
+
+const __DRIbackgroundCallableExtension background_callable_extension = {
+   { __DRI_BACKGROUND_CALLABLE, __DRI_BACKGROUND_CALLABLE_VERSION },
+   dri_set_background_context,
+};
+
 const __DRIuseInvalidateExtension use_invalidate = {
    { __DRI_USE_INVALIDATE, 1 }
 };

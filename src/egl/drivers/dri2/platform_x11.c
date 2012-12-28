@@ -1154,7 +1154,8 @@ dri2_initialize_x11_dri2(_EGLDriver *drv, _EGLDisplay *disp)
       
    dri2_dpy->extensions[0] = &dri2_dpy->dri2_loader_extension.base;
    dri2_dpy->extensions[1] = &image_lookup_extension.base;
-   dri2_dpy->extensions[2] = NULL;
+   dri2_dpy->extensions[2] = &background_callable_extension.base;
+   dri2_dpy->extensions[3] = NULL;
 
    dri2_dpy->swap_available = (dri2_dpy->dri2_minor >= 2);
    dri2_dpy->invalidate_available = (dri2_dpy->dri2_minor >= 3);

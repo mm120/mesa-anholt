@@ -292,6 +292,7 @@ intel_flush_front(struct gl_context *ctx)
           * performance.
           */
          intel_downsample_for_dri2_flush(intel, driDrawable);
+         intel_flush(ctx);
 
          screen->dri2.loader->flushFrontBuffer(driDrawable,
                                                driDrawable->loaderPrivate);

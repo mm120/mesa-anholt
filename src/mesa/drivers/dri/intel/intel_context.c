@@ -551,8 +551,7 @@ intelFinish(struct gl_context * ctx)
 {
    struct intel_context *intel = intel_context(ctx);
 
-   intel_flush(ctx);
-   intel_flush_front(ctx);
+   intel_glFlush(ctx);
 
    if (intel->batch.last_bo)
       drm_intel_bo_wait_rendering(intel->batch.last_bo);

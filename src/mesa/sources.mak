@@ -49,6 +49,7 @@ MAIN_FILES = \
 	$(SRCDIR)main/get.c \
 	$(SRCDIR)main/getstring.c \
 	$(SRCDIR)main/glformats.c \
+	$(SRCDIR)main/glthread.c \
 	$(SRCDIR)main/hash.c \
 	$(SRCDIR)main/hash_table.c \
 	$(SRCDIR)main/hint.c \

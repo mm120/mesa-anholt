@@ -183,9 +183,6 @@ intel_dri2_flush_with_flags(__DRIcontext *cPriv,
    if (!intel)
       return;
 
-   if (intel->gen < 4)
-      INTEL_FIREVERTICES(intel);
-
    if (flags & __DRI2_FLUSH_DRAWABLE)
       intel_downsample_for_dri2_flush(intel, dPriv);
 
@@ -194,8 +191,7 @@ intel_dri2_flush_with_flags(__DRIcontext *cPriv,
       intel->need_throttle = true;
    }
 
-   if (intel->batch.used)
-      intel_batchbuffer_flush(intel);
+   intel_flush(ctx);
 
    if (INTEL_DEBUG & DEBUG_AUB) {
       aub_dump_bmp(ctx);

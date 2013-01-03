@@ -53,7 +53,7 @@ PUBLIC const char __driConfigOptions[] =
       DRI_CONF_SECTION_END
 
       DRI_CONF_SECTION_QUALITY
-/*       DRI_CONF_FORCE_S3TC_ENABLE(false) */
+/*       DRI_CONF_FORCE_S3TC_ENABLE("false") */
          DRI_CONF_ALLOW_LARGE_TEXTURES(1)
          DRI_CONF_PP_CELSHADE(0)
          DRI_CONF_PP_NORED(0)
@@ -64,7 +64,7 @@ PUBLIC const char __driConfigOptions[] =
       DRI_CONF_SECTION_END
 
       DRI_CONF_SECTION_DEBUG
-         DRI_CONF_FORCE_GLSL_EXTENSIONS_WARN(false)
+         DRI_CONF_FORCE_GLSL_EXTENSIONS_WARN("false")
       DRI_CONF_SECTION_END
 
    DRI_CONF_END;

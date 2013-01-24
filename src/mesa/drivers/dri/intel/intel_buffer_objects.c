@@ -31,6 +31,7 @@
 #include "main/mtypes.h"
 #include "main/macros.h"
 #include "main/bufferobj.h"
+#include "x86/sse.h"
 
 #include "intel_blit.h"
 #include "intel_buffer_objects.h"
@@ -483,137 +484,91 @@ intel_bufferobj_buffer(struct intel_context *intel,
    return intel_obj->buffer;
 }
 
-#define INTEL_UPLOAD_SIZE (64*1024)
-
 void
 intel_upload_finish(struct intel_context *intel)
 {
    if (!intel->upload.bo)
-	   return;
+      return;
 
-   if (intel->upload.buffer_len) {
-	   drm_intel_bo_subdata(intel->upload.bo,
-				intel->upload.buffer_offset,
-				intel->upload.buffer_len,
-				intel->upload.buffer);
-	   intel->upload.buffer_len = 0;
-   }
-
+   drm_intel_bo_unmap(intel->upload.bo);
    drm_intel_bo_unreference(intel->upload.bo);
    intel->upload.bo = NULL;
+   intel->upload.next_offset = 0;
 }
 
-static void wrap_buffers(struct intel_context *intel, GLuint size)
+/**
+ * Interface for getting memory for uploading streamed data to the GPU
+ *
+ * In most cases, streamed data (for GPU state structures, for example) is
+ * uploaded through brw_state_batch(), since that interface allows relocations
+ * from the streamed space returned to other BOs.  However, that interface has
+ * the restriction that the amount of space allocated has to be "small" (see
+ * estimated_max_prim_size in brw_draw.c).
+ *
+ * This interface, on the other hand, is able to handle arbitrary sized
+ * allocation requestions, though it will batch small allocations into the
+ * same BO for efficiency and reduced memory footprint.
+ *
+ * \note The returned pointer is valid only until intel_upload_finish(), which
+ * will happen at batch flush or the next intel_stream_data().
+ *
+ * \param out_bo Pointer to a BO, which must point be a valid BO or NULL on
+ * entry, and will have a reference to the new BO containing the state on
+ * return.
+ *
+ * \param out_offset Offset within the buffer object that the data will land.
+ */
+void *
+intel_upload_space(struct intel_context *intel,
+                   uint32_t size,
+                   uint32_t alignment,
+                   drm_intel_bo **out_bo,
+                   uint32_t *out_offset)
 {
-   intel_upload_finish(intel);
+   uint32_t offset;
 
-   if (size < INTEL_UPLOAD_SIZE)
-      size = INTEL_UPLOAD_SIZE;
-
-   intel->upload.bo = drm_intel_bo_alloc(intel->bufmgr, "upload", size, 0);
-   intel->upload.offset = 0;
-}
-
-void intel_upload_data(struct intel_context *intel,
-		       const void *ptr, GLuint size, GLuint align,
-		       drm_intel_bo **return_bo,
-		       GLuint *return_offset)
-{
-   GLuint base, delta;
-
-   base = (intel->upload.offset + align - 1) / align * align;
-   if (intel->upload.bo == NULL || base + size > intel->upload.bo->size) {
-      wrap_buffers(intel, size);
-      base = 0;
+   offset = ALIGN(intel->upload.next_offset, alignment);
+   if (intel->upload.bo && offset + size > intel->upload.bo->size) {
+      intel_upload_finish(intel);
+      offset = 0;
    }
 
-   drm_intel_bo_reference(intel->upload.bo);
-   *return_bo = intel->upload.bo;
-   *return_offset = base;
-
-   delta = base - intel->upload.offset;
-   if (intel->upload.buffer_len &&
-       intel->upload.buffer_len + delta + size > sizeof(intel->upload.buffer))
-   {
-      drm_intel_bo_subdata(intel->upload.bo,
-			   intel->upload.buffer_offset,
-			   intel->upload.buffer_len,
-			   intel->upload.buffer);
-      intel->upload.buffer_len = 0;
-   }
-
-   if (size < sizeof(intel->upload.buffer))
-   {
-      if (intel->upload.buffer_len == 0)
-	 intel->upload.buffer_offset = base;
+   if (!intel->upload.bo) {
+      intel->upload.bo = drm_intel_bo_alloc(intel->bufmgr, "streamed data",
+                                            MAX2(16 * 4096, size), 4096);
+      if (intel->has_llc)
+         drm_intel_bo_map(intel->upload.bo, true);
       else
-	 intel->upload.buffer_len += delta;
-
-      memcpy(intel->upload.buffer + intel->upload.buffer_len, ptr, size);
-      intel->upload.buffer_len += size;
-   }
-   else
-   {
-      drm_intel_bo_subdata(intel->upload.bo, base, size, ptr);
+         drm_intel_gem_bo_map_gtt(intel->upload.bo);
    }
 
-   intel->upload.offset = base + size;
+   intel->upload.next_offset = offset + size;
+
+   *out_offset = offset;
+   if (*out_bo != intel->upload.bo) {
+      drm_intel_bo_unreference(*out_bo);
+      *out_bo = intel->upload.bo;
+      drm_intel_bo_reference(intel->upload.bo);
+   }
+
+   return intel->upload.bo->virtual + offset;
 }
 
-void *intel_upload_map(struct intel_context *intel, GLuint size, GLuint align)
+/**
+ * Handy interface to upload some data to GPU memory quickly.
+ *
+ * See intel_upload_data().
+ */
+void
+intel_upload_data(struct intel_context *intel,
+                  const void *data,
+                  uint32_t size,
+                  uint32_t alignment,
+                  drm_intel_bo **out_bo,
+                  uint32_t *out_offset)
 {
-   GLuint base, delta;
-   char *ptr;
-
-   base = (intel->upload.offset + align - 1) / align * align;
-   if (intel->upload.bo == NULL || base + size > intel->upload.bo->size) {
-      wrap_buffers(intel, size);
-      base = 0;
-   }
-
-   delta = base - intel->upload.offset;
-   if (intel->upload.buffer_len &&
-       intel->upload.buffer_len + delta + size > sizeof(intel->upload.buffer))
-   {
-      drm_intel_bo_subdata(intel->upload.bo,
-			   intel->upload.buffer_offset,
-			   intel->upload.buffer_len,
-			   intel->upload.buffer);
-      intel->upload.buffer_len = 0;
-   }
-
-   if (size <= sizeof(intel->upload.buffer)) {
-      if (intel->upload.buffer_len == 0)
-	 intel->upload.buffer_offset = base;
-      else
-	 intel->upload.buffer_len += delta;
-
-      ptr = intel->upload.buffer + intel->upload.buffer_len;
-      intel->upload.buffer_len += size;
-   } else
-      ptr = malloc(size);
-
-   return ptr;
-}
-
-void intel_upload_unmap(struct intel_context *intel,
-			const void *ptr, GLuint size, GLuint align,
-			drm_intel_bo **return_bo,
-			GLuint *return_offset)
-{
-   GLuint base;
-
-   base = (intel->upload.offset + align - 1) / align * align;
-   if (size > sizeof(intel->upload.buffer)) {
-      drm_intel_bo_subdata(intel->upload.bo, base, size, ptr);
-      free((void*)ptr);
-   }
-
-   drm_intel_bo_reference(intel->upload.bo);
-   *return_bo = intel->upload.bo;
-   *return_offset = base;
-
-   intel->upload.offset = base + size;
+   void *dst = intel_upload_space(intel, size, alignment, out_bo, out_offset);
+   _mesa_sse_movnt_write(dst, data, size);
 }
 
 drm_intel_bo *

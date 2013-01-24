@@ -254,10 +254,7 @@ struct intel_context
 
    struct {
       drm_intel_bo *bo;
-      GLuint offset;
-      uint32_t buffer_len;
-      uint32_t buffer_offset;
-      char buffer[4096];
+      GLuint next_offset;
    } upload;
 
    GLuint stats_wm;

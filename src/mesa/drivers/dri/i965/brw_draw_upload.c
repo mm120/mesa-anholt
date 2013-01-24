@@ -351,6 +351,7 @@ copy_array_to_vbo_array(struct brw_context *brw,
 			struct brw_vertex_buffer *buffer,
 			GLuint dst_stride)
 {
+   struct intel_context *intel = &brw->intel;
    const int src_stride = element->glarray->StrideB;
 
    /* If the source stride is zero, we just want to upload the current
@@ -358,7 +359,7 @@ copy_array_to_vbo_array(struct brw_context *brw,
     * to replicate it out.
     */
    if (src_stride == 0) {
-      intel_upload_data(&brw->intel, element->glarray->Ptr,
+      intel_upload_data(intel, element->glarray->Ptr,
                         element->glarray->_ElementSize,
                         element->glarray->_ElementSize,
 			&buffer->bo, &buffer->offset);
@@ -370,21 +371,17 @@ copy_array_to_vbo_array(struct brw_context *brw,
    const unsigned char *src = element->glarray->Ptr + min * src_stride;
    int count = max - min + 1;
    GLuint size = count * dst_stride;
+   uint8_t *dst = intel_upload_space(intel, size, dst_stride,
+                                     &buffer->bo, &buffer->offset);
 
    if (dst_stride == src_stride) {
-      intel_upload_data(&brw->intel, src, size, dst_stride,
-			&buffer->bo, &buffer->offset);
+      memcpy(dst, src, size);
    } else {
-      char * const map = intel_upload_map(&brw->intel, size, dst_stride);
-      char *dst = map;
-
       while (count--) {
 	 memcpy(dst, src, dst_stride);
 	 src += src_stride;
 	 dst += dst_stride;
       }
-      intel_upload_unmap(&brw->intel, map, size, dst_stride,
-			 &buffer->bo, &buffer->offset);
    }
    buffer->stride = dst_stride;
 }

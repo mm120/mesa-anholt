@@ -33,4 +33,6 @@
 
 void _mesa_init_sse_transform_asm( void );
 
+void _mesa_sse_movnt_write(void *dst, const void *src, unsigned int len);
+
 #endif

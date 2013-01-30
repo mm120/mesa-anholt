@@ -275,6 +275,7 @@ ASM_C_FILES =	\
 	$(SRCDIR)x86/common_x86.c \
 	$(SRCDIR)x86/x86_xform.c \
 	$(SRCDIR)x86/3dnow.c \
+	$(SRCDIR)x86/movnt.c \
 	$(SRCDIR)x86/sse.c \
 	$(SRCDIR)x86/rtasm/x86sse.c \
 	$(SRCDIR)sparc/sparc.c \

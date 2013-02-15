@@ -752,7 +752,7 @@ do_assignment(exec_list *instructions, struct _mesa_glsl_parse_state *state,
 
 	 assert(var != NULL);
 
-	 if (var->max_array_access >= unsigned(rhs->type->array_size())) {
+	 if (var->max_array_access >= rhs->type->array_size()) {
 	    /* FINISHME: This should actually log the location of the RHS. */
 	    _mesa_glsl_error(& lhs_loc, state, "array size must be > %u due to "
 			     "previous access",
@@ -1709,7 +1709,7 @@ process_array_type(YYLTYPE *loc, const glsl_type *base, ast_node *array_size,
     *
     *     "Only one-dimensional arrays may be declared."
     */
-   if (base->is_array()) {
+   if (base->is_array() && !state->ARB_geometry_shader4_enable) {
       _mesa_glsl_error(loc, state,
 		       "invalid array of `%s' (only one-dimensional arrays "
 		       "may be declared)",
@@ -1875,7 +1875,7 @@ apply_type_qualifier_to_variable(const struct ast_type_qualifier *qual,
       var->mode = ir_var_shader_in;
    else if (qual->flags.q.out)
       var->mode = is_parameter ? ir_var_function_out : ir_var_shader_out;
-   else if (qual->flags.q.varying && (state->target == vertex_shader))
+   else if (qual->flags.q.varying && (state->target == vertex_shader || state->target == geometry_shader))
       var->mode = ir_var_shader_out;
    else if (qual->flags.q.uniform)
       var->mode = ir_var_uniform;
@@ -1957,10 +1957,11 @@ apply_type_qualifier_to_variable(const struct ast_type_qualifier *qual,
 
    if (var->interpolation != INTERP_QUALIFIER_NONE &&
        !(state->target == vertex_shader && var->mode == ir_var_shader_out) &&
-       !(state->target == fragment_shader && var->mode == ir_var_shader_in)) {
+       !(state->target == fragment_shader && var->mode == ir_var_shader_in) &&
+       !(state->target == geometry_shader)) {
       _mesa_glsl_error(loc, state,
-		       "interpolation qualifier `%s' can only be applied to "
-		       "vertex shader outputs and fragment shader inputs.",
+		       "interpolation qualifier `%s' cannot be applied to "
+		       "vertex shader inputs or fragment shader outputs.",
 		       var->interpolation_string());
    }
 
@@ -2206,7 +2207,30 @@ get_variable_being_redeclared(ir_variable *var, ast_declaration *decl,
        * FINISHME: required or not.
        */
 
-      const unsigned size = unsigned(var->type->array_size());
+      const int size = var->type->array_size();
+      check_builtin_array_max_size(var->name, size, loc, state);
+      if ((size > 0) && (size <= earlier->max_array_access)) {
+	 _mesa_glsl_error(& loc, state, "array size must be > %u due to "
+			  "previous access",
+			  earlier->max_array_access);
+      }
+
+      earlier->type = var->type;
+      delete var;
+      var = NULL;
+   } else if (var->type->is_array()
+       && var->type->element_type()->is_array()
+       && earlier->type->is_array()
+       && earlier->type->element_type()->is_array()
+       && (earlier->type->element_type()->array_size() == 0)
+       && (var->type->element_type()->element_type() == 
+           earlier->type->element_type()->element_type())) {
+      /* FINISHME: This doesn't match the qualifiers on the two
+       * FINISHME: declarations.  It's not 100% clear whether this is
+       * FINISHME: required or not.
+       */
+
+      const int size = var->type->array_size();
       check_builtin_array_max_size(var->name, size, loc, state);
       if ((size > 0) && (size <= earlier->max_array_access)) {
 	 _mesa_glsl_error(& loc, state, "array size must be > %u due to "
@@ -2540,6 +2564,9 @@ ast_declarator_list::hir(exec_list *instructions,
       if (decl->is_array) {
 	 var_type = process_array_type(&loc, decl_type, decl->array_size,
 				       state);
+	 if (decl->is_2D_array)
+	    var_type = process_array_type(&loc, var_type, decl->outer_array_size,
+				          state);
 	 if (var_type->is_error())
 	    continue;
       } else {
@@ -2547,6 +2574,26 @@ ast_declarator_list::hir(exec_list *instructions,
       }
 
       var = new(ctx) ir_variable(var_type, decl->identifier, ir_var_auto);
+
+      /* The 'varying in' and 'varying out' qualifiers can only be used with
+       * ARB_geometry_shader4 and EXT_geometry_shader4. */
+      if (this->type->qualifier.flags.q.varying
+	  && !state->ARB_geometry_shader4_enable) {
+	 if (this->type->qualifier.flags.q.in) {
+	    _mesa_glsl_error(& loc, state,
+			     "`varying in' qualifier in declaration of "
+			     "`%s' only valid for geometry shaders using "
+			     "ARB_geometry_shader4 or EXT_geometry_shader4.",
+			     decl->identifier);
+	 }
+	 else if (this->type->qualifier.flags.q.out) {
+	    _mesa_glsl_error(& loc, state,
+			     "`varying out' qualifier in declaration of "
+			     "`%s' only valid for geometry shaders using "
+			     "ARB_geometry_shader4 or EXT_geometry_shader4.",
+			     decl->identifier);
+	 }
+      }
 
       /* From page 22 (page 28 of the PDF) of the GLSL 1.10 specification;
        *
@@ -2557,11 +2604,16 @@ ast_declarator_list::hir(exec_list *instructions,
        *     Local variables can only use the qualifier const."
        *
        * This is relaxed in GLSL 1.30 and GLSL ES 3.00.  It is also relaxed by
-       * any extension that adds the 'layout' keyword.
+       * any extension that adds the 'layout' keyword.  It is also relaxed by
+       * any extension that adds the 'layout' keyword.  The
+       * EXT/ARB_geometry_shader4 extensions change this by adding 'varying
+       * in' and 'varying out' qualifiers for geometry shaders.
        */
       if (!state->is_version(130, 300)
 	  && !state->ARB_explicit_attrib_location_enable
-	  && !state->ARB_fragment_coord_conventions_enable) {
+	  && !state->ARB_fragment_coord_conventions_enable
+	  && !(state->ARB_geometry_shader4_enable
+	     && this->type->qualifier.flags.q.varying)) {
 	 if (this->type->qualifier.flags.q.out) {
 	    _mesa_glsl_error(& loc, state,
 			     "`out' qualifier in declaration of `%s' "
@@ -2608,14 +2660,14 @@ ast_declarator_list::hir(exec_list *instructions,
 	    mode = "attribute";
 	 } else if (this->type->qualifier.flags.q.uniform) {
 	    mode = "uniform";
-	 } else if (this->type->qualifier.flags.q.varying) {
-	    mode = "varying";
 	 } else if (this->type->qualifier.flags.q.in) {
 	    mode = "in";
 	    extra = " or in function parameter list";
 	 } else if (this->type->qualifier.flags.q.out) {
 	    mode = "out";
 	    extra = " or in function parameter list";
+	 } else if (this->type->qualifier.flags.q.varying) {
+	    mode = "varying";
 	 }
 
 	 if (mode) {
@@ -2792,7 +2844,7 @@ ast_declarator_list::hir(exec_list *instructions,
             }
             break;
          default:
-            assert(0);
+            break;
          }
       }
 

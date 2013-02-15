@@ -288,6 +288,10 @@ struct _mesa_glsl_parse_state {
    bool ARB_gpu_shader5_warn;
    bool AMD_vertex_shader_layer_enable;
    bool AMD_vertex_shader_layer_warn;
+   bool ARB_geometry_shader4_enable;
+   bool ARB_geometry_shader4_warn;
+   bool EXT_geometry_shader4_enable;
+   bool EXT_geometry_shader4_warn;
    /*@}*/
 
    /** Extensions supported by the OpenGL implementation. */

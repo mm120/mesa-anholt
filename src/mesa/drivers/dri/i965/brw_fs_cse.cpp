@@ -33,6 +33,19 @@
  */
 
 namespace {
+
+#define AEB_GRF_HASH_SIZE 256
+
+struct aeb {
+   /* All available expressions (struct aeb_entry). */
+   exec_list aeb;
+
+   /* List of struct aeb_external_entry for entries that use a virtual GRF,
+    * improving access times.
+    */
+   exec_list aeb_grf_hash[AEB_GRF_HASH_SIZE];
+};
+
 struct aeb_entry : public exec_node {
    /** The instruction that generates the expression value. */
    fs_inst *generator;
@@ -40,7 +53,12 @@ struct aeb_entry : public exec_node {
    /** The temporary where the value is stored. */
    fs_reg tmp;
 };
-}
+
+struct aeb_external_entry : public exec_node {
+   struct aeb_entry *entry;
+};
+
+} /* anonymous namespace */
 
 static bool
 is_expression(const fs_inst *const inst)
@@ -81,12 +99,54 @@ operands_match(fs_reg *xs, fs_reg *ys)
    return xs[0].equals(ys[0]) && xs[1].equals(ys[1]) && xs[2].equals(ys[2]);
 }
 
+static void
+aeb_add_entry(struct aeb *aeb, struct aeb_entry *entry)
+{
+   aeb->aeb.push_tail(entry);
+
+   for (int i = 0; i < 3; i++) {
+      struct fs_reg *src_reg = &entry->generator->src[i];
+      if (src_reg->file == GRF) {
+         struct aeb_external_entry *external = ralloc(aeb, aeb_external_entry);
+         external->entry = entry;
+         aeb->aeb_grf_hash[src_reg->reg %
+                           AEB_GRF_HASH_SIZE].push_tail(external);
+      }
+   }
+}
+
+static void
+aeb_remove_entry(struct aeb *aeb, struct aeb_entry *entry)
+{
+   for (int i = 0; i < 3; i++) {
+      struct fs_reg *src_reg = &entry->generator->src[i];
+      if (src_reg->file == GRF) {
+         foreach_list_safe(node, &aeb->aeb_grf_hash[src_reg->reg %
+                                                    AEB_GRF_HASH_SIZE]) {
+            struct aeb_external_entry *external =
+               (struct aeb_external_entry *)node;
+            if (external->entry == entry) {
+               external->remove();
+               ralloc_free(external);
+               break;
+            }
+         }
+      }
+   }
+
+   entry->remove();
+   ralloc_free(entry);
+}
+
 bool
-fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
+fs_visitor::opt_cse_local(bblock_t *block)
 {
    bool progress = false;
 
-   void *mem_ctx = ralloc_context(this->mem_ctx);
+   struct aeb *aeb = ralloc(NULL, struct aeb);
+   aeb->aeb.make_empty();
+   for (unsigned i = 0; i < ARRAY_SIZE(aeb->aeb_grf_hash); i++)
+      aeb->aeb_grf_hash[i].make_empty();
 
    for (fs_inst *inst = (fs_inst *)block->start;
 	inst != block->end->next;
@@ -100,7 +160,7 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
 	 bool found = false;
 
 	 aeb_entry *entry;
-	 foreach_list(entry_node, aeb) {
+	 foreach_list(entry_node, &aeb->aeb) {
 	    entry = (aeb_entry *) entry_node;
 
 	    /* Match current instruction's expression against those in AEB. */
@@ -117,10 +177,10 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
 
 	 if (!found) {
 	    /* Our first sighting of this expression.  Create an entry. */
-	    aeb_entry *entry = ralloc(mem_ctx, aeb_entry);
+	    aeb_entry *entry = ralloc(aeb, aeb_entry);
 	    entry->tmp = reg_undef;
 	    entry->generator = inst;
-	    aeb->push_tail(entry);
+            aeb_add_entry(aeb, entry);
 	 } else {
 	    /* This is at least our second sighting of this expression.
 	     * If we don't have a temporary already, make one.
@@ -154,20 +214,34 @@ fs_visitor::opt_cse_local(bblock_t *block, exec_list *aeb)
       }
 
       /* Kill all AEB entries that use the destination. */
-      foreach_list_safe(entry_node, aeb) {
-	 aeb_entry *entry = (aeb_entry *)entry_node;
+      if (inst->dst.file == GRF) {
+         foreach_list_safe(node, &aeb->aeb_grf_hash[inst->dst.reg %
+                                                    AEB_GRF_HASH_SIZE]) {
+            struct aeb_external_entry *external =
+               (struct aeb_external_entry *)node;
+            struct aeb_entry *entry = external->entry;
+            for (int i = 0; i < 3; i++) {
+               if (inst->overwrites_reg(entry->generator->src[i])) {
+                  aeb_remove_entry(aeb, entry);
+                  break;
+               }
+            }
+         }
+      } else {
+         foreach_list_safe(entry_node, &aeb->aeb) {
+            aeb_entry *entry = (aeb_entry *)entry_node;
 
-	 for (int i = 0; i < 3; i++) {
-            if (inst->overwrites_reg(entry->generator->src[i])) {
-	       entry->remove();
-	       ralloc_free(entry);
-	       break;
-	    }
-	 }
+            for (int i = 0; i < 3; i++) {
+               if (inst->overwrites_reg(entry->generator->src[i])) {
+                  aeb_remove_entry(aeb, entry);
+                  break;
+               }
+            }
+         }
       }
    }
 
-   ralloc_free(mem_ctx);
+   ralloc_free(aeb);
 
    if (progress)
       this->live_intervals_valid = false;
@@ -184,9 +258,8 @@ fs_visitor::opt_cse()
 
    for (int b = 0; b < cfg.num_blocks; b++) {
       bblock_t *block = cfg.blocks[b];
-      exec_list aeb;
 
-      progress = opt_cse_local(block, &aeb) || progress;
+      progress = opt_cse_local(block) || progress;
    }
 
    return progress;

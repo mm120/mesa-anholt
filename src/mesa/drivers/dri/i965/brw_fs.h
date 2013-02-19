@@ -316,7 +316,7 @@ public:
    void calculate_live_intervals();
    bool opt_algebraic();
    bool opt_cse();
-   bool opt_cse_local(bblock_t *block, exec_list *aeb);
+   bool opt_cse_local(bblock_t *block);
    bool opt_copy_propagate();
    bool try_copy_propagate(fs_inst *inst, int arg, acp_entry *entry);
    bool try_constant_propagate(fs_inst *inst, acp_entry *entry);

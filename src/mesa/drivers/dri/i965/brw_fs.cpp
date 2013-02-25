@@ -2477,6 +2477,7 @@ fs_visitor::lower_uniform_pull_constant_loads()
 
          fs_inst *setup1 = MOV(payload, fs_reg(g0));
          setup1->force_writemask_all = true;
+         setup1->force_uncompressed = true;
          /* We don't need the second half of this vgrf to be filled with g1
           * in the 16-wide case, but if we use force_uncompressed then live
           * variable analysis won't consider this a def!

@@ -648,8 +648,12 @@ fs_generator::generate_uniform_pull_constant_load_gen7(fs_inst *inst,
    struct brw_instruction *send = brw_next_insn(p, BRW_OPCODE_SEND);
    brw_pop_insn_state(p);
 
+   assert(send->header.compression_control == BRW_COMPRESSION_NONE);
+
    brw_set_dest(p, send, dst);
    brw_set_src0(p, send, offset);
+
+   assert(send->header.compression_control == BRW_COMPRESSION_NONE);
 
    uint32_t msg_control = BRW_DATAPORT_OWORD_BLOCK_2_OWORDS;
    uint32_t msg_type = BRW_DATAPORT_READ_MESSAGE_OWORD_BLOCK_READ;
@@ -662,6 +666,8 @@ fs_generator::generate_uniform_pull_constant_load_gen7(fs_inst *inst,
                            1,
                            header_present,
                            1);
+
+   assert(send->header.compression_control == BRW_COMPRESSION_NONE);
 }
 
 void

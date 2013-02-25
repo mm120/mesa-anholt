@@ -2806,7 +2806,7 @@ fs_visitor::run()
 
       remove_dead_constants();
 
-      schedule_instructions(false);
+      //schedule_instructions(false);
 
       lower_uniform_pull_constant_loads();
 
@@ -2841,7 +2841,7 @@ fs_visitor::run()
    if (failed)
       return false;
 
-   schedule_instructions(true);
+   //schedule_instructions(true);
 
    if (dispatch_width == 8) {
       c->prog_data.reg_blocks = brw_register_blocks(grf_used);

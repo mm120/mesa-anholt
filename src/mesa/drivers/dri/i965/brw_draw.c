@@ -348,6 +348,12 @@ static void brw_postdraw_set_buffers_need_resolve(struct brw_context *brw)
       intel_renderbuffer_set_needs_downsample(back_irb);
    if (depth_irb && ctx->Depth.Mask)
       intel_renderbuffer_set_needs_depth_resolve(depth_irb);
+
+   if (depth_irb && depth_irb->mt->hiz_mt) {
+      printf("HIZ after drawing to %p %d/%d:\n", depth_irb->mt->hiz_mt,
+             depth_irb->mt_level, depth_irb->mt_layer);
+      dump_hiz(intel, depth_irb->mt->hiz_mt);
+   }
 }
 
 static int

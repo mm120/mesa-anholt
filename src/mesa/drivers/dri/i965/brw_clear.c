@@ -183,6 +183,12 @@ brw_fast_clear_depth(struct gl_context *ctx)
       mt->depth_clear_value = depth_clear_value;
    }
 
+   printf("START fast clear of %p %d/%d (%dx%d) to 0x%08x\n",
+          mt->hiz_mt, depth_irb->mt_level, depth_irb->mt_layer,
+          fb->Width, fb->Height, mt->depth_clear_value);
+   printf("BEFORE hiz contents:\n");
+   dump_hiz(intel, mt->hiz_mt);
+
    /* From the Sandy Bridge PRM, volume 2 part 1, page 313:
     *
     *     "If other rendering operations have preceded this clear, a
@@ -209,6 +215,12 @@ brw_fast_clear_depth(struct gl_context *ctx)
     * buffer.
     */
    intel_renderbuffer_set_needs_depth_resolve(depth_irb);
+
+
+   printf("END fast clear of %d/%d (%dx%d) to 0x%08x\n",
+          depth_irb->mt_level, depth_irb->mt_layer,
+          fb->Width, fb->Height,
+          mt->depth_clear_value);
 
    return true;
 }

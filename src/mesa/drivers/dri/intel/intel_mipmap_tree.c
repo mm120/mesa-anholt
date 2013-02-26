@@ -863,6 +863,38 @@ intel_miptree_alloc_mcs(struct intel_context *intel,
    return mt->mcs_mt;
 }
 
+void
+dump_hiz(struct intel_context *intel, struct intel_mipmap_tree *mt)
+{
+   void *ptr = intel_region_map(intel, mt->region, GL_MAP_READ_BIT);
+
+   intel_batchbuffer_flush(intel);
+
+   for (int y = 0; y < mt->region->height; y++) {
+      uint8_t *data = ptr + y * mt->region->pitch;
+
+      printf("0x%08x: ", y * mt->region->pitch);
+
+      for (int x = 0; x < mt->region->width; x++)
+         printf("%02x", data[x]);
+
+      /* XXX: We're allocating these things way too big -- 4 bytes per pixel
+       * in width, instead of 1 (HZ_Width is in bytes in vol 2a.11
+       * "Hierarchical Depth Buffer").  Print some pad just to prove it.
+       */
+      if (mt->region->pitch > mt->region->width) {
+         printf(" ");
+         for (int x = mt->region->width; x < MIN2(mt->region->width + 8,
+                                                  mt->region->pitch); x++) {
+            printf("%02x", data[x]);
+         }
+      }
+      printf("\n");
+   }
+
+   intel_region_unmap(intel, mt->region);
+}
+
 bool
 intel_miptree_alloc_hiz(struct intel_context *intel,
 			struct intel_mipmap_tree *mt,
@@ -883,6 +915,14 @@ intel_miptree_alloc_hiz(struct intel_context *intel,
 
    if (!mt->hiz_mt)
       return false;
+
+   /* Start with a dummy value */
+   void *ptr = intel_region_map(intel, mt->hiz_mt->region, GL_MAP_WRITE_BIT);
+   memset(ptr, 0xd0, mt->hiz_mt->region->pitch * mt->hiz_mt->region->height);
+   intel_region_unmap(intel, mt->hiz_mt->region);
+
+   printf("Allocated hiz mt %p:\n", mt->hiz_mt);
+   dump_hiz(intel, mt->hiz_mt);
 
    /* Mark that all slices need a HiZ resolve. */
    struct intel_resolve_map *head = &mt->hiz_map;

@@ -634,6 +634,7 @@ gen7_blorp_emit_depth_stencil_config(struct brw_context *brw,
                 tile_y << 16);
       OUT_BATCH(0);
       ADVANCE_BATCH();
+      printf("blorp tile offset %d, %d\n", tile_x, tile_y);
    }
 
    /* 3DSTATE_HIER_DEPTH_BUFFER */
@@ -650,6 +651,7 @@ gen7_blorp_emit_depth_stencil_config(struct brw_context *brw,
       OUT_RELOC(hiz_region->bo,
                 I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER,
                 hiz_offset);
+      printf("blorp hiz offset 0x%08x\n", hiz_offset);
       ADVANCE_BATCH();
    }
 
@@ -811,4 +813,10 @@ gen7_blorp_exec(struct intel_context *intel,
    /* Be safe. */
    brw->state.dirty.brw = ~0;
    brw->state.dirty.cache = ~0;
+
+   if (params->depth.mt && params->depth.mt->hiz_mt) {
+      printf("AFTER blorp op %d to %p:\n",
+             params->hiz_op, params->depth.mt->hiz_mt);
+      dump_hiz(intel, params->depth.mt->hiz_mt);
+   }
 }

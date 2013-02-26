@@ -53,7 +53,9 @@ bin_PROGRAMS = \
 	teximage \
 	vbo \
 	vertexrate \
+	vs-bind \
 	glslstateschange
 endif
 
 glslstateschange_LDADD = libperf.la ../util/libutil.la
+vs_bind_LDADD = libperf.la ../util/libutil.la

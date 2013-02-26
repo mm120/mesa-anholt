@@ -24,6 +24,7 @@ pointcoord
 points
 samplers
 samplers_array
+shadertime
 shadow_sampler
 shtest
 simplex-noise

@@ -58,6 +58,7 @@ bin_PROGRAMS = \
 	points \
 	samplers \
 	samplers_array \
+	shadertime \
 	shadow_sampler \
 	shtest \
 	simplex-noise \
@@ -100,6 +101,7 @@ pointcoord_LDADD = ../util/libutil.la
 points_LDADD = ../util/libutil.la
 samplers_LDADD = ../util/libutil.la
 samplers_array_LDADD = ../util/libutil.la
+shadertime_LDADD = ../util/libutil.la
 shtest_LDADD = ../util/libutil.la
 skinning_LDADD = ../util/libutil.la
 texdemo1_LDADD = ../util/libutil.la

@@ -62,6 +62,7 @@ class marshal_function(gl_XML.gl_function):
 
         # Store the "marshal" attribute, if present.
         self.marshal = element.nsProp('marshal', None)
+        self.marshal_fail = element.nsProp('marshal_fail', None)
 
     def marshal_flavor(self):
         """Find out how this function should be marshalled between

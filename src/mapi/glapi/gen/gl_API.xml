@@ -3220,7 +3220,8 @@
     </function>
 
     <function name="ColorPointer" offset="308" es1="1.0" deprecated="3.1"
-              marshal="async">
+              marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="size" type="GLint"/>
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
@@ -3243,7 +3244,8 @@
     </function>
 
     <function name="DrawElements" offset="311" es1="1.0" es2="2.0"
-              exec="dynamic" marshal="draw">
+              exec="dynamic" marshal="draw"
+              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
         <param name="mode" type="GLenum"/>
         <param name="count" type="GLsizei"/>
         <param name="type" type="GLenum"/>
@@ -3252,7 +3254,8 @@
     </function>
 
     <function name="EdgeFlagPointer"
-              offset="312" deprecated="3.1" marshal="async">
+              offset="312" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="stride" type="GLsizei"/>
         <param name="pointer" type="const GLvoid *"/>
         <glx handcode="true"/>
@@ -3270,7 +3273,8 @@
     </function>
 
     <function name="IndexPointer"
-              offset="314" deprecated="3.1" marshal="async">
+              offset="314" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
         <param name="pointer" type="const GLvoid *"/>
@@ -3285,7 +3289,8 @@
     </function>
 
     <function name="NormalPointer"
-              offset="318" es1="1.0" deprecated="3.1" marshal="async">
+              offset="318" es1="1.0" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
         <param name="pointer" type="const GLvoid *"/>
@@ -3293,7 +3298,8 @@
     </function>
 
     <function name="TexCoordPointer"
-              offset="320" es1="1.0" deprecated="3.1" marshal="async">
+              offset="320" es1="1.0" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="size" type="GLint"/>
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
@@ -3302,7 +3308,8 @@
     </function>
 
     <function name="VertexPointer"
-              offset="321" es1="1.0" deprecated="3.1" marshal="async">
+              offset="321" es1="1.0" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="size" type="GLint"/>
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
@@ -3807,7 +3814,8 @@
     </function>
 
     <function name="DrawRangeElements" offset="338" es2="3.0"
-              exec="dynamic" marshal="draw">
+              exec="dynamic" marshal="draw"
+              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
         <param name="mode" type="GLenum"/>
         <param name="start" type="GLuint"/>
         <param name="end" type="GLuint"/>
@@ -4830,7 +4838,8 @@
     </function>
 
     <function name="FogCoordPointer"
-              deprecated="3.1" offset="assign" marshal="async">
+              deprecated="3.1" offset="assign" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
         <param name="pointer" type="const GLvoid *"/>
@@ -4981,7 +4990,8 @@
     </function>
 
     <function name="SecondaryColorPointer"
-              deprecated="3.1" offset="assign" marshal="async">
+              deprecated="3.1" offset="assign" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="size" type="GLint"/>
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
@@ -5146,7 +5156,7 @@
     <type name="intptr"   size="4"                  glx_name="CARD32"/>
     <type name="sizeiptr" size="4"  unsigned="true" glx_name="CARD32"/>
 
-    <function name="BindBuffer" es1="1.1" es2="2.0" offset="assign">
+    <function name="BindBuffer" es1="1.1" es2="2.0" offset="assign" marshal="custom">
         <param name="target" type="GLenum"/>
         <param name="buffer" type="GLuint"/>
         <glx ignore="true"/>
@@ -5976,7 +5986,8 @@
     </function>
 
     <function name="VertexAttribPointer"
-              es2="2.0" offset="assign" marshal="async">
+              es2="2.0" offset="assign" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="index" type="GLuint"/>
         <param name="size" type="GLint"/>
         <param name="type" type="GLenum"/>
@@ -9148,7 +9159,8 @@
     </function>
 
     <function name="ColorPointerEXT"
-              offset="assign" deprecated="3.1" marshal="async">
+              offset="assign" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="size" type="GLint"/>
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
@@ -9164,7 +9176,8 @@
     </function>
 
     <function name="EdgeFlagPointerEXT"
-              offset="assign" deprecated="3.1" marshal="async">
+              offset="assign" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="stride" type="GLsizei"/>
         <param name="count" type="GLsizei"/>
         <param name="pointer" type="const GLboolean *"/>
@@ -9177,7 +9190,8 @@
     </function>
 
     <function name="IndexPointerEXT"
-              offset="assign" deprecated="3.1" marshal="async">
+              offset="assign" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
         <param name="count" type="GLsizei"/>
@@ -9186,7 +9200,8 @@
     </function>
 
     <function name="NormalPointerEXT"
-              offset="assign" deprecated="3.1" marshal="async">
+              offset="assign" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
         <param name="count" type="GLsizei"/>
@@ -9195,7 +9210,8 @@
     </function>
 
     <function name="TexCoordPointerEXT"
-              offset="assign" deprecated="3.1" marshal="async">
+              offset="assign" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="size" type="GLint"/>
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
@@ -9205,7 +9221,8 @@
     </function>
 
     <function name="VertexPointerEXT"
-              offset="assign" deprecated="3.1" marshal="async">
+              offset="assign" deprecated="3.1" marshal="async"
+              marshal_fail="_mesa_glthread_is_non_vbo_vertex_attrib_pointer(ctx)">
         <param name="size" type="GLint"/>
         <param name="type" type="GLenum"/>
         <param name="stride" type="GLsizei"/>
@@ -10181,7 +10198,8 @@
     </function>
 
     <function name="MultiDrawElementsEXT" offset="assign" es1="1.0" es2="2.0"
-              exec="dynamic" marshal="draw">
+              exec="dynamic" marshal="draw"
+              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
         <param name="mode" type="GLenum"/>
         <param name="count" type="const GLsizei *"/>
         <param name="type" type="GLenum"/>
@@ -11203,7 +11221,8 @@
     </function>
 
     <function name="MultiModeDrawElementsIBM" offset="assign"
-              static_dispatch="false" marshal="draw">
+              static_dispatch="false" marshal="draw"
+              marshal_fail="_mesa_glthread_is_non_vbo_draw_elements(ctx)">
         <param name="mode" type="const GLenum *"/>
         <param name="count" type="const GLsizei *"/>
         <param name="type" type="GLenum"/>

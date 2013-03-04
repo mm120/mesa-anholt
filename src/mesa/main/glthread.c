@@ -119,15 +119,6 @@ _mesa_glthread_init(struct gl_context *ctx)
    if (!glthread)
       return;
 
-   /* The marshalling dispatch table isn't integrated with the Begin/End
-    * dispatch table for desktop OpenGL, and the drawing functions are
-    * synchronous to support user vertex arrays on everything but GL core
-    * (even GLES 2/3) anyway, which means you'll end up with too much overhead
-    * from threading.
-    */
-   if (ctx->API != API_OPENGL_CORE)
-      return;
-
    ctx->MarshalExec = _mesa_create_marshal_table(ctx);
    if (!ctx->MarshalExec) {
       free(glthread);

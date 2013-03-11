@@ -409,7 +409,7 @@ brw_collect_shader_time(struct brw_context *brw)
    uint32_t *times = brw->shader_time.bo->virtual;
 
    for (int i = 0; i < brw->shader_time.num_entries; i++) {
-      brw->shader_time.cumulative[i] += times[i];
+      brw->shader_time.cumulative[i] += times[i * 16];
    }
 
    /* Zero the BO out to clear it out for our next collection.

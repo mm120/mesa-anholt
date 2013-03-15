@@ -1601,8 +1601,13 @@ fs_visitor::move_uniform_array_access_to_pull_constants()
       fs_inst *inst = (fs_inst *)node;
 
       for (int i = 0 ; i < 3; i++) {
-         if (inst->src[i].file != UNIFORM || !inst->src[i].reladdr)
+         if (inst->src[i].file != UNIFORM)
             continue;
+         if (!inst->src[i].reladdr) {
+            inst->src[i].reladdr = new(mem_ctx) fs_reg(this,
+                                                       glsl_type::int_type);
+            inst->insert_before(MOV(*inst->src[i].reladdr, fs_reg(0)));
+         }
 
          int uniform = inst->src[i].reg;
 

@@ -134,18 +134,25 @@ gen6_upload_blend_state(struct brw_context *brw)
             dstA = brw_fix_xRGB_alpha(dstA);
          }
 
-	 blend[b].blend0.dest_blend_factor = brw_translate_blend_factor(dstRGB);
-	 blend[b].blend0.source_blend_factor = brw_translate_blend_factor(srcRGB);
-	 blend[b].blend0.blend_func = brw_translate_blend_equation(eqRGB);
+         if (srcRGB != GL_ONE ||
+             srcA != GL_ONE ||
+             dstRGB != GL_ZERO ||
+             dstA != GL_ZERO ||
+             eqRGB != GL_FUNC_ADD ||
+             eqA != GL_FUNC_ADD) {
+            blend[b].blend0.dest_blend_factor = brw_translate_blend_factor(dstRGB);
+            blend[b].blend0.source_blend_factor = brw_translate_blend_factor(srcRGB);
+            blend[b].blend0.blend_func = brw_translate_blend_equation(eqRGB);
 
-	 blend[b].blend0.ia_dest_blend_factor = brw_translate_blend_factor(dstA);
-	 blend[b].blend0.ia_source_blend_factor = brw_translate_blend_factor(srcA);
-	 blend[b].blend0.ia_blend_func = brw_translate_blend_equation(eqA);
+            blend[b].blend0.ia_dest_blend_factor = brw_translate_blend_factor(dstA);
+            blend[b].blend0.ia_source_blend_factor = brw_translate_blend_factor(srcA);
+            blend[b].blend0.ia_blend_func = brw_translate_blend_equation(eqA);
 
-	 blend[b].blend0.blend_enable = 1;
-	 blend[b].blend0.ia_blend_enable = (srcA != srcRGB ||
-					 dstA != dstRGB ||
-					 eqA != eqRGB);
+            blend[b].blend0.blend_enable = 1;
+            blend[b].blend0.ia_blend_enable = (srcA != srcRGB ||
+                                               dstA != dstRGB ||
+                                               eqA != eqRGB);
+         }
       }
 
       /* See section 8.1.6 "Pre-Blend Color Clamping" of the

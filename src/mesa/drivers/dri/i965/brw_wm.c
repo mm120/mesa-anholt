@@ -32,6 +32,8 @@
 #include "brw_context.h"
 #include "brw_wm.h"
 #include "brw_state.h"
+#include "intel_fbo.h"
+#include "intel_mipmap_tree.h"
 #include "main/formats.h"
 #include "main/fbobject.h"
 #include "main/samplerobj.h"
@@ -354,6 +356,8 @@ static void brw_wm_populate_key( struct brw_context *brw,
 {
    struct gl_context *ctx = &brw->intel.ctx;
    struct intel_context *intel = &brw->intel;
+   /* _NEW_BUFFERS */
+   struct gl_framebuffer *fb = ctx->DrawBuffer;
    /* BRW_NEW_FRAGMENT_PROGRAM */
    const struct brw_fragment_program *fp = 
       (struct brw_fragment_program *)brw->fragment_program;
@@ -467,15 +471,37 @@ static void brw_wm_populate_key( struct brw_context *brw,
     * drawable height in order to invert the Y axis.
     */
    if (fp->program.Base.InputsRead & VARYING_BIT_POS) {
-      key->drawable_height = ctx->DrawBuffer->Height;
+      key->drawable_height = fb->Height;
    }
 
    if ((fp->program.Base.InputsRead & VARYING_BIT_POS) || program_uses_dfdy) {
-      key->render_to_fbo = _mesa_is_user_fbo(ctx->DrawBuffer);
+      key->render_to_fbo = _mesa_is_user_fbo(fb);
    }
 
    /* _NEW_BUFFERS */
-   key->nr_color_regions = ctx->DrawBuffer->_NumColorDrawBuffers;
+   key->nr_color_regions = fb->_NumColorDrawBuffers;
+
+   /* The SIMD16 replicated data message allows the hardware to basically
+    * memset() a tiled renderbuffer with a constant color.
+    *
+    * Note that this message actually ignores blending, alphatest, logicop,
+    * and other blend-related state, so we skip using it in those cases.  This
+    * is not mentioned in the spec, but is pretty clear from simulator source.
+    */
+   if (fb->_NumColorDrawBuffers >= 1 &&
+       !ctx->Color.BlendEnabled &&
+       !ctx->Color.ColorLogicOpEnabled &&
+       !ctx->Color.AlphaEnabled &&
+       ctx->Color.ColorMask[0][0] &&
+       ctx->Color.ColorMask[0][1] &&
+       ctx->Color.ColorMask[0][2] &&
+       ctx->Color.ColorMask[0][3] &&
+       !ctx->Multisample.SampleAlphaToOne) {
+      struct intel_renderbuffer *irb =
+         intel_renderbuffer(fb->_ColorDrawBuffers[0]);
+      key->try_const_color = irb && irb->mt->region->tiling != I915_TILING_NONE;
+   }
+
   /* _NEW_MULTISAMPLE */
    key->sample_alpha_to_coverage = ctx->Multisample.SampleAlphaToCoverage;
 

@@ -321,6 +321,7 @@ public:
    bool opt_copy_propagate();
    bool try_copy_propagate(fs_inst *inst, int arg, acp_entry *entry);
    bool try_constant_propagate(fs_inst *inst, acp_entry *entry);
+   void try_constant_color_write();
    bool opt_copy_propagate_local(void *mem_ctx, bblock_t *block,
                                  exec_list *acp);
    bool register_coalesce();
@@ -462,6 +463,7 @@ public:
    const void *base_ir;
    /** @} */
 
+   bool fb_write_is_constant_color;
    bool failed;
    char *fail_msg;
 

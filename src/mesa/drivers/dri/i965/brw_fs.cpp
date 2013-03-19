@@ -748,6 +748,7 @@ fs_visitor::implied_mrf_writes(fs_inst *inst)
    case SHADER_OPCODE_SHADER_TIME_ADD:
       return 0;
    case FS_OPCODE_FB_WRITE:
+   case FS_OPCODE_CONST_FB_WRITE:
       return 2;
    case FS_OPCODE_UNIFORM_PULL_CONSTANT_LOAD:
    case FS_OPCODE_UNSPILL:
@@ -2655,6 +2656,96 @@ fs_visitor::dump_instructions()
    }
 }
 
+void
+fs_visitor::try_constant_color_write()
+{
+   int reg_width = dispatch_width / 8;
+
+   /* Not sure if we can use this message in an 8-wide dispatch. */
+   if (dispatch_width != 16)
+      return;
+
+   fs_inst *fb_write = NULL;
+
+   /* The constant color write message can't handle anything but the 4 color
+    * values.  We could do MRT, but the loops below would need to understand
+    * handling the header being enabled or disabled on different messages.  It
+    * also requires that the render target be tiled, which might not be the
+    * case for some EGLImage paths or if we some day do rendering to PBOs.
+    */
+   if (!c->key.try_const_color ||
+       fp->UsesKill ||
+       fp->Base.OutputsWritten & BITFIELD64_BIT(FRAG_RESULT_DEPTH) ||
+       c->dest_depth_reg ||
+       c->key.nr_color_regions != 1 ||
+       c->key.sample_alpha_to_coverage ||
+       c->aa_dest_stencil_reg ||
+       dual_src_output.file != BAD_FILE) {
+      return;
+   }
+
+   /* Check the instruction stream to see it's just MOVs of uniforms to the
+    * output color.
+    */
+   foreach_list(node, &this->instructions) {
+      fs_inst *inst = (fs_inst *)node;
+
+      if (inst->opcode == BRW_OPCODE_MOV) {
+         if (inst->src[0].file != UNIFORM && inst->src[0].file != IMM)
+            return;
+         if (inst->dst.file != MRF)
+            return;
+         if (inst->predicate != BRW_PREDICATE_NONE)
+            return;
+      } else if (inst->opcode == FS_OPCODE_FB_WRITE) {
+         /* Only one FB write supported. */
+         if (!inst->eot)
+            return;
+         fb_write = inst;
+         break;
+      } else {
+         /* We don't support any other way to set the colors in this path,
+          * though it would be possible (like simple math on uniforms and
+          * immediates).
+          */
+         return;
+      }
+   }
+   assert(fb_write);
+
+   /* Rewrite the instruction stream to the SIMD16 replicated data message
+    * parameter layout.
+    */
+   int first_color_mrf = fb_write->base_mrf + fb_write->header_present * 2;
+   foreach_list(node, &this->instructions) {
+      fs_inst *inst = (fs_inst *)node;
+
+      if (inst->opcode == BRW_OPCODE_MOV) {
+         assert(inst->dst.file == MRF);
+         int mrf = inst->dst.reg + inst->dst.reg_offset;
+         if (mrf >= first_color_mrf && mrf < first_color_mrf + 4 * reg_width) {
+            /* Translate the MOVs from constant values into a full MRF, to a
+             * MOV from the constant value to the appropriate dword of the
+             * single MRF.
+             */
+            inst->dst = fs_reg(retype(brw_vec1_reg(BRW_MESSAGE_REGISTER_FILE,
+                                                   first_color_mrf,
+                                                   (mrf - first_color_mrf) /
+                                                   reg_width),
+                                      inst->dst.type));
+            /* The channel that should be active for the MOV no longer bears
+             * any relation to the pixel channel enables.
+             */
+            inst->force_writemask_all = true;
+         }
+      } else {
+         assert(inst->opcode == FS_OPCODE_FB_WRITE);
+         inst->opcode = FS_OPCODE_CONST_FB_WRITE;
+         inst->mlen = first_color_mrf - inst->base_mrf + 1;
+      }
+   }
+}
+
 /**
  * Possibly returns an instruction that set up @param reg.
  *
@@ -2823,6 +2914,8 @@ fs_visitor::run()
       schedule_instructions(false);
 
       lower_uniform_pull_constant_loads();
+
+      try_constant_color_write();
 
       assign_curb_setup();
       assign_urb_setup();

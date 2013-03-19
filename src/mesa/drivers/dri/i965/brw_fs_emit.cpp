@@ -101,6 +101,7 @@ fs_generator::generate_fb_write(fs_inst *inst)
    bool eot = inst->eot;
    struct brw_reg implied_header;
    uint32_t msg_control;
+   bool fb_write_is_constant_color = inst->opcode == FS_OPCODE_CONST_FB_WRITE;
 
    /* Note that the jumps emitted to this point mean that the g0 ->
     * base_mrf setup must be inside of this function, so that we jump
@@ -117,6 +118,8 @@ fs_generator::generate_fb_write(fs_inst *inst)
 
    if (fp->UsesKill) {
       struct brw_reg pixel_mask;
+
+      assert(!fb_write_is_constant_color);
 
       if (intel->gen >= 6)
          pixel_mask = retype(brw_vec1_grf(1, 7), BRW_REGISTER_TYPE_UW);
@@ -137,6 +140,8 @@ fs_generator::generate_fb_write(fs_inst *inst)
          if (inst->target > 0 &&
 	     c->key.nr_color_regions > 1 &&
 	     c->key.sample_alpha_to_coverage) {
+            assert(!fb_write_is_constant_color);
+
             /* Set "Source0 Alpha Present to RenderTarget" bit in message
              * header.
              */
@@ -147,6 +152,8 @@ fs_generator::generate_fb_write(fs_inst *inst)
          }
 
 	 if (inst->target > 0) {
+            assert(!fb_write_is_constant_color);
+
 	    /* Set the render target index for choosing BLEND_STATE. */
 	    brw_MOV(p, retype(brw_vec1_reg(BRW_MESSAGE_REGISTER_FILE,
 					   inst->base_mrf, 2),
@@ -166,7 +173,9 @@ fs_generator::generate_fb_write(fs_inst *inst)
       implied_header = brw_null_reg();
    }
 
-   if (this->dual_source_output)
+   if (fb_write_is_constant_color)
+      msg_control = BRW_DATAPORT_RENDER_TARGET_WRITE_SIMD16_SINGLE_SOURCE_REPLICATED;
+   else if (this->dual_source_output)
       msg_control = BRW_DATAPORT_RENDER_TARGET_WRITE_SIMD8_DUAL_SOURCE_SUBSPAN01;
    else if (dispatch_width == 16)
       msg_control = BRW_DATAPORT_RENDER_TARGET_WRITE_SIMD16_SINGLE_SOURCE;
@@ -1279,6 +1288,7 @@ fs_generator::generate_code(exec_list *instructions)
 	 break;
 
       case FS_OPCODE_FB_WRITE:
+      case FS_OPCODE_CONST_FB_WRITE:
 	 generate_fb_write(inst);
 	 break;
 

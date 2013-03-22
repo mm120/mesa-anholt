@@ -185,4 +185,8 @@ intelInitExtensions(struct gl_context *ctx)
    if (intel->gen >= 4) {
       ctx->Extensions.NV_primitive_restart = true;
    }
+
+   if (intel->gen >= 7) {
+      ctx->Extensions.ARB_geometry_shader4 = true;
+   }
 }

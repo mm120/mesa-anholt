@@ -797,6 +797,7 @@ enum opcode {
    VS_OPCODE_PULL_CONSTANT_LOAD_GEN7,
 
    GS_OPCODE_URB_WRITE,
+   GS_OPCODE_THREAD_END,
 };
 
 #define BRW_PREDICATE_NONE             0

@@ -58,18 +58,35 @@ gen7_allocate_push_constants(struct brw_context *brw)
 {
    struct intel_context *intel = &brw->intel;
 
-   unsigned size = 8;
+   unsigned total_size = 16;
+   unsigned offset = 0;
    if (intel->is_haswell && intel->gt == 3)
-      size = 16;
+      total_size = 32;
+
+   /* HACK for GS: split the push constant space evenly among GS, VS,
+    * and FS.
+    *
+    * TODO: Really what we should do is adjust the allocation based on whether
+    * GS is active.
+    */
 
    BEGIN_BATCH(2);
    OUT_BATCH(_3DSTATE_PUSH_CONSTANT_ALLOC_VS << 16 | (2 - 2));
-   OUT_BATCH(size);
+   OUT_BATCH(total_size / 3);
+   offset += total_size / 3;
+   ADVANCE_BATCH();
+
+   BEGIN_BATCH(2);
+   OUT_BATCH(_3DSTATE_PUSH_CONSTANT_ALLOC_GS << 16 | (2 - 2));
+   OUT_BATCH(offset |
+             (total_size / 3) << GEN7_PUSH_CONSTANT_BUFFER_OFFSET_SHIFT);
+   offset += total_size / 3;
    ADVANCE_BATCH();
 
    BEGIN_BATCH(2);
    OUT_BATCH(_3DSTATE_PUSH_CONSTANT_ALLOC_PS << 16 | (2 - 2));
-   OUT_BATCH(size | size << GEN7_PUSH_CONSTANT_BUFFER_OFFSET_SHIFT);
+   OUT_BATCH(offset |
+             (total_size - offset) << GEN7_PUSH_CONSTANT_BUFFER_OFFSET_SHIFT);
    ADVANCE_BATCH();
 }
 

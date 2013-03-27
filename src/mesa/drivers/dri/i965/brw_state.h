@@ -110,6 +110,8 @@ extern const struct brw_tracked_state gen7_depthbuffer;
 extern const struct brw_tracked_state gen7_cc_viewport_state_pointer;
 extern const struct brw_tracked_state gen7_clip_state;
 extern const struct brw_tracked_state gen7_disable_stages;
+extern const struct brw_tracked_state gen7_gs_push_constants;
+extern const struct brw_tracked_state gen7_gs_state;
 extern const struct brw_tracked_state gen7_ps_state;
 extern const struct brw_tracked_state gen7_samplers;
 extern const struct brw_tracked_state gen7_sbe_state;

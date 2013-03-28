@@ -339,6 +339,7 @@ public:
    bool opt_copy_propagation();
    bool opt_algebraic();
    bool opt_register_coalesce();
+   bool try_coalesce_one_instruction(vec4_instruction *inst, int ip);
 
    bool can_do_source_mods(vec4_instruction *inst);
 

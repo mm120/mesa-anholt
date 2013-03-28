@@ -700,6 +700,180 @@ vec4_instruction::reswizzle_dst(int dst_writemask, int swizzle)
    }
 }
 
+bool
+vec4_visitor::try_coalesce_one_instruction(vec4_instruction *inst, int ip)
+{
+   if (inst->opcode != BRW_OPCODE_MOV ||
+       (inst->dst.file != GRF && inst->dst.file != MRF) ||
+       inst->predicate ||
+       inst->src[0].file != GRF ||
+       inst->dst.type != inst->src[0].type ||
+       inst->src[0].abs || inst->src[0].negate || inst->src[0].reladdr) {
+      return false;
+   }
+
+   bool to_mrf = (inst->dst.file == MRF);
+
+   /* Can't coalesce this GRF if someone else was going to
+    * read it later.
+    */
+   if (this->virtual_grf_use[inst->src[0].reg] > ip)
+      return false;
+
+   /* We need to check interference with the final destination between this
+    * instruction and the earliest instruction involved in writing the GRF
+    * we're eliminating.  To do that, keep track of which of our source
+    * channels we've seen initialized.
+    */
+   bool chans_needed[4] = {false, false, false, false};
+   int chans_remaining = 0;
+   int swizzle_mask = 0;
+   for (int i = 0; i < 4; i++) {
+      int chan = BRW_GET_SWZ(inst->src[0].swizzle, i);
+
+      if (!(inst->dst.writemask & (1 << i)))
+         continue;
+
+      swizzle_mask |= (1 << chan);
+
+      if (!chans_needed[chan]) {
+         chans_needed[chan] = true;
+         chans_remaining++;
+      }
+   }
+
+   /* Now walk up the instruction stream trying to see if we can rewrite
+    * everything writing to the temporary to write into the destination
+    * instead.
+    */
+   vec4_instruction *scan_inst;
+   for (scan_inst = (vec4_instruction *)inst->prev;
+        scan_inst->prev != NULL;
+        scan_inst = (vec4_instruction *)scan_inst->prev) {
+      if (scan_inst->dst.file == GRF &&
+          scan_inst->dst.reg == inst->src[0].reg &&
+          scan_inst->dst.reg_offset == inst->src[0].reg_offset) {
+         /* Found something writing to the reg we want to coalesce away. */
+         if (to_mrf) {
+            /* SEND instructions can't have MRF as a destination. */
+            if (scan_inst->mlen)
+               break;
+
+            if (intel->gen == 6) {
+               /* gen6 math instructions must have the destination be
+                * GRF, so no compute-to-MRF for them.
+                */
+               if (scan_inst->is_math()) {
+                  break;
+               }
+            }
+         }
+
+         /* If we can't handle the swizzle, bail. */
+         if (!scan_inst->can_reswizzle_dst(inst->dst.writemask,
+                                           inst->src[0].swizzle,
+                                           swizzle_mask)) {
+            break;
+         }
+
+         /* Mark which channels we found unconditional writes for. */
+         if (!scan_inst->predicate) {
+            for (int i = 0; i < 4; i++) {
+               if (scan_inst->dst.writemask & (1 << i) &&
+                   chans_needed[i]) {
+                  chans_needed[i] = false;
+                  chans_remaining--;
+               }
+            }
+         }
+
+         if (chans_remaining == 0)
+            break;
+      }
+
+      /* We don't handle flow control here.  Most computation of values
+       * that could be coalesced happens just before their use.
+       */
+      if (scan_inst->opcode == BRW_OPCODE_DO ||
+          scan_inst->opcode == BRW_OPCODE_WHILE ||
+          scan_inst->opcode == BRW_OPCODE_ELSE ||
+          scan_inst->opcode == BRW_OPCODE_ENDIF) {
+         break;
+      }
+
+      /* You can't read from an MRF, so if someone else reads our MRF's
+       * source GRF that we wanted to rewrite, that stops us.  If it's a
+       * GRF we're trying to coalesce to, we don't actually handle
+       * rewriting sources so bail in that case as well.
+       */
+      bool interfered = false;
+      for (int i = 0; i < 3; i++) {
+         if (scan_inst->src[i].file == GRF &&
+             scan_inst->src[i].reg == inst->src[0].reg &&
+             scan_inst->src[i].reg_offset == inst->src[0].reg_offset) {
+            interfered = true;
+         }
+      }
+      if (interfered)
+         break;
+
+      /* If somebody else writes our destination here, we can't coalesce
+       * before that.
+       */
+      if (scan_inst->dst.file == inst->dst.file &&
+          scan_inst->dst.reg == inst->dst.reg) {
+         break;
+      }
+
+      /* Check for reads of the register we're trying to coalesce into.  We
+       * can't go rewriting instructions above that to put some other value
+       * in the register instead.
+       */
+      if (to_mrf && scan_inst->mlen > 0) {
+         if (inst->dst.reg >= scan_inst->base_mrf &&
+             inst->dst.reg < scan_inst->base_mrf + scan_inst->mlen) {
+            break;
+         }
+      } else {
+         for (int i = 0; i < 3; i++) {
+            if (scan_inst->src[i].file == inst->dst.file &&
+                scan_inst->src[i].reg == inst->dst.reg &&
+                scan_inst->src[i].reg_offset == inst->src[0].reg_offset) {
+               interfered = true;
+            }
+         }
+         if (interfered)
+            break;
+      }
+   }
+
+   if (chans_remaining == 0) {
+      /* If we've made it here, we have an MOV we want to coalesce out, and
+       * a scan_inst pointing to the earliest instruction involved in
+       * computing the value.  Now go rewrite the instruction stream
+       * between the two.
+       */
+
+      while (scan_inst != inst) {
+         if (scan_inst->dst.file == GRF &&
+             scan_inst->dst.reg == inst->src[0].reg &&
+             scan_inst->dst.reg_offset == inst->src[0].reg_offset) {
+            scan_inst->reswizzle_dst(inst->dst.writemask,
+                                     inst->src[0].swizzle);
+            scan_inst->dst.file = inst->dst.file;
+            scan_inst->dst.reg = inst->dst.reg;
+            scan_inst->dst.reg_offset = inst->dst.reg_offset;
+            scan_inst->saturate |= inst->saturate;
+         }
+         scan_inst = (vec4_instruction *)scan_inst->next;
+      }
+      inst->remove();
+      return true;
+   }
+
+   return false;
+}
+
 /*
  * Tries to reduce extra MOV instructions by taking temporary GRFs that get
  * just written and then MOVed into another reg and making the original write
@@ -709,182 +883,15 @@ bool
 vec4_visitor::opt_register_coalesce()
 {
    bool progress = false;
-   int next_ip = 0;
+   int ip = 0;
 
    calculate_live_intervals();
 
    foreach_list_safe(node, &this->instructions) {
       vec4_instruction *inst = (vec4_instruction *)node;
 
-      int ip = next_ip;
-      next_ip++;
-
-      if (inst->opcode != BRW_OPCODE_MOV ||
-          (inst->dst.file != GRF && inst->dst.file != MRF) ||
-	  inst->predicate ||
-	  inst->src[0].file != GRF ||
-	  inst->dst.type != inst->src[0].type ||
-	  inst->src[0].abs || inst->src[0].negate || inst->src[0].reladdr)
-	 continue;
-
-      bool to_mrf = (inst->dst.file == MRF);
-
-      /* Can't coalesce this GRF if someone else was going to
-       * read it later.
-       */
-      if (this->virtual_grf_use[inst->src[0].reg] > ip)
-	 continue;
-
-      /* We need to check interference with the final destination between this
-       * instruction and the earliest instruction involved in writing the GRF
-       * we're eliminating.  To do that, keep track of which of our source
-       * channels we've seen initialized.
-       */
-      bool chans_needed[4] = {false, false, false, false};
-      int chans_remaining = 0;
-      int swizzle_mask = 0;
-      for (int i = 0; i < 4; i++) {
-	 int chan = BRW_GET_SWZ(inst->src[0].swizzle, i);
-
-	 if (!(inst->dst.writemask & (1 << i)))
-	    continue;
-
-         swizzle_mask |= (1 << chan);
-
-	 if (!chans_needed[chan]) {
-	    chans_needed[chan] = true;
-	    chans_remaining++;
-	 }
-      }
-
-      /* Now walk up the instruction stream trying to see if we can rewrite
-       * everything writing to the temporary to write into the destination
-       * instead.
-       */
-      vec4_instruction *scan_inst;
-      for (scan_inst = (vec4_instruction *)inst->prev;
-	   scan_inst->prev != NULL;
-	   scan_inst = (vec4_instruction *)scan_inst->prev) {
-	 if (scan_inst->dst.file == GRF &&
-	     scan_inst->dst.reg == inst->src[0].reg &&
-	     scan_inst->dst.reg_offset == inst->src[0].reg_offset) {
-            /* Found something writing to the reg we want to coalesce away. */
-            if (to_mrf) {
-               /* SEND instructions can't have MRF as a destination. */
-               if (scan_inst->mlen)
-                  break;
-
-               if (intel->gen == 6) {
-                  /* gen6 math instructions must have the destination be
-                   * GRF, so no compute-to-MRF for them.
-                   */
-                  if (scan_inst->is_math()) {
-                     break;
-                  }
-               }
-            }
-
-            /* If we can't handle the swizzle, bail. */
-            if (!scan_inst->can_reswizzle_dst(inst->dst.writemask,
-                                              inst->src[0].swizzle,
-                                              swizzle_mask)) {
-               break;
-            }
-
-	    /* Mark which channels we found unconditional writes for. */
-	    if (!scan_inst->predicate) {
-	       for (int i = 0; i < 4; i++) {
-		  if (scan_inst->dst.writemask & (1 << i) &&
-		      chans_needed[i]) {
-		     chans_needed[i] = false;
-		     chans_remaining--;
-		  }
-	       }
-	    }
-
-	    if (chans_remaining == 0)
-	       break;
-	 }
-
-	 /* We don't handle flow control here.  Most computation of values
-	  * that could be coalesced happens just before their use.
-	  */
-	 if (scan_inst->opcode == BRW_OPCODE_DO ||
-	     scan_inst->opcode == BRW_OPCODE_WHILE ||
-	     scan_inst->opcode == BRW_OPCODE_ELSE ||
-	     scan_inst->opcode == BRW_OPCODE_ENDIF) {
-	    break;
-	 }
-
-         /* You can't read from an MRF, so if someone else reads our MRF's
-          * source GRF that we wanted to rewrite, that stops us.  If it's a
-          * GRF we're trying to coalesce to, we don't actually handle
-          * rewriting sources so bail in that case as well.
-          */
-	 bool interfered = false;
-	 for (int i = 0; i < 3; i++) {
-	    if (scan_inst->src[i].file == GRF &&
-		scan_inst->src[i].reg == inst->src[0].reg &&
-		scan_inst->src[i].reg_offset == inst->src[0].reg_offset) {
-	       interfered = true;
-	    }
-	 }
-	 if (interfered)
-	    break;
-
-         /* If somebody else writes our destination here, we can't coalesce
-          * before that.
-          */
-         if (scan_inst->dst.file == inst->dst.file &&
-             scan_inst->dst.reg == inst->dst.reg) {
-	    break;
-         }
-
-         /* Check for reads of the register we're trying to coalesce into.  We
-          * can't go rewriting instructions above that to put some other value
-          * in the register instead.
-          */
-         if (to_mrf && scan_inst->mlen > 0) {
-            if (inst->dst.reg >= scan_inst->base_mrf &&
-                inst->dst.reg < scan_inst->base_mrf + scan_inst->mlen) {
-               break;
-            }
-         } else {
-            for (int i = 0; i < 3; i++) {
-               if (scan_inst->src[i].file == inst->dst.file &&
-                   scan_inst->src[i].reg == inst->dst.reg &&
-                   scan_inst->src[i].reg_offset == inst->src[0].reg_offset) {
-                  interfered = true;
-               }
-            }
-            if (interfered)
-               break;
-         }
-      }
-
-      if (chans_remaining == 0) {
-	 /* If we've made it here, we have an MOV we want to coalesce out, and
-	  * a scan_inst pointing to the earliest instruction involved in
-	  * computing the value.  Now go rewrite the instruction stream
-	  * between the two.
-	  */
-
-	 while (scan_inst != inst) {
-	    if (scan_inst->dst.file == GRF &&
-		scan_inst->dst.reg == inst->src[0].reg &&
-		scan_inst->dst.reg_offset == inst->src[0].reg_offset) {
-               scan_inst->reswizzle_dst(inst->dst.writemask,
-                                        inst->src[0].swizzle);
-	       scan_inst->dst.file = inst->dst.file;
-	       scan_inst->dst.reg = inst->dst.reg;
-	       scan_inst->dst.reg_offset = inst->dst.reg_offset;
-	       scan_inst->saturate |= inst->saturate;
-	    }
-	    scan_inst = (vec4_instruction *)scan_inst->next;
-	 }
-	 inst->remove();
-	 progress = true;
-      }
+      progress = try_coalesce_one_instruction(inst, ip) || progress;
+      ip++;
    }
 
    if (progress)

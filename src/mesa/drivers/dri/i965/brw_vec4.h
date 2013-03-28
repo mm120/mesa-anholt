@@ -38,6 +38,7 @@ extern "C" {
 #include "glsl/ir.h"
 
 class cfg_t;
+class bblock_t;
 
 namespace brw {
 
@@ -242,6 +243,7 @@ public:
    const void *base_ir;
    const char *current_annotation;
 
+   cfg_t *cfg;
    int *virtual_grf_sizes;
    int virtual_grf_count;
    int virtual_grf_array_size;
@@ -339,7 +341,8 @@ public:
    bool opt_copy_propagation();
    bool opt_algebraic();
    bool opt_register_coalesce();
-   bool try_coalesce_one_instruction(vec4_instruction *inst, int ip);
+   bool try_coalesce_one_instruction(bblock_t *bblock,
+                                     vec4_instruction *inst, int ip);
 
    bool can_do_source_mods(vec4_instruction *inst);
 

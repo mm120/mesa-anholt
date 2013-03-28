@@ -22,6 +22,7 @@
  */
 
 #include "brw_vec4.h"
+#include "brw_cfg.h"
 #include "glsl/ir_uniform.h"
 extern "C" {
 #include "main/context.h"
@@ -60,6 +61,7 @@ vec4_visitor::emit_before(vec4_instruction *inst, vec4_instruction *new_inst)
    new_inst->annotation = inst->annotation;
 
    inst->insert_before(new_inst);
+   cfg->add_instruction_fixup(inst);
 
    return inst;
 }
@@ -2789,6 +2791,7 @@ vec4_visitor::emit_scratch_write(vec4_instruction *inst, int base_offset)
    write->ir = inst->ir;
    write->annotation = inst->annotation;
    inst->insert_after(write);
+   cfg->add_instruction_fixup(write);
 
    inst->dst.file = temp.file;
    inst->dst.reg = temp.reg;

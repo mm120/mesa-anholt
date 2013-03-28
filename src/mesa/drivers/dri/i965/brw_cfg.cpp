@@ -79,6 +79,48 @@ bblock_t::remove_instruction(backend_instruction *inst)
    inst->remove();
 }
 
+/**
+ * Fixes up the CFG for the insertion of an instruction.
+ *
+ * Our passes aren't currently structured so that they know what bblock an
+ * instruction is added into, so we have to actually walk the instruction list
+ * to find which block it was in, so that we can fix ip for the later blocks.
+ *
+ * Hopefully after converting to SSA, our dependence on "ip" between blocks
+ * will be removed and we can avoid this work entirely.
+ */
+void
+cfg_t::add_instruction_fixup(backend_instruction *inst)
+{
+   bool found = false;
+
+   for (int i = 0; i < num_blocks; i++) {
+      bblock_t *bblock = blocks[i];
+
+      if (!found) {
+         backend_instruction *scan_inst;
+         for (scan_inst = (backend_instruction *)bblock->start;
+              scan_inst != (backend_instruction *)bblock->end->next;
+              scan_inst = (backend_instruction *)scan_inst->next) {
+            if (scan_inst == inst) {
+               if (bblock->start == inst->next)
+                  bblock->start = inst;
+               if (bblock->end == inst->prev)
+                  bblock->end = inst;
+
+               found = true;
+               bblock->end_ip++;
+               break;
+            }
+         }
+      } else {
+         bblock->start_ip++;
+         bblock->end_ip++;
+      }
+   }
+   assert(found);
+}
+
 bblock_link *
 bblock_t::make_list(void *mem_ctx)
 {

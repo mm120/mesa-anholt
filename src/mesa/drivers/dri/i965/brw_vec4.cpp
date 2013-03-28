@@ -304,19 +304,26 @@ bool
 vec4_visitor::dead_code_eliminate()
 {
    bool progress = false;
-   int pc = 0;
 
    calculate_live_intervals();
 
-   foreach_list_safe(node, &this->instructions) {
-      vec4_instruction *inst = (vec4_instruction *)node;
+   for (int i = 0; i < cfg->num_blocks; i++) {
+      bblock_t *bblock = cfg->blocks[i];
+      vec4_instruction *next_inst;
 
-      if (inst->dst.file == GRF && this->virtual_grf_use[inst->dst.reg] <= pc) {
-	 inst->remove();
-	 progress = true;
+      int ip = bblock->start_ip;
+      for (vec4_instruction *inst = (vec4_instruction *)bblock->start;
+           inst != (vec4_instruction *)bblock->end->next;
+           inst = next_inst) {
+         next_inst = (vec4_instruction *)inst->next;
+
+         if (inst->dst.file == GRF && virtual_grf_use[inst->dst.reg] <= ip) {
+            bblock->remove_instruction(inst);
+            progress = true;
+         }
+
+         ip++;
       }
-
-      pc++;
    }
 
    if (progress)
@@ -701,7 +708,8 @@ vec4_instruction::reswizzle_dst(int dst_writemask, int swizzle)
 }
 
 bool
-vec4_visitor::try_coalesce_one_instruction(vec4_instruction *inst, int ip)
+vec4_visitor::try_coalesce_one_instruction(bblock_t *bblock,
+                                           vec4_instruction *inst, int ip)
 {
    if (inst->opcode != BRW_OPCODE_MOV ||
        (inst->dst.file != GRF && inst->dst.file != MRF) ||
@@ -867,7 +875,7 @@ vec4_visitor::try_coalesce_one_instruction(vec4_instruction *inst, int ip)
          }
          scan_inst = (vec4_instruction *)scan_inst->next;
       }
-      inst->remove();
+      bblock->remove_instruction(inst);
       return true;
    }
 
@@ -883,15 +891,22 @@ bool
 vec4_visitor::opt_register_coalesce()
 {
    bool progress = false;
-   int ip = 0;
 
    calculate_live_intervals();
 
-   foreach_list_safe(node, &this->instructions) {
-      vec4_instruction *inst = (vec4_instruction *)node;
+   for (int i = 0; i < cfg->num_blocks; i++) {
+      bblock_t *bblock = cfg->blocks[i];
+      vec4_instruction *next_inst;
 
-      progress = try_coalesce_one_instruction(inst, ip) || progress;
-      ip++;
+      int ip = bblock->start_ip;
+      for (vec4_instruction *inst = (vec4_instruction *)bblock->start;
+           inst != (vec4_instruction *)bblock->end->next;
+           inst = next_inst) {
+         next_inst = (vec4_instruction *)inst->next;
+
+         progress = try_coalesce_one_instruction(bblock, inst, ip) || progress;
+         ip++;
+      }
    }
 
    if (progress)
@@ -1302,6 +1317,8 @@ vec4_visitor::run()
       emit_vertex_program_code();
    }
    base_ir = NULL;
+
+   cfg = new(mem_ctx) cfg_t(this);
 
    if (c->key.userclip_active && !c->key.uses_clip_distance)
       setup_uniform_clipplane_values();

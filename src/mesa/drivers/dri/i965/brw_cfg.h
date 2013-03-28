@@ -86,6 +86,8 @@ public:
    cfg_t(void *mem_ctx, exec_list *instructions);
    ~cfg_t();
 
+   void add_instruction_fixup(backend_instruction *inst);
+
    void create(void *mem_ctx, exec_list *instructions);
 
    bblock_t *new_block();

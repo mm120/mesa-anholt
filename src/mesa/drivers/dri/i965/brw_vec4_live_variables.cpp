@@ -241,19 +241,18 @@ vec4_visitor::calculate_live_intervals()
     * The control flow-aware analysis was done at a channel level, while at
     * this point we're distilling it down to vgrfs.
     */
-   cfg_t cfg(this);
-   vec4_live_variables livevars(this, &cfg);
+   vec4_live_variables livevars(this, cfg);
 
-   for (int b = 0; b < cfg.num_blocks; b++) {
+   for (int b = 0; b < cfg->num_blocks; b++) {
       for (int i = 0; i < livevars.num_vars; i++) {
 	 if (livevars.bd[b].livein[i]) {
-	    def[i / 4] = MIN2(def[i / 4], cfg.blocks[b]->start_ip);
-	    use[i / 4] = MAX2(use[i / 4], cfg.blocks[b]->start_ip);
+	    def[i / 4] = MIN2(def[i / 4], cfg->blocks[b]->start_ip);
+	    use[i / 4] = MAX2(use[i / 4], cfg->blocks[b]->start_ip);
 	 }
 
 	 if (livevars.bd[b].liveout[i]) {
-	    def[i / 4] = MIN2(def[i / 4], cfg.blocks[b]->end_ip);
-	    use[i / 4] = MAX2(use[i / 4], cfg.blocks[b]->end_ip);
+	    def[i / 4] = MIN2(def[i / 4], cfg->blocks[b]->end_ip);
+	    use[i / 4] = MAX2(use[i / 4], cfg->blocks[b]->end_ip);
 	 }
       }
    }

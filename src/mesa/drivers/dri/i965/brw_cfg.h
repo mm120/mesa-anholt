@@ -27,6 +27,8 @@
 
 #include "brw_fs.h"
 
+class cfg_t;
+
 class bblock_link : public exec_node {
 public:
    bblock_link(bblock_t *block)
@@ -51,10 +53,12 @@ public:
 
    bblock_link *make_list(void *mem_ctx);
 
-   bblock_t();
+   bblock_t(cfg_t *cfg);
 
    void add_successor(void *mem_ctx, bblock_t *successor);
+   void remove_instruction(backend_instruction *inst);
 
+   cfg_t *cfg;
    backend_instruction *start;
    backend_instruction *end;
 

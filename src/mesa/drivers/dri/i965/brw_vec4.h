@@ -37,6 +37,8 @@ extern "C" {
 
 #include "glsl/ir.h"
 
+class cfg_t;
+
 namespace brw {
 
 class dst_reg;

@@ -44,7 +44,8 @@ pop_stack(exec_list *list)
    return block;
 }
 
-bblock_t::bblock_t()
+bblock_t::bblock_t(cfg_t *cfg)
+   : cfg(cfg)
 {
    start = NULL;
    end = NULL;
@@ -58,6 +59,24 @@ bblock_t::add_successor(void *mem_ctx, bblock_t *successor)
 {
    successor->parents.push_tail(this->make_list(mem_ctx));
    children.push_tail(successor->make_list(mem_ctx));
+}
+
+void
+bblock_t::remove_instruction(backend_instruction *inst)
+{
+   if (start == inst)
+      start = (backend_instruction *)inst->next;
+   if (end == inst)
+      end = (backend_instruction *)inst->prev;
+
+   end_ip--;
+
+   for (int i = block_num + 1; i < cfg->num_blocks; i++) {
+      cfg->blocks[i]->start_ip--;
+      cfg->blocks[i]->end_ip--;
+   }
+
+   inst->remove();
 }
 
 bblock_link *
@@ -228,7 +247,7 @@ cfg_t::~cfg_t()
 bblock_t *
 cfg_t::new_block()
 {
-   bblock_t *block = new(mem_ctx) bblock_t();
+   bblock_t *block = new(mem_ctx) bblock_t(this);
 
    return block;
 }

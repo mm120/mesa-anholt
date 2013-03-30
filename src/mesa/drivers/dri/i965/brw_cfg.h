@@ -59,6 +59,16 @@ public:
    void remove_instruction(backend_instruction *inst);
 
    cfg_t *cfg;
+   /**
+    * The immediate dominator of this block.
+    *
+    * For two blocks X and Y, X is a dominator of Y if X is called on every
+    * path from the start node of the cfg to block Y.  A dominator tree can be
+    * constructed of dominators of the blocks in this way.  The immediate
+    * dominator of block Y is the nearest block (the parent) in the dominator
+    * tree.
+    */
+   bblock_t *idom;
    backend_instruction *start;
    backend_instruction *end;
 

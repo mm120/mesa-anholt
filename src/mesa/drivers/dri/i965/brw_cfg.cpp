@@ -137,6 +137,14 @@ cfg_t::cfg_t(void *mem_ctx, exec_list *instructions)
    create(mem_ctx, instructions);
 }
 
+/**
+ * Creates the control flow graph for our shader instructions, taking
+ * advantage of the structured control flow in GLSL.
+ *
+ * Dominator tree handling is described in "Single-Pass Generation of Static
+ * Single-Assignment Form for Structured Languages" by Marc M. Brandis and
+ * Hanspeter Mössenböck (1994).
+ */
 void
 cfg_t::create(void *parent_mem_ctx, exec_list *instructions)
 {
@@ -152,6 +160,7 @@ cfg_t::create(void *parent_mem_ctx, exec_list *instructions)
    exec_list if_stack, else_stack, endif_stack, do_stack, while_stack;
    bblock_t *next;
 
+   entry->idom = NULL;
    set_next_block(entry);
 
    entry->start = (backend_instruction *) instructions->get_head();
@@ -176,15 +185,18 @@ cfg_t::create(void *parent_mem_ctx, exec_list *instructions)
 	 cur_if = cur;
 	 cur_else = NULL;
 	 /* Set up the block just after the endif.  Don't know when exactly
-	  * it will start, yet.
+	  * it will start, yet, but it's dominated by the block that ends with
+	  * the IF instruction (since neither branch after the IF dominates it)
 	  */
 	 cur_endif = new_block();
+         cur_endif->idom = cur_if;
 
 	 /* Set up our immediately following block, full of "then"
 	  * instructions.
 	  */
 	 next = new_block();
 	 next->start = (backend_instruction *)inst->next;
+         next->idom = cur_if;
 	 cur_if->add_successor(mem_ctx, next);
 
 	 set_next_block(next);
@@ -195,6 +207,8 @@ cfg_t::create(void *parent_mem_ctx, exec_list *instructions)
 
 	 next = new_block();
 	 next->start = (backend_instruction *)inst->next;
+         next->idom = cur_if;
+
 	 cur_if->add_successor(mem_ctx, next);
 	 cur_else = next;
 
@@ -222,18 +236,27 @@ cfg_t::create(void *parent_mem_ctx, exec_list *instructions)
 	 do_stack.push_tail(cur_do->make_list(mem_ctx));
 	 while_stack.push_tail(cur_while->make_list(mem_ctx));
 
-	 /* Set up the block just after the while.  Don't know when exactly
-	  * it will start, yet.
-	  */
-	 cur_while = new_block();
-
 	 /* Set up our immediately following block, full of "then"
 	  * instructions.
 	  */
 	 next = new_block();
 	 next->start = (backend_instruction *)inst->next;
+         next->idom = cur;
 	 cur->add_successor(mem_ctx, next);
 	 cur_do = next;
+
+	 /* Set up the block just after the while.  Don't know when exactly
+	  * it will start, yet.
+	  */
+	 cur_while = new_block();
+         /* This is not strictly the idom in the tree -- we know at least that
+          * the first block of the DO is always called on the way from the
+          * start node to the instruction after WHILE, but when you hit an IF
+          * after that you don't know if it will contain a BREAK or CONTINUE
+          * out to the end of the loop, so we don't try to track the optimal
+          * idom for it.
+          */
+         cur_while->idom = next;
 
 	 set_next_block(next);
 	 break;
@@ -243,6 +266,7 @@ cfg_t::create(void *parent_mem_ctx, exec_list *instructions)
 
 	 next = new_block();
 	 next->start = (backend_instruction *)inst->next;
+         next->idom = cur;
 	 if (inst->predicate)
 	    cur->add_successor(mem_ctx, next);
 
@@ -254,6 +278,7 @@ cfg_t::create(void *parent_mem_ctx, exec_list *instructions)
 
 	 next = new_block();
 	 next->start = (backend_instruction *)inst->next;
+         next->idom = cur;
 	 if (inst->predicate)
 	    cur->add_successor(mem_ctx, next);
 

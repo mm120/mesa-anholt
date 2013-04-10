@@ -904,7 +904,7 @@ check_extra(struct gl_context *ctx, const char *func, const struct value_desc *d
    GLboolean api_found = GL_FALSE;
    const int *e;
 
-   for (e = d->extra; *e != EXTRA_END; e++)
+   for (e = d->extra; *e != EXTRA_END; e++) {
       switch (*e) {
       case EXTRA_VERSION_30:
          api_check = GL_TRUE;
@@ -986,6 +986,7 @@ check_extra(struct gl_context *ctx, const char *func, const struct value_desc *d
 	    api_found = GL_TRUE;
 	 break;
       }
+   }
 
    if (api_check && !api_found) {
       _mesa_error(ctx, GL_INVALID_ENUM, "%s(pname=%s)", func,

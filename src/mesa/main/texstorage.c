@@ -244,6 +244,27 @@ _mesa_is_legal_tex_storage_format(struct gl_context *ctx, GLenum internalformat)
    }
 }
 
+GLboolean
+_mesa_alloc_texture_storage(struct gl_context *ctx,
+                            struct gl_texture_object *texObj,
+                            GLsizei levels, GLsizei width,
+                            GLsizei height, GLsizei depth)
+{
+   const int numFaces = _mesa_num_tex_faces(texObj->Target);
+   int face;
+   int level;
+
+   for (face = 0; face < numFaces; face++) {
+      for (level = 0; level < levels; level++) {
+         struct gl_texture_image *const texImage = texObj->Image[face][level];
+         if (!ctx->Driver.AllocTextureImageBuffer(ctx, texImage))
+            return GL_FALSE;
+      }
+   }
+
+   return GL_TRUE;
+}
+
 
 /**
  * Do error checking for calls to glTexStorage1/2/3D().

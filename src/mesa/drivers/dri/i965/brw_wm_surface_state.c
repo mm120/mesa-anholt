@@ -112,6 +112,9 @@ struct surface_format_info {
  * Y^: 60 (gen6)
  * Y#: 70 (gen7)
  *
+ * To encode baytrail, we use "71" (since gen7.5 has been used to refer to
+ * HSW)
+ *
  * The abbreviations in the header below are:
  * smpl  - Sampling Engine
  * filt  - Sampling Engine Filtering
@@ -326,13 +329,13 @@ const struct surface_format_info surface_formats[] = {
    SF(70, 70,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_BC6H_UF16)
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_PLANAR_420_8)
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_R8G8B8_UNORM_SRGB)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC1_RGB8)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_RGB8)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_EAC_R11)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_EAC_RG11)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_EAC_SIGNED_R11)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_EAC_SIGNED_RG11)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_SRGB8)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC1_RGB8)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_RGB8)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_EAC_R11)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_EAC_RG11)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_EAC_SIGNED_R11)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_EAC_SIGNED_RG11)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_SRGB8)
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_R16G16B16_UINT)
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_R16G16B16_SINT)
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_R32_SFIXED)
@@ -347,10 +350,10 @@ const struct surface_format_info surface_formats[] = {
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_B10G10R10A2_SINT)
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_R64G64B64A64_PASSTHRU)
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_R64G64B64_PASSTHRU)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_RGB8_PTA)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_SRGB8_PTA)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_EAC_RGBA8)
-   SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_EAC_SRGB8_A8)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_RGB8_PTA)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_SRGB8_PTA)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_EAC_RGBA8)
+   SF(71, 71,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_ETC2_EAC_SRGB8_A8)
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_R8G8B8_UINT)
    SF( x,  x,  x,  x,  x,  x,  x,  x,  x, BRW_SURFACEFORMAT_R8G8B8_SINT)
 };
@@ -584,6 +587,8 @@ brw_init_surface_formats(struct brw_context *brw)
    gen = intel->gen * 10;
    if (intel->is_g4x)
       gen += 5;
+   if (intel->is_baytrail)
+      gen++;
 
    for (format = MESA_FORMAT_NONE + 1; format < MESA_FORMAT_COUNT; format++) {
       uint32_t texture, render;

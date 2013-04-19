@@ -88,11 +88,12 @@ _swrast_alloc_texture_image_buffer(struct gl_context *ctx,
       return GL_FALSE;
 
    /* RowStride and ImageSlices[] describe how to address texels in 'Data' */
-   swImg->RowStride = texImage->Width;
+   swImg->RowStride = _mesa_format_row_stride(texImage->TexFormat,
+                                              texImage->Width);
 
    for (i = 0; i < texture_slices(texImage); i++) {
-      swImg->ImageSlices[i] =
-         swImg->Buffer + (i * texImage->Width * texImage->Height);
+      swImg->ImageSlices[i] = (swImg->Buffer +
+                               i * swImg->RowStride * texImage->Height);
    }
 
    return GL_TRUE;

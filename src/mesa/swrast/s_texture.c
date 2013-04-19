@@ -218,18 +218,17 @@ _swrast_map_teximage(struct gl_context *ctx,
    map = swImage->Buffer;
 
    assert(slice < texture_slices(texImage));
+   if (slice != 0) {
+      int sliceHeight = texImage->Height;
+      /* For 1D array textures, the slices are all 1 pixel high, and Height is
+       * the number of slices.
+       */
+      if (texImage->TexObject->Target == GL_TEXTURE_1D_ARRAY)
+         sliceHeight = 1;
 
-   if (texImage->TexObject->Target == GL_TEXTURE_3D ||
-       texImage->TexObject->Target == GL_TEXTURE_2D_ARRAY) {
       GLuint sliceSize = _mesa_format_image_size(texImage->TexFormat,
                                                  texImage->Width,
-                                                 texImage->Height,
-                                                 1);
-      map += slice * sliceSize;
-   } else if (texImage->TexObject->Target == GL_TEXTURE_1D_ARRAY) {
-      GLuint sliceSize = _mesa_format_image_size(texImage->TexFormat,
-                                                 texImage->Width,
-                                                 1,
+                                                 sliceHeight,
                                                  1);
       map += slice * sliceSize;
    }

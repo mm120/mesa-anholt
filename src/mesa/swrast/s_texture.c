@@ -87,11 +87,12 @@ _swrast_alloc_texture_image_buffer(struct gl_context *ctx,
    if (!swImg->Buffer)
       return GL_FALSE;
 
-   /* RowStride and ImageOffsets[] describe how to address texels in 'Data' */
+   /* RowStride and ImageSlices[] describe how to address texels in 'Data' */
    swImg->RowStride = texImage->Width;
 
    for (i = 0; i < texture_slices(texImage); i++) {
-      swImg->ImageOffsets[i] = i * texImage->Width * texImage->Height;
+      swImg->ImageSlices[i] =
+         swImg->Buffer + (i * texImage->Width * texImage->Height);
    }
 
    return GL_TRUE;
@@ -101,7 +102,7 @@ _swrast_alloc_texture_image_buffer(struct gl_context *ctx,
 /**
  * Code that overrides ctx->Driver.AllocTextureImageBuffer may use this to
  * initialize the fields of swrast_texture_image without allocating the image
- * buffer or initializing RowStride or the contents of ImageOffsets.
+ * buffer or initializing RowStride or the contents of ImageSlices.
  *
  * Returns GL_TRUE on success, GL_FALSE on memory allocation failure.
  */
@@ -130,9 +131,9 @@ _swrast_init_texture_image(struct gl_texture_image *texImage)
       swImg->DepthScale = (GLfloat) texImage->Depth;
    }
 
-   assert(!swImg->ImageOffsets);
-   swImg->ImageOffsets = malloc(texture_slices(texImage) * sizeof(GLuint));
-   if (!swImg->ImageOffsets)
+   assert(!swImg->ImageSlices);
+   swImg->ImageSlices = calloc(texture_slices(texImage), sizeof(void *));
+   if (!swImg->ImageSlices)
       return GL_FALSE;
 
    return GL_TRUE;
@@ -152,8 +153,8 @@ _swrast_free_texture_image_buffer(struct gl_context *ctx,
       swImage->Buffer = NULL;
    }
 
-   free(swImage->ImageOffsets);
-   swImage->ImageOffsets = NULL;
+   free(swImage->ImageSlices);
+   swImage->ImageSlices = NULL;
 }
 
 

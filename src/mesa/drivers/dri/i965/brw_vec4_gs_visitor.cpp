@@ -134,7 +134,7 @@ vec4_gs_visitor::emit_thread_end()
     * in MRF 1.
     */
    int base_mrf = 1;
-   unsigned mlen = 0;
+   unsigned mlen = 1;
 
    current_annotation = "thread end";
    dst_reg mrf_reg(MRF, base_mrf);
@@ -142,7 +142,7 @@ vec4_gs_visitor::emit_thread_end()
    emit(MOV(mrf_reg, r0))->force_writemask_all = true;
    emit(GS_OPCODE_SET_VERTEX_COUNT, mrf_reg, this->vertex_count);
    if (true) { /* TODO: disable this if we aren't using EndPrimitive() */
-      mlen = 1;
+      mlen = 2;
       /* TODO: don't do the write if vertex_count is a multiple of 32 */
       /* TODO: write to the appropriate DWORD */
       dst_reg mrf_reg2(MRF, base_mrf + 1);

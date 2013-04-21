@@ -434,7 +434,7 @@ vec4_generator::generate_gs_thread_end(vec4_instruction *inst)
                  src,
                  false,          /* allocate */
                  true,           /* used */
-                 1,              /* message len */
+                 inst->mlen,
                  0,              /* response len */
                  true,           /* eot */
                  true,           /* writes complete */

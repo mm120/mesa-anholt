@@ -190,7 +190,7 @@ vec4_gs_visitor::emit_urb_write_opcode(bool complete)
    (void) complete;
 
    vec4_instruction *inst = emit(GS_OPCODE_URB_WRITE);
-   inst->offset = 2; /* TODO: compute correct offset based on max vertex count */
+   inst->offset = 1; /* TODO: compute correct offset based on max vertex count */
    return inst;
 }
 

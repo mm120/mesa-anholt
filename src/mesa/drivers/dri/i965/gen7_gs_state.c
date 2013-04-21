@@ -129,7 +129,7 @@ upload_gs_state(struct brw_context *brw)
                 (1 << GEN6_GS_DISPATCH_START_GRF_SHIFT));
       OUT_BATCH(((brw->max_gs_threads - 1) << max_threads_shift) |
                 GEN7_GS_CONTROL_DATA_FORMAT_GSCTL_CUT |
-                (1 << GEN7_GS_CONTROL_DATA_HEADER_SIZE_SHIFT) | /* TODO: set appropriately */
+                (0 << GEN7_GS_CONTROL_DATA_HEADER_SIZE_SHIFT) | /* TODO: set appropriately */
                 GEN7_GS_DISPATCH_MODE_DUAL_OBJECT |
                 GEN6_GS_STATISTICS_ENABLE | GEN7_GS_ENABLE);
       OUT_BATCH(0);

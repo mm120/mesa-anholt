@@ -93,6 +93,7 @@ do_vec4_gs_prog(struct brw_context *brw,
    /* URB entry sizes are computed in multiples of 64 bytes. */
    unsigned output_size_bytes =
       c.prog_data.output_vertex_size_32B * 32 * gp->program.VerticesOut;
+   output_size_bytes += 32; /* TODO: account for cut indices correctly */
    c.prog_data.base.urb_entry_size = ALIGN(output_size_bytes, 64) / 64;
 
    c.prog_data.output_topology = prim_to_hw_prim[gp->program.OutputType];

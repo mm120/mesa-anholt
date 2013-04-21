@@ -94,6 +94,7 @@ protected:
 
 private:
    src_reg vertex_count;
+   src_reg cut_bits;
    const struct brw_vec4_gs_compile * const c;
 };
 

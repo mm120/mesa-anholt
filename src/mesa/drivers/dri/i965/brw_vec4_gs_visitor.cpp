@@ -103,6 +103,19 @@ vec4_gs_visitor::emit_prolog()
    /* Initialize the vertex_count register to 0 */
    this->current_annotation = "initialize vertex_count";
    emit(MOV(dst_reg(this->vertex_count), 0u))->force_writemask_all = true;
+
+   /* Create a virtual register to hold the cut bits.  TODO: only do this if
+    * the shader uses EndPrimitive() and outputs lines or triangles.
+    */
+   this->cut_bits = src_reg(this, glsl_type::uint_type);
+
+   /* Initialize the cut_bits register to 0 */
+   this->current_annotation = "initialize cut bits";
+   emit(MOV(dst_reg(this->cut_bits), 0u))->force_writemask_all = true;
+
+   /* TODO: would it make sense to pack vertex_count and cut_bits into a
+    * single register?
+    */
 }
 
 
@@ -121,17 +134,25 @@ vec4_gs_visitor::emit_thread_end()
     * in MRF 1.
     */
    int base_mrf = 1;
+   unsigned mlen = 0;
 
    current_annotation = "thread end";
    dst_reg mrf_reg(MRF, base_mrf);
    src_reg r0(retype(brw_vec8_grf(0, 0), BRW_REGISTER_TYPE_UD));
    emit(MOV(mrf_reg, r0))->force_writemask_all = true;
    emit(GS_OPCODE_SET_VERTEX_COUNT, mrf_reg, this->vertex_count);
+   if (true) { /* TODO: disable this if we aren't using EndPrimitive() */
+      mlen = 1;
+      /* TODO: don't do the write if vertex_count is a multiple of 32 */
+      /* TODO: write to the appropriate DWORD */
+      dst_reg mrf_reg2(MRF, base_mrf + 1);
+      emit(MOV(mrf_reg2, this->cut_bits))->force_writemask_all = true;
+   }
    if (INTEL_DEBUG & DEBUG_SHADER_TIME)
       emit_shader_time_end();
    vec4_instruction *inst = emit(GS_OPCODE_THREAD_END);
    inst->base_mrf = base_mrf;
-   inst->mlen = 0;
+   inst->mlen = mlen;
 }
 
 
@@ -168,7 +189,9 @@ vec4_gs_visitor::emit_urb_write_opcode(bool complete)
     */
    (void) complete;
 
-   return emit(GS_OPCODE_URB_WRITE);
+   vec4_instruction *inst = emit(GS_OPCODE_URB_WRITE);
+   inst->offset = 2; /* TODO: compute correct offset based on max vertex count */
+   return inst;
 }
 
 
@@ -203,6 +226,10 @@ vec4_gs_visitor::visit(ir_emitvertex *)
             src_reg(num_output_vertices), BRW_CONDITIONAL_L));
    emit(IF(BRW_PREDICATE_NORMAL));
 
+   /* TODO: if EndPrimitive() is in use, and vertex_counter%32 == 31, write
+    * the cut bits to the URB and reset this->cut_bits to 0.
+    */
+
    this->current_annotation = "emit vertex: vertex data";
    emit_vertex();
 
@@ -216,7 +243,14 @@ vec4_gs_visitor::visit(ir_emitvertex *)
 void
 vec4_gs_visitor::visit(ir_endprim *)
 {
-   assert(!"Not implemented yet");
+   this->current_annotation = "end primitive";
+   src_reg tmp(this, glsl_type::uint_type);
+
+   /* tmp = 1 << (vertex_count & 31) */
+   emit(SHL(dst_reg(tmp), 1u, this->vertex_count));
+
+   /* cut_bits |= tmp */
+   emit(OR(dst_reg(this->cut_bits), this->cut_bits, tmp));
 }
 
 

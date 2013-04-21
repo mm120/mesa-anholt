@@ -110,6 +110,9 @@ vec4_gs_visitor::emit_prolog()
    this->cut_bits = src_reg(this, glsl_type::uint_type);
 
    /* Initialize the cut_bits register to 0 */
+   /* TODO: actually this shouldn't be necessary because cut bits are going to
+    * get reset to 0 after the first EmitVertex().
+    */
    this->current_annotation = "initialize cut bits";
    emit(MOV(dst_reg(this->cut_bits), 0u))->force_writemask_all = true;
 
@@ -143,7 +146,6 @@ vec4_gs_visitor::emit_thread_end()
    emit(GS_OPCODE_SET_VERTEX_COUNT, mrf_reg, this->vertex_count);
    if (true) { /* TODO: disable this if we aren't using EndPrimitive() */
       mlen = 2;
-      /* TODO: don't do the write if vertex_count is a multiple of 32 */
       /* TODO: write to the appropriate DWORD */
       dst_reg mrf_reg2(MRF, base_mrf + 1);
       emit(MOV(mrf_reg2, this->cut_bits))->force_writemask_all = true;
@@ -226,8 +228,9 @@ vec4_gs_visitor::visit(ir_emitvertex *)
             src_reg(num_output_vertices), BRW_CONDITIONAL_L));
    emit(IF(BRW_PREDICATE_NORMAL));
 
-   /* TODO: if EndPrimitive() is in use, and vertex_counter%32 == 31, write
-    * the cut bits to the URB and reset this->cut_bits to 0.
+   /* TODO: if EndPrimitive() is in use, and vertex_counter%32 == 0, and
+    * vertex_counter != 0, write the cut bits to the URB and reset
+    * this->cut_bits to 0.
     */
 
    this->current_annotation = "emit vertex: vertex data";
@@ -249,12 +252,16 @@ vec4_gs_visitor::visit(ir_endprim *)
    src_reg tmp1(this, glsl_type::uint_type);
    emit(MOV(dst_reg(tmp1), 1u));
 
-   /* uint tmp2 = tmp1 << (vertex_count & 31) */
+   /* uint tmp2 = vertex_count - 1 */
    src_reg tmp2(this, glsl_type::uint_type);
-   emit(SHL(dst_reg(tmp2), tmp1, this->vertex_count));
+   emit(ADD(dst_reg(tmp2), this->vertex_count, 0xffffffffu));
 
-   /* cut_bits |= tmp2 */
-   emit(OR(dst_reg(this->cut_bits), this->cut_bits, tmp2));
+   /* uint tmp3 = tmp1 << (tmp2 & 31) */
+   src_reg tmp3(this, glsl_type::uint_type);
+   emit(SHL(dst_reg(tmp3), tmp1, tmp2));
+
+   /* cut_bits |= tmp3 */
+   emit(OR(dst_reg(this->cut_bits), this->cut_bits, tmp3));
 }
 
 

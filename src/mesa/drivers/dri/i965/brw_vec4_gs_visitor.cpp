@@ -141,7 +141,7 @@ vec4_gs_visitor::emit_thread_end()
    src_reg r0(retype(brw_vec8_grf(0, 0), BRW_REGISTER_TYPE_UD));
    emit(MOV(mrf_reg, r0))->force_writemask_all = true;
    emit(GS_OPCODE_SET_VERTEX_COUNT, mrf_reg, this->vertex_count);
-   if (false) { /* TODO: disable this if we aren't using EndPrimitive() */
+   if (true) { /* TODO: disable this if we aren't using EndPrimitive() */
       mlen = 1;
       /* TODO: don't do the write if vertex_count is a multiple of 32 */
       /* TODO: write to the appropriate DWORD */

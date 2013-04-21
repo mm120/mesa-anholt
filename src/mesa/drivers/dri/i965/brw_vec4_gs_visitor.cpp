@@ -244,13 +244,17 @@ void
 vec4_gs_visitor::visit(ir_endprim *)
 {
    this->current_annotation = "end primitive";
-   src_reg tmp(this, glsl_type::uint_type);
 
-   /* tmp = 1 << (vertex_count & 31) */
-   emit(SHL(dst_reg(tmp), 1u, this->vertex_count));
+   /* uint tmp1 = 1u */
+   src_reg tmp1(this, glsl_type::uint_type);
+   emit(MOV(dst_reg(tmp1), 1u));
 
-   /* cut_bits |= tmp */
-   emit(OR(dst_reg(this->cut_bits), this->cut_bits, tmp));
+   /* uint tmp2 = tmp1 << (vertex_count & 31) */
+   src_reg tmp2(this, glsl_type::uint_type);
+   emit(SHL(dst_reg(tmp2), tmp1, this->vertex_count));
+
+   /* cut_bits |= tmp2 */
+   emit(OR(dst_reg(this->cut_bits), this->cut_bits, tmp2));
 }
 
 

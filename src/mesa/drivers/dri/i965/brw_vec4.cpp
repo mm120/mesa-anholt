@@ -1445,12 +1445,30 @@ vec4_visitor::run()
    split_virtual_grfs();
 
    bool progress;
+   int iter = 0;
    do {
+      if (iter == 2) {
+         printf("Artificially stopping after %d iterations\n", iter);
+         break;
+      }
+      printf("Optimization iteration %d\n", iter++);
       progress = false;
-      progress = dead_code_eliminate() || progress;
-      progress = opt_copy_propagation() || progress;
-      progress = opt_algebraic() || progress;
-      progress = opt_register_coalesce() || progress;
+      if (dead_code_eliminate()) {
+         printf("  dead_code_eliminate progress\n");
+         progress = true;
+      }
+      if (opt_copy_propagation()) {
+         printf("  opt_copy_propagation progress\n");
+         progress = true;
+      }
+      if (opt_algebraic()) {
+         printf("  opt_algebraic progress\n");
+         progress = true;
+      }
+      if (opt_register_coalesce()) {
+         printf("  opt_register_coalesce progress\n");
+         progress = true;
+      }
    } while (progress);
 
 

@@ -971,6 +971,12 @@ vec4_visitor::opt_register_coalesce()
       }
 
       if (chans_remaining == 0) {
+         printf("Coalescing away MOV: ");
+         if (inst->ir)
+            ((const ir_instruction *) inst->ir)->print();
+         else
+            printf("???");
+         printf("\n");
 	 /* If we've made it here, we have an MOV we want to coalesce out, and
 	  * a scan_inst pointing to the earliest instruction involved in
 	  * computing the value.  Now go rewrite the instruction stream
@@ -981,6 +987,12 @@ vec4_visitor::opt_register_coalesce()
 	    if (scan_inst->dst.file == GRF &&
 		scan_inst->dst.reg == inst->src[0].reg &&
 		scan_inst->dst.reg_offset == inst->src[0].reg_offset) {
+               printf("  rewriting: ");
+               if (scan_inst->ir)
+                  ((const ir_instruction *) scan_inst->ir)->print();
+               else
+                  printf("???");
+               printf("\n");
                scan_inst->reswizzle_dst(inst->dst.writemask,
                                         inst->src[0].swizzle);
 	       scan_inst->dst.file = inst->dst.file;

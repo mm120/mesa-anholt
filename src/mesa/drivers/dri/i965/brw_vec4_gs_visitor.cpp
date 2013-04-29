@@ -97,6 +97,18 @@ vec4_gs_visitor::setup_attributes(int payload_reg)
 void
 vec4_gs_visitor::emit_prolog()
 {
+   /* In vertex shaders, r0.2 is guaranteed to be initialized to zero.  In
+    * geometry shaders, it isn't (it contains a bunch of information we don't
+    * need, like the input primitive type).  We need r0.2 to be zero in order
+    * to build scratch read/write messages correctly (otherwise this value
+    * will be interpreted as a global offset, causing us to do our scratch
+    * reads/writes to garbage memory).  So just set it to zero at the top of
+    * the shader.
+    */
+   this->current_annotation = "clear r0.2";
+   dst_reg r0(retype(brw_vec4_grf(0, 0), BRW_REGISTER_TYPE_UD));
+   emit(GS_OPCODE_SET_R0_2, r0, 0u);
+
    /* Create a virtual register to hold the vertex count */
    this->vertex_count = src_reg(this, glsl_type::uint_type);
 

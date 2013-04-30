@@ -113,7 +113,11 @@ _mesa_choose_tex_format(struct gl_context *ctx, GLenum target,
       /* shallow RGB formats */
       case 3:
       case GL_RGB:
-         if (type == GL_UNSIGNED_INT_2_10_10_10_REV) {
+         if (type == GL_UNSIGNED_SHORT_5_6_5_REV ||
+             type == GL_UNSIGNED_SHORT_5_6_5) {
+            RETURN_IF_SUPPORTED(MESA_FORMAT_RGB565);
+            RETURN_IF_SUPPORTED(MESA_FORMAT_RGB565_REV);
+         } else if (type == GL_UNSIGNED_INT_2_10_10_10_REV) {
             RETURN_IF_SUPPORTED(MESA_FORMAT_ARGB2101010);
          }
          /* fallthrough */

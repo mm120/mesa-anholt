@@ -2,8 +2,8 @@
    (signature float
      (parameters
        (declare (in) float y_over_x))
-     ((declare () float s)
-      (call asin (var_ref s)
+     ((declare () float sin_theta)
+      (call clamp (var_ref sin_theta)
 			  ((expression float *
 			   (var_ref y_over_x)
 			   (expression float rsq
@@ -11,7 +11,12 @@
 			     (expression float *
 			      (var_ref y_over_x)
 			      (var_ref y_over_x))
-			     (constant float (1.0)))))))
+			     (constant float (1.0)))))
+			   (constant float (-1.0))
+			   (constant float (1.0))))
+      (declare () float s)
+      (call asin (var_ref s)
+			  ((var_ref sin_theta)))
       (return (var_ref s))))
 
    (signature vec2

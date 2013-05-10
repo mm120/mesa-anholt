@@ -1960,87 +1960,6 @@ fs_visitor::dead_code_eliminate_local()
    return progress;
 }
 
-/**
- * Implements a second type of register coalescing: This one checks if
- * the two regs involved in a raw move don't interfere, in which case
- * they can both by stored in the same place and the MOV removed.
- */
-bool
-fs_visitor::register_coalesce_2()
-{
-   bool progress = false;
-
-   calculate_live_intervals();
-
-   foreach_list_safe(node, &this->instructions) {
-      fs_inst *inst = (fs_inst *)node;
-
-      if (inst->opcode != BRW_OPCODE_MOV ||
-	  inst->is_partial_write() ||
-	  inst->saturate ||
-	  inst->src[0].file != GRF ||
-	  inst->src[0].negate ||
-	  inst->src[0].abs ||
-	  inst->src[0].smear != -1 ||
-	  inst->dst.file != GRF ||
-	  inst->dst.type != inst->src[0].type ||
-	  virtual_grf_sizes[inst->src[0].reg] != 1 ||
-	  virtual_grf_interferes(inst->dst.reg, inst->src[0].reg)) {
-	 continue;
-      }
-
-      int reg_from = inst->src[0].reg;
-      assert(inst->src[0].reg_offset == 0);
-      int reg_to = inst->dst.reg;
-      int reg_to_offset = inst->dst.reg_offset;
-
-      foreach_list(node, &this->instructions) {
-	 fs_inst *scan_inst = (fs_inst *)node;
-
-	 if (scan_inst->dst.file == GRF &&
-	     scan_inst->dst.reg == reg_from) {
-	    scan_inst->dst.reg = reg_to;
-	    scan_inst->dst.reg_offset = reg_to_offset;
-	 }
-	 for (int i = 0; i < 3; i++) {
-	    if (scan_inst->src[i].file == GRF &&
-		scan_inst->src[i].reg == reg_from) {
-	       scan_inst->src[i].reg = reg_to;
-	       scan_inst->src[i].reg_offset = reg_to_offset;
-	    }
-	 }
-      }
-
-      inst->remove();
-
-      /* We don't need to recalculate live intervals inside the loop despite
-       * flagging live_intervals_valid because we only use live intervals for
-       * the interferes test, and we must have had a situation where the
-       * intervals were:
-       *
-       *  from  to
-       *  ^
-       *  |
-       *  v
-       *        ^
-       *        |
-       *        v
-       *
-       * Some register R that might get coalesced with one of these two could
-       * only be referencing "to", otherwise "from"'s range would have been
-       * longer.  R's range could also only start at the end of "to" or later,
-       * otherwise it will conflict with "to" when we try to coalesce "to"
-       * into Rw anyway.
-       */
-      live_intervals_valid = false;
-
-      progress = true;
-      continue;
-   }
-
-   return progress;
-}
-
 bool
 fs_visitor::register_coalesce()
 {
@@ -2935,7 +2854,6 @@ fs_visitor::run()
 	 progress = dead_code_eliminate() || progress;
 	 progress = dead_code_eliminate_local() || progress;
 	 progress = register_coalesce() || progress;
-	 progress = register_coalesce_2() || progress;
 	 progress = compute_to_mrf() || progress;
       } while (progress);
 

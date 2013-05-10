@@ -68,6 +68,8 @@ GLboolean ra_simplify(struct ra_graph *g);
 void ra_optimistic_color(struct ra_graph *g);
 GLboolean ra_select(struct ra_graph *g);
 GLboolean ra_allocate_no_spills(struct ra_graph *g);
+GLboolean ra_try_conservative_coalesce(struct ra_graph *g,
+                                       int n_dst, int n_src);
 
 unsigned int ra_get_node_reg(struct ra_graph *g, unsigned int n);
 void ra_set_node_reg(struct ra_graph * g, unsigned int n, unsigned int reg);

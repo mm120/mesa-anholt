@@ -406,6 +406,87 @@ static GLboolean pq_test(struct ra_graph *g, unsigned int n)
 }
 
 /**
+ * Implements the test for Briggs-style conservative register coalescing,
+ * adapted for Runeson/Nyström's graph coloring.
+ *
+ * If the union of the interference of n_dst and n_src still produces a
+ * trivially-colorable node, then they are trivially colorable if forced to
+ * the same register (and the MOV is removed).  This conservative choice
+ * avoids increases in spilling that may occur with more aggressive register
+ * coalescing algorithms like that described in the original Chaitin paper
+ * (which was just "Remove all copies between non-interfering nodes.").
+ *
+ * Note that this leaves n_src still in the node list in case of success.
+ * Since we know both nodes are trivially colorable, n_src will not interfere
+ * with any register allocation decisions other than possibly spilling.  If
+ * you decide to spill it (unusual for GPUs), no spill code will be introduced
+ * and the only runtime cost is that you rebuild the interference graph
+ * anyway, plus run the ra_simplify() step an extra time.
+ */
+GLboolean
+ra_try_conservative_coalesce(struct ra_graph *g, int n_dst, int n_src)
+{
+   unsigned int i;
+   unsigned int q = 0;
+   int n, n_class, n_dst_class;
+
+   /* Sum the q for n_dst. */
+   n = n_dst;
+   n_class = n_dst_class = g->nodes[n_dst].class;
+   for (i = 0; i < g->nodes[n].adjacency_count; i++) {
+      unsigned int n2 = g->nodes[n].adjacency_list[i];
+      unsigned int n2_class = g->nodes[n2].class;
+
+      if (n != n2 && !g->nodes[n2].in_stack) {
+	 q += g->regs->classes[n_class]->q[n2_class];
+      }
+   }
+   /* If it already fails the pq test, bail */
+   if (q >= g->regs->classes[n_class]->p)
+      return GL_FALSE;
+
+   /* Add in q for anything in n_src that wasn't in n_dst */
+   n = n_src;
+   n_class = g->nodes[n_src].class;
+   for (i = 0; i < g->nodes[n].adjacency_count; i++) {
+      unsigned int n2 = g->nodes[n].adjacency_list[i];
+      unsigned int n2_class = g->nodes[n2].class;
+      bool already_counted = false;
+      int j;
+
+      for (j = 0; j < g->nodes[n_dst].adjacency_count; j++) {
+         if (g->nodes[n_dst].adjacency_list[j] == n2) {
+            already_counted = true;
+            break;
+         }
+      }
+      if (already_counted)
+         continue;
+
+      if (n != n2 && !g->nodes[n2].in_stack) {
+	 q += g->regs->classes[n_class]->q[n2_class];
+      }
+   }
+
+   if (q >= g->regs->classes[n_class]->p)
+      return GL_FALSE;
+
+   /* If the loops above are correct, then the original src and dst were both
+    * trivially colorable.
+    */
+   assert(pq_test(g, n_dst));
+   assert(pq_test(g, n_src));
+
+   for (i = 0; i < g->nodes[n_src].adjacency_count; i++)
+      ra_add_node_interference(g, n_dst, g->nodes[n_src].adjacency_list[i]);
+
+   /* And our reslting merged node is trivially colorable. */
+   assert(pq_test(g, n_dst));
+
+   return GL_TRUE;
+}
+
+/**
  * Simplifies the interference graph by pushing all
  * trivially-colorable nodes into a stack of nodes to be colored,
  * removing them from the graph, and rinsing and repeating.

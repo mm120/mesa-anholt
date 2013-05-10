@@ -387,6 +387,100 @@ fs_visitor::setup_mrf_hack_interference(struct ra_graph *g, int first_mrf_node)
    }
 }
 
+/**
+ * Implements Briggs-style conservative register coalescing as adapted for
+ * Runeson/Nyström's graph coloring.
+ *
+ * For each raw MOV instruction where the source and destination don't
+ * interfere, ask the register allocator if the union of their two
+ * interferences is still trivially colorable.  If so, it will merge the
+ * source's interferences into the destinations, and we can replace all use of
+ * the source in the program with use of the dest, removing the copy.
+ */
+void
+fs_visitor::opt_conservative_coalescing(struct ra_graph *g)
+{
+   bool progress = true;
+
+   while (progress) {
+      progress = false;
+
+      foreach_list_safe(node, &this->instructions) {
+         fs_inst *inst = (fs_inst *)node;
+
+         /* Check for a raw MOV. */
+         if (inst->opcode != BRW_OPCODE_MOV ||
+             inst->is_partial_write() ||
+             inst->saturate ||
+             inst->src[0].file != GRF ||
+             inst->src[0].negate ||
+             inst->src[0].abs ||
+             inst->src[0].smear != -1 ||
+             inst->dst.file != GRF ||
+             inst->dst.type != inst->src[0].type ||
+             virtual_grf_sizes[inst->src[0].reg] != 1 ||
+             virtual_grf_interferes(inst->dst.reg, inst->src[0].reg)) {
+            continue;
+         }
+
+         /* Ask the RA if it would be trivially colorable. */
+         if (!ra_try_conservative_coalesce(g, inst->dst.reg, inst->src[0].reg))
+            continue;
+
+         /* Fix up the IR for the removal of this MOV and the replacement of
+          * src[0] by dst.
+          */
+         int reg_from = inst->src[0].reg;
+         assert(inst->src[0].reg_offset == 0);
+         int reg_to = inst->dst.reg;
+         int reg_to_offset = inst->dst.reg_offset;
+
+         foreach_list(node, &this->instructions) {
+            fs_inst *scan_inst = (fs_inst *)node;
+
+            if (scan_inst->dst.file == GRF &&
+                scan_inst->dst.reg == reg_from) {
+               scan_inst->dst.reg = reg_to;
+               scan_inst->dst.reg_offset = reg_to_offset;
+            }
+            for (int i = 0; i < 3; i++) {
+               if (scan_inst->src[i].file == GRF &&
+                   scan_inst->src[i].reg == reg_from) {
+                  scan_inst->src[i].reg = reg_to;
+                  scan_inst->src[i].reg_offset = reg_to_offset;
+               }
+            }
+         }
+
+         inst->remove();
+
+         /* We don't need to recalculate live intervals inside the loop
+          * despite flagging live_intervals_valid, because we only use live
+          * intervals for the interferes test, and we must have had a
+          * situation where the intervals were:
+          *
+          *  from  to
+          *  ^
+          *  |
+          *  v
+          *        ^
+          *        |
+          *        v
+          *
+          * Some register R that might get coalesced with one of these two
+          * could only be referencing "to", otherwise "from"'s range would
+          * have been longer.  R's range could also only start at the end of
+          * "to" or later, otherwise it will conflict with "to" when we try to
+          * coalesce "to" into R anyway.
+          */
+         live_intervals_valid = false;
+
+         progress = true;
+         continue;
+      }
+   }
+}
+
 bool
 fs_visitor::assign_regs()
 {
@@ -451,6 +545,8 @@ fs_visitor::assign_regs()
    setup_payload_interference(g, payload_node_count, first_payload_node);
    if (intel->gen >= 7)
       setup_mrf_hack_interference(g, first_mrf_hack_node);
+
+   opt_conservative_coalescing(g);
 
    if (!ra_allocate_no_spills(g)) {
       /* Failed to allocate registers.  Spill a reg, and the caller will

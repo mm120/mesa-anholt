@@ -151,6 +151,9 @@ bool do_wm_prog(struct brw_context *brw,
 
    c = rzalloc(NULL, struct brw_wm_compile);
 
+   c->prog_data.uses_discard = (fp->program.UsesKill ||
+                                key->blend_discard);
+
    /* Allocate the references to the uniforms that will end up in the
     * prog_data associated with the compiled program, and which will be freed
     * by the state cache.
@@ -289,6 +292,8 @@ brw_wm_debug_recompile(struct brw_context *brw,
                       old_key->drawable_height, key->drawable_height);
    found |= key_debug(intel, "input slots valid",
                       old_key->input_slots_valid, key->input_slots_valid);
+   found |= key_debug(intel, "blend discard optimization",
+                      old_key->blend_discard, key->blend_discard);
 
    found |= brw_debug_recompile_sampler_key(intel, &old_key->tex, &key->tex);
 
@@ -467,6 +472,25 @@ static void brw_wm_populate_key( struct brw_context *brw,
    /* BRW_NEW_VUE_MAP_GEOM_OUT */
    if (intel->gen < 6)
       key->input_slots_valid = brw->vue_map_geom_out.slots_valid;
+
+   /* _NEW_COLOR | _NEW_BUFFERS | _NEW_DEPTH | _NEW_STENCIL*/
+   key->blend_discard =
+      (ctx->DrawBuffer->_NumColorDrawBuffers == 1 &&
+       !ctx->Stencil._Enabled &&
+       !(ctx->Depth.Test && ctx->Depth.Mask) &&
+       ctx->Color.BlendEnabled & 1 &&
+       ctx->Color.AlphaEnabled &&
+       (ctx->Color.Blend[0].SrcRGB == GL_ONE ||
+        ctx->Color.Blend[0].SrcRGB == GL_SRC_ALPHA) &&
+       (ctx->Color.Blend[0].SrcA == GL_ONE ||
+        ctx->Color.Blend[0].SrcA == GL_SRC_ALPHA) &&
+       (ctx->Color.Blend[0].DstRGB == GL_ONE ||
+        ctx->Color.Blend[0].DstRGB == GL_ONE_MINUS_SRC_COLOR ||
+        ctx->Color.Blend[0].DstRGB == GL_ONE_MINUS_SRC_ALPHA) &&
+       (ctx->Color.Blend[0].DstA == GL_ONE_MINUS_SRC_ALPHA ||
+        ctx->Color.Blend[0].DstA == GL_ONE) &&
+       ctx->Color.Blend[0].EquationRGB == GL_FUNC_ADD &&
+       ctx->Color.Blend[0].EquationA == GL_FUNC_ADD);
 
    /* The unique fragment program ID */
    key->program_string_id = fp->id;

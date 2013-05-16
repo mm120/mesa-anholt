@@ -65,6 +65,7 @@ struct brw_wm_prog_key {
    GLuint sample_alpha_to_coverage:1;
    GLuint render_to_fbo:1;
    GLuint clamp_fragment_color:1;
+   GLuint blend_discard:1;
    GLuint line_aa:2;
 
    GLushort drawable_height;

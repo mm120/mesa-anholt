@@ -599,6 +599,42 @@ fs_visitor::emit_shader_time_write(enum shader_time_shader_type type,
                 fs_reg(), payload, offset, value));
 }
 
+/**
+ * Insert a discard to avoid render target reads by the color calculator in
+ * cases where it's unnecessary.
+ *
+ * One might hope that the hardware would notice that (0, 0, 0, 0) added to
+ * the destination is a no-op, but it doesn't.  So for compositing things like
+ * text, we end up reading all the areas of the render target that aren't
+ * actually being affected by the glyph, costing memory bandwidth.  We can
+ * trade off a bit of extra EU time here to avoid that, and it appears to be
+ * worth it (1.2% improvement on firefox-planet-gnome in cairo-gl).
+ */
+void
+fs_visitor::emit_blend_discard()
+{
+   if (!c->key.blend_discard)
+      return;
+
+   assert(c->prog_data.uses_discard);
+   this->current_annotation = "'Over' blend optimization";
+   for (int i = 0; i < 4; i++) {
+      fs_reg color_chan = outputs[0];
+      color_chan.reg_offset = i;
+      fs_inst *cmp = emit(CMP(reg_null_d, color_chan, fs_reg(0.0f),
+                              BRW_CONDITIONAL_EQ));
+      if (i != 0)
+         cmp->predicate = BRW_PREDICATE_NORMAL;
+   }
+
+   emit(IF(BRW_PREDICATE_NORMAL));
+
+   ir_discard *disc = new(mem_ctx) ir_discard();
+   disc->accept(this);
+
+   emit(BRW_OPCODE_ENDIF);
+}
+
 void
 fs_visitor::fail(const char *format, ...)
 {
@@ -2890,7 +2926,7 @@ fs_visitor::run()
       /* We handle discards by keeping track of the still-live pixels in f0.1.
        * Initialize it with the dispatched pixels.
        */
-      if (fp->UsesKill) {
+      if (c->prog_data.uses_discard) {
          fs_inst *discard_init = emit(FS_OPCODE_MOV_DISPATCH_TO_FLAGS);
          discard_init->flag_subreg = 1;
       }
@@ -2911,6 +2947,8 @@ fs_visitor::run()
       base_ir = NULL;
       if (failed)
 	 return false;
+
+      emit_blend_discard();
 
       emit(FS_OPCODE_PLACEHOLDER_HALT);
 

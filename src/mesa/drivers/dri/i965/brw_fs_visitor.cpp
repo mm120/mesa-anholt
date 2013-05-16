@@ -2238,7 +2238,7 @@ fs_visitor::emit_fb_writes()
     *      thread message and on all dual-source messages."
     */
    if (intel->gen >= 6 &&
-       !this->fp->UsesKill &&
+       !c->prog_data.uses_discard &&
        !do_dual_src &&
        c->key.nr_color_regions == 1) {
       header_present = false;

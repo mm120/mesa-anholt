@@ -635,6 +635,65 @@ fs_visitor::emit_blend_discard()
    emit(BRW_OPCODE_ENDIF);
 }
 
+
+/**
+ * Insert a discard to avoid render target reads by the color calculator in
+ * cases where it's unnecessary.
+ *
+ * One might hope that the hardware would notice that (0, 0, 0, 0) added to
+ * the destination is a no-op, but it doesn't.  So for compositing things like
+ * text, we end up reading all the areas of the render target that aren't
+ * actually being affected by the glyph, costing memory bandwidth.  We can
+ * trade off a bit of extra EU time here to avoid that, and it appears to be
+ * worth it (1.2% improvement on firefox-planet-gnome in cairo-gl).
+ */
+void
+fs_visitor::emit_circular_points_discard()
+{
+   if (!c->key.circular_points_discard)
+      return;
+
+   /* XXX See hack in brw_shader.cpp */
+   assert(fp->Base.InputsRead & BITFIELD64_BIT(VARYING_SLOT_PNTC));
+
+   /* Make up a dummy instruction to reuse code for emitting
+    * interpolation.
+    */
+   ir_variable *pntc_var = new(mem_ctx) ir_variable(glsl_type::vec4_type,
+                                              "pntc",
+                                              ir_var_shader_in);
+   pntc_var->location = VARYING_SLOT_PNTC;
+   fs_reg pntc = *emit_general_interpolation(pntc_var);
+
+   assert(c->prog_data.uses_discard);
+   this->current_annotation = "GL_POINTS rectangle-to-circle";
+   fs_reg dist_comp = fs_reg(this, glsl_type::vec2_type);
+   fs_reg dx2 = dist_comp;
+   fs_reg dy2 = dist_comp;
+   dy2.reg_offset++;
+
+   for (int i = 0; i < 2; i++) {
+      pntc.reg_offset = i;
+      dist_comp.reg_offset = i;
+
+      /* Translate pntc from (0,1) to (-0.5, 0.5) */
+      fs_reg temp = fs_reg(this, glsl_type::float_type);
+      emit(ADD(temp, pntc, fs_reg(-0.5f)));
+
+      emit(MUL(dist_comp, temp, temp));
+   }
+   fs_reg dist = fs_reg(this, glsl_type::float_type);
+   emit(ADD(dist, dx2, dy2));
+   emit(CMP(reg_null_d, dist, fs_reg(0.25f), BRW_CONDITIONAL_G));
+
+   emit(IF(BRW_PREDICATE_NORMAL));
+
+   ir_discard *disc = new(mem_ctx) ir_discard();
+   disc->accept(this);
+
+   emit(BRW_OPCODE_ENDIF);
+}
+
 void
 fs_visitor::fail(const char *format, ...)
 {
@@ -2930,6 +2989,8 @@ fs_visitor::run()
          fs_inst *discard_init = emit(FS_OPCODE_MOV_DISPATCH_TO_FLAGS);
          discard_init->flag_subreg = 1;
       }
+
+      emit_circular_points_discard();
 
       /* Generate FS IR for main().  (the visitor only descends into
        * functions called "main").

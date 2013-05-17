@@ -152,7 +152,8 @@ bool do_wm_prog(struct brw_context *brw,
    c = rzalloc(NULL, struct brw_wm_compile);
 
    c->prog_data.uses_discard = (fp->program.UsesKill ||
-                                key->blend_discard);
+                                key->blend_discard ||
+                                key->circular_points_discard);
 
    /* Allocate the references to the uniforms that will end up in the
     * prog_data associated with the compiled program, and which will be freed
@@ -294,6 +295,8 @@ brw_wm_debug_recompile(struct brw_context *brw,
                       old_key->input_slots_valid, key->input_slots_valid);
    found |= key_debug(intel, "blend discard optimization",
                       old_key->blend_discard, key->blend_discard);
+   found |= key_debug(intel, "circular wide points",
+                      old_key->circular_points_discard, key->circular_points_discard);
 
    found |= brw_debug_recompile_sampler_key(intel, &old_key->tex, &key->tex);
 
@@ -364,6 +367,8 @@ static void brw_wm_populate_key( struct brw_context *brw,
    GLuint lookup = 0;
    GLuint line_aa;
    bool program_uses_dfdy = fp->program.UsesDFdy;
+   /* _NEW_BUFFERS */
+   bool multisampled_fbo = ctx->DrawBuffer->Visual.samples > 1;
 
    memset(key, 0, sizeof(*key));
 
@@ -492,6 +497,16 @@ static void brw_wm_populate_key( struct brw_context *brw,
        ctx->Color.Blend[0].EquationRGB == GL_FUNC_ADD &&
        ctx->Color.Blend[0].EquationA == GL_FUNC_ADD);
 
+  /* BRW_NEW_REDUCED_PRIMITIVE | _NEW_POINT | _NEW_MULTISAMPLE |
+   * _NEW_BUFFERS
+   */
+   /* XXX: Actually update brw->reduced_primitive in brw_draw.c and check it
+    * here.
+    */
+   key->circular_points_discard =
+      ((ctx->Point.SmoothFlag ||
+        (ctx->Multisample.Enabled && multisampled_fbo)));
+
    /* The unique fragment program ID */
    key->program_string_id = fp->id;
 }
@@ -526,6 +541,7 @@ const struct brw_tracked_state brw_wm_prog = {
 		_NEW_STENCIL |
 		_NEW_POLYGON |
 		_NEW_LINE |
+		_NEW_POINT |
 		_NEW_LIGHT |
 		_NEW_FRAG_CLAMP |
 		_NEW_BUFFERS |

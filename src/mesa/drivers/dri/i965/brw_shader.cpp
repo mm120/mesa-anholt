@@ -246,6 +246,10 @@ brw_link_shader(struct gl_context *ctx, struct gl_shader_program *shProg)
       do_set_program_inouts(shader->ir, prog,
 			    shader->base.Type == GL_FRAGMENT_SHADER);
 
+      /* XXX LOL HAX */
+      if (stage == MESA_SHADER_FRAGMENT)
+         prog->InputsRead |= VARYING_BIT_PNTC;
+
       prog->SamplersUsed = shader->base.active_samplers;
       _mesa_update_shader_textures_used(shProg, prog);
 

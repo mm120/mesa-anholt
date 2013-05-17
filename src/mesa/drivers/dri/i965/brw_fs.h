@@ -396,6 +396,7 @@ public:
 
    void emit_color_write(int target, int index, int first_color_mrf);
    void emit_blend_discard();
+   void emit_circular_points_discard();
    void emit_fb_writes();
 
    void emit_shader_time_begin();

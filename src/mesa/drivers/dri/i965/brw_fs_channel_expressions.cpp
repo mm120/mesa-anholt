@@ -342,6 +342,14 @@ ir_channel_expressions_visitor::visit_leave(ir_assignment *ir)
       assert(!"noise should have been broken down to function call");
       break;
 
+   case ir_binop_vector_extract:
+      assert(!"not reached: should be handled by lower_vec_index_to_cond_assign()");
+      break;
+
+   case ir_triop_vector_insert:
+      assert(!"not reached: should be handled by lower_vector_insert()");
+      break;
+
    case ir_binop_bfm: {
       /* Does not need to be scalarized, since its result will be identical
        * for all channels.

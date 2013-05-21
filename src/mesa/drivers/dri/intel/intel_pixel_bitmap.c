@@ -259,14 +259,17 @@ do_blit_bitmap( struct gl_context *ctx,
 	  * Have to translate destination coordinates back into source
 	  * coordinates.
 	  */
-	 if (get_bitmap_rect(bitmap_width, bitmap_height, unpack,
-			     bitmap,
-			     -orig_dstx + (dstx + px),
-			     -orig_dsty + y_flip(fb, dsty + py, h),
-			     w, h,
-			     (GLubyte *)stipple,
-			     8,
-			     _mesa_is_winsys_fbo(fb)) == 0)
+         int count = get_bitmap_rect(bitmap_width, bitmap_height, unpack,
+                                     bitmap,
+                                     -orig_dstx + (dstx + px),
+                                     -orig_dsty + y_flip(fb, dsty + py, h),
+                                     w, h,
+                                     (GLubyte *)stipple,
+                                     8,
+                                     _mesa_is_winsys_fbo(fb));
+         if (ctx->Query.CurrentOcclusionObject)
+            ctx->Query.CurrentOcclusionObject->Result += count;
+         if (count == 0)
 	    continue;
 
 	 if (!intelEmitImmediateColorExpandBlit(intel,

@@ -111,7 +111,12 @@ do_vec4_gs_prog(struct brw_context *brw,
       return false;
    }
 
-   /* TODO: set c.prog_data.base.num_surfaces properly */
+   if (c.prog_data.base.nr_pull_params)
+      c.prog_data.base.num_surfaces = 1;
+   if (gp->program.Base.SamplersUsed)
+      c.prog_data.base.num_surfaces = SURF_INDEX_GS_TEXTURE(BRW_MAX_TEX_UNIT);
+   if (gs->NumUniformBlocks)
+      c.prog_data.base.num_surfaces = SURF_INDEX_GS_UBO(gs->NumUniformBlocks);
 
    /* Scratch space is used for register spilling */
    if (c.base.last_scratch) {

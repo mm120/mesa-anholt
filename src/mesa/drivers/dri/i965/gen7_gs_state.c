@@ -62,13 +62,10 @@ upload_gs_state(struct brw_context *brw)
    /* BRW_NEW_GEOMETRY_PROGRAM */
    bool active = brw->geometry_program;
 
-   /* HACK: For now we just use the VS binding table.  TODO: implement the
-    * correct GS binding table pointer pointer.
-    */
    /* BRW_NEW_VS_BINDING_TABLE */
    BEGIN_BATCH(2);
    OUT_BATCH(_3DSTATE_BINDING_TABLE_POINTERS_GS << 16 | (2 - 2));
-   OUT_BATCH(brw->vs.bind_bo_offset);
+   OUT_BATCH(brw->gs.bind_bo_offset);
    ADVANCE_BATCH();
 
    /* CACHE_NEW_SAMPLER */

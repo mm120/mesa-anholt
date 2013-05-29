@@ -148,6 +148,7 @@ enum brw_state_id {
    BRW_STATE_BATCH,
    BRW_STATE_INDEX_BUFFER,
    BRW_STATE_VS_CONSTBUF,
+   BRW_STATE_GS_CONSTBUF,
    BRW_STATE_PROGRAM_CACHE,
    BRW_STATE_STATE_BASE_ADDRESS,
    BRW_STATE_VUE_MAP_VS,
@@ -182,6 +183,7 @@ enum brw_state_id {
 /** \see brw.state.depth_region */
 #define BRW_NEW_INDEX_BUFFER           (1 << BRW_STATE_INDEX_BUFFER)
 #define BRW_NEW_VS_CONSTBUF            (1 << BRW_STATE_VS_CONSTBUF)
+#define BRW_NEW_GS_CONSTBUF            (1 << BRW_STATE_GS_CONSTBUF)
 #define BRW_NEW_PROGRAM_CACHE		(1 << BRW_STATE_PROGRAM_CACHE)
 #define BRW_NEW_STATE_BASE_ADDRESS	(1 << BRW_STATE_STATE_BASE_ADDRESS)
 #define BRW_NEW_VUE_MAP_VS		(1 << BRW_STATE_VUE_MAP_VS)
@@ -622,8 +624,19 @@ struct brw_vec4_gs_prog_data
 #define SURF_INDEX_VS_SHADER_TIME    (SURF_INDEX_VS_UBO(12))
 #define BRW_MAX_VS_SURFACES          (SURF_INDEX_VS_SHADER_TIME + 1)
 
-#define SURF_INDEX_SOL_BINDING(t)    ((t))
-#define BRW_MAX_GS_SURFACES          SURF_INDEX_SOL_BINDING(BRW_MAX_SOL_BINDINGS)
+#define SURF_INDEX_GEN6_SOL_BINDING(t) (t)
+#define BRW_MAX_GEN6_GS_SURFACES       SURF_INDEX_GEN6_SOL_BINDING(BRW_MAX_SOL_BINDINGS)
+
+#define SURF_INDEX_GS_GEN6_SOL_BUFFER 0
+#define SURF_INDEX_GS_CONST_BUFFER   (SURF_INDEX_GS_GEN6_SOL_BUFFER)
+
+#define SURF_INDEX_GS_TEXTURE(t)     (SURF_INDEX_GS_CONST_BUFFER + 1 + (t))
+#define SURF_INDEX_GS_UBO(u)         (SURF_INDEX_GS_TEXTURE(BRW_MAX_TEX_UNIT) + u)
+#define SURF_INDEX_GS_SHADER_TIME    (SURF_INDEX_GS_UBO(12))
+#define BRW_MAX_GEN7_GS_SURFACES          (SURF_INDEX_GS_SHADER_TIME + 1)
+
+#define BRW_MAX_GS_SURFACES MAX2(BRW_MAX_GEN6_GS_SURFACES, \
+                                 BRW_MAX_GEN7_GS_SURFACES)
 
 /**
  * Stride in bytes between shader_time entries.
@@ -1019,6 +1032,7 @@ struct brw_context
 
    struct {
       struct brw_gs_prog_data *prog_data;
+      drm_intel_bo *const_bo;
 
       bool prog_active;
       /** Offset in the program cache to the CLIP program pre-gen6 */

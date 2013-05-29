@@ -635,7 +635,12 @@ validate_geometry_shader_executable(struct gl_shader_program *prog,
 
    int num_vertices = vertices_per_prim(prog->Geom.InputType);
    prog->Geom.VerticesIn = num_vertices;
-   
+
+   if (prog->Geom.VerticesOut == 0) {
+      linker_error(prog, "Program parameter GL_GEOMETRY_VERTICES_OUT is zero.\n");
+      return false;
+   }
+
    /* Replace references to gl_VerticesIn with the number of input vertices */
    inject_num_vertices_visitor inject_visitor(num_vertices);
    foreach_iter(exec_list_iterator, iter, *shader->ir) {

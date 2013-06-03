@@ -1120,6 +1120,9 @@ emit_fetch_gs_input(
                                           reg->Register.File,
                                           reg->Register.Index,
                                           &reg->Indirect);
+
+      LLVMValueRef ind = lp_build_const_int32(gallivm, 0);
+      attrib_index = LLVMBuildExtractElement(builder, attrib_index, ind, "");
    } else {
       attrib_index = lp_build_const_int32(gallivm, reg->Register.Index);
    }

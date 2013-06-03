@@ -248,10 +248,15 @@ struct dd_function_table {
 
    /**
     * Called by glCopyTex[Sub]Image[123]D().
+    *
+    * In the case of 1D array textures, the driver will be called to copy each
+    * appropriate scanline from the rb to each destination slice.  For 3D or
+    * other array textures, only one slice may be copied, but @slice may be
+    * nonzero.
     */
    void (*CopyTexSubImage)(struct gl_context *ctx, GLuint dims,
                            struct gl_texture_image *texImage,
-                           GLint xoffset, GLint yoffset, GLint zoffset,
+                           GLint xoffset, GLint yoffset, GLint slice,
                            struct gl_renderbuffer *rb,
                            GLint x, GLint y,
                            GLsizei width, GLsizei height);

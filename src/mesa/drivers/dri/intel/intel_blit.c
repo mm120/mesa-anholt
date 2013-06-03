@@ -86,6 +86,33 @@ br13_for_cpp(int cpp)
 }
 
 /**
+ * Emits the packet for switching the blitter from X to Y tiled or back.
+ *
+ * The BATCH_BEGIN_BLT must already be started, since the pairs of this
+ * command emitted need to be in the same batchbuffer as the blit they're
+ * wrapping (otherwise, our state might leak out into another context, since
+ * BCS_SWCTRL is saved as part of the power context, not a render context).
+ */
+static void
+set_blitter_tiling(struct intel_context *intel,
+                   bool dst_y_tiled, bool src_y_tiled)
+{
+   assert(intel->gen >= 6);
+
+   /* Idle the blitter before we update how tiling is interpreted. */
+   OUT_BATCH(MI_FLUSH_DW);
+   OUT_BATCH(0);
+   OUT_BATCH(0);
+   OUT_BATCH(0);
+
+   OUT_BATCH(MI_LOAD_REGISTER_IMM | (3 - 2));
+   OUT_BATCH(BCS_SWCTRL);
+   OUT_BATCH((BCS_SWCTRL_DST_Y | BCS_SWCTRL_SRC_Y) << 16 |
+             (dst_y_tiled ? BCS_SWCTRL_DST_Y : 0) |
+             (src_y_tiled ? BCS_SWCTRL_SRC_Y : 0));
+}
+
+/**
  * Implements a rectangular block transfer (blit) of pixels between two
  * miptrees.
  *
@@ -204,21 +231,20 @@ intelEmitCopyBlit(struct intel_context *intel,
    int dst_y2 = dst_y + h;
    int dst_x2 = dst_x + w;
    drm_intel_bo *aper_array[3];
-   uint32_t bcs_swctrl = 0;
+   bool dst_y_tiled = dst_tiling == I915_TILING_Y;
+   bool src_y_tiled = src_tiling == I915_TILING_Y;
    BATCH_LOCALS;
 
    if (dst_tiling != I915_TILING_NONE) {
       if (dst_offset & 4095)
 	 return false;
-      if (dst_tiling == I915_TILING_Y && intel->gen < 6)
-	 return false;
    }
    if (src_tiling != I915_TILING_NONE) {
       if (src_offset & 4095)
 	 return false;
-      if (src_tiling == I915_TILING_Y && intel->gen < 6)
-	 return false;
    }
+   if ((dst_y_tiled || src_y_tiled) && intel->gen < 6)
+      return false;
 
    /* do space check before going any further */
    do {
@@ -284,16 +310,10 @@ intelEmitCopyBlit(struct intel_context *intel,
    if (dst_tiling != I915_TILING_NONE) {
       CMD |= XY_DST_TILED;
       dst_pitch /= 4;
-
-      if (dst_tiling == I915_TILING_Y)
-         bcs_swctrl |= BCS_SWCTRL_DST_Y;
    }
    if (src_tiling != I915_TILING_NONE) {
       CMD |= XY_SRC_TILED;
       src_pitch /= 4;
-
-      if (src_tiling == I915_TILING_Y)
-         bcs_swctrl |= BCS_SWCTRL_SRC_Y;
    }
 #endif
 
@@ -304,20 +324,10 @@ intelEmitCopyBlit(struct intel_context *intel,
    assert(dst_x < dst_x2);
    assert(dst_y < dst_y2);
 
-   BEGIN_BATCH_BLT(8 + ((bcs_swctrl != 0) ? 14 : 0));
+   BEGIN_BATCH_BLT(8 + ((dst_y_tiled || src_y_tiled) ? 14 : 0));
 
-   if (bcs_swctrl != 0) {
-      /* Idle the blitter before we update how tiling is interpreted. */
-      OUT_BATCH(MI_FLUSH_DW);
-      OUT_BATCH(0);
-      OUT_BATCH(0);
-      OUT_BATCH(0);
-
-      OUT_BATCH(MI_LOAD_REGISTER_IMM | (3 - 2));
-      OUT_BATCH(BCS_SWCTRL);
-      OUT_BATCH((BCS_SWCTRL_DST_Y | BCS_SWCTRL_SRC_Y) << 16 |
-                bcs_swctrl);
-   }
+   if (dst_y_tiled || src_y_tiled)
+      set_blitter_tiling(intel, dst_y_tiled, src_y_tiled);
 
    OUT_BATCH(CMD | (8 - 2));
    OUT_BATCH(BR13 | (uint16_t)dst_pitch);
@@ -332,16 +342,8 @@ intelEmitCopyBlit(struct intel_context *intel,
 		    I915_GEM_DOMAIN_RENDER, 0,
 		    src_offset);
 
-   if (bcs_swctrl != 0) {
-      OUT_BATCH(MI_FLUSH_DW);
-      OUT_BATCH(0);
-      OUT_BATCH(0);
-      OUT_BATCH(0);
-
-      OUT_BATCH(MI_LOAD_REGISTER_IMM | (3 - 2));
-      OUT_BATCH(BCS_SWCTRL);
-      OUT_BATCH((BCS_SWCTRL_DST_Y | BCS_SWCTRL_SRC_Y) << 16);
-   }
+   if (dst_y_tiled || src_y_tiled)
+      set_blitter_tiling(intel, false, false);
 
    ADVANCE_BATCH();
 

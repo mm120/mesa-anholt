@@ -709,8 +709,6 @@ intel_set_teximage_alpha_to_one(struct gl_context *ctx,
    CMD = XY_COLOR_BLT_CMD;
    CMD |= XY_BLT_WRITE_ALPHA;
 
-   assert(region->tiling != I915_TILING_Y);
-
 #ifndef I915
    if (region->tiling != I915_TILING_NONE) {
       CMD |= XY_DST_TILED;
@@ -728,7 +726,12 @@ intel_set_teximage_alpha_to_one(struct gl_context *ctx,
       intel_batchbuffer_flush(intel);
    }
 
-   BEGIN_BATCH_BLT(6);
+   bool dst_y_tiled = region->tiling == I915_TILING_Y;
+
+   BEGIN_BATCH_BLT(6 + dst_y_tiled ? 14 : 0);
+   if (dst_y_tiled)
+      set_blitter_tiling(intel, dst_y_tiled, false);
+
    OUT_BATCH(CMD | (6 - 2));
    OUT_BATCH(BR13);
    OUT_BATCH((y1 << 16) | x1);
@@ -737,6 +740,9 @@ intel_set_teximage_alpha_to_one(struct gl_context *ctx,
 		    I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER,
 		    0);
    OUT_BATCH(0xffffffff); /* white, but only alpha gets written */
+
+   if (dst_y_tiled)
+      set_blitter_tiling(intel, false, false);
    ADVANCE_BATCH();
 
    intel_batchbuffer_emit_mi_flush(intel);

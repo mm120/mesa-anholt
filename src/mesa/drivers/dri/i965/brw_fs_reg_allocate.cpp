@@ -540,23 +540,13 @@ fs_visitor::choose_spill_reg(struct ra_graph *g)
       for (unsigned int i = 0; i < 3; i++) {
 	 if (inst->src[i].file == GRF) {
 	    spill_costs[inst->src[i].reg] += loop_scale;
-
-            /* Register spilling logic assumes full-width registers; smeared
-             * registers have a width of 1 so if we try to spill them we'll
-             * generate invalid assembly.  This shouldn't be a problem because
-             * smeared registers are only used as short-term temporaries when
-             * loading pull constants, so spilling them is unlikely to reduce
-             * register pressure anyhow.
-             */
-            if (inst->src[i].smear >= 0) {
-               no_spill[inst->src[i].reg] = true;
-            }
 	 }
       }
 
       if (inst->dst.file == GRF) {
 	 spill_costs[inst->dst.reg] += inst->regs_written * loop_scale;
 
+         assert(inst->dst.smear == -1);
          if (inst->dst.smear >= 0) {
             no_spill[inst->dst.reg] = true;
          }
@@ -615,7 +605,15 @@ fs_visitor::spill_reg(int spill_reg)
 	 if (inst->src[i].file == GRF &&
 	     inst->src[i].reg == spill_reg) {
 	    inst->src[i].reg = virtual_grf_alloc(1);
-	    emit_unspill(inst, inst->src[i],
+
+            fs_reg unspill_dst = inst->src[i];
+            if (unspill_dst.smear != -1) {
+               perf_debug("Unspilling a value that was probably loaded from "
+                          "a pull constant.  We should just reload the pull "
+                          "constant instead of spilling.\n");
+               unspill_dst.smear = -1;
+            }
+            emit_unspill(inst, unspill_dst,
                          spill_offset + REG_SIZE * inst->src[i].reg_offset);
 	 }
       }

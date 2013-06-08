@@ -192,9 +192,10 @@ static void upload_cc_unit(struct brw_context *brw)
       cc->cc3.alpha_test = 1;
       cc->cc3.alpha_test_func =
 	 intel_translate_compare_func(ctx->Color.AlphaFunc);
-      cc->cc3.alpha_test_format = BRW_ALPHATEST_FORMAT_UNORM8;
+      cc->cc3.alpha_test_format = BRW_ALPHATEST_FORMAT_FLOAT32;
 
       UNCLAMPED_FLOAT_TO_UBYTE(cc->cc7.alpha_ref.ub[0], ctx->Color.AlphaRef);
+      cc->cc7.alpha_ref.f = ctx->Color.AlphaRef;
    }
 
    if (ctx->Color.DitherFlag) {

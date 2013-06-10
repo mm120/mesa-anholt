@@ -240,7 +240,7 @@ brwCreateContext(int api,
    ctx->Const.MaxPointSizeAA = 255.0;
 
    /* We want the GLSL compiler to emit code that uses condition codes */
-   for (i = 0; i <= MESA_SHADER_FRAGMENT; i++) {
+   for (i = 0; i < MESA_SHADER_TYPES; i++) {
       ctx->ShaderCompilerOptions[i].MaxIfDepth = intel->gen < 6 ? 16 : UINT_MAX;
       ctx->ShaderCompilerOptions[i].EmitCondCodes = true;
       ctx->ShaderCompilerOptions[i].EmitNoNoise = true;

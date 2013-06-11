@@ -125,6 +125,7 @@ extern "C" {
 struct brw_context;
 struct brw_instruction;
 struct brw_vs_prog_key;
+struct brw_vec4_prog_key;
 struct brw_wm_prog_key;
 struct brw_wm_prog_data;
 
@@ -1432,6 +1433,11 @@ gen6_upload_vec4_push_constants(struct brw_context *brw,
                                 const struct brw_vec4_prog_data *prog_data,
                                 struct brw_push_const_info *const_info,
                                 enum state_struct_type type);
+
+void
+brw_setup_vec4_key_clip_info(struct brw_context *brw,
+                             struct brw_vec4_prog_key *key,
+                             bool program_uses_clip_distance);
 
 #ifdef __cplusplus
 }

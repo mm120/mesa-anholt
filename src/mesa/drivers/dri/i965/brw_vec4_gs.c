@@ -161,9 +161,7 @@ brw_upload_vec4_gs_prog(struct brw_context *brw)
    memset(&key, 0, sizeof(key));
 
    key.base.program_string_id = gp->id;
-   key.base.userclip_active = 0; /* TODO */
-   key.base.uses_clip_distance = 0; /* TODO */
-   key.base.nr_userclip_plane_consts = 0; /* TODO */
+   brw_setup_vec4_key_clip_info(brw, &key.base, gp->program.UsesClipDistance);
 
    /* _NEW_LIGHT | _NEW_BUFFERS */
    key.base.clamp_vertex_color = ctx->Light._ClampVertexColor;

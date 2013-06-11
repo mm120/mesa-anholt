@@ -422,6 +422,31 @@ brw_vs_debug_recompile(struct brw_context *brw,
    }
 }
 
+
+void
+brw_setup_vec4_key_clip_info(struct brw_context *brw,
+                             struct brw_vec4_prog_key *key,
+                             bool program_uses_clip_distance)
+{
+   struct intel_context *intel = &brw->intel;
+   struct gl_context *ctx = &intel->ctx;
+
+   key->userclip_active = (ctx->Transform.ClipPlanesEnabled != 0);
+   key->uses_clip_distance = program_uses_clip_distance;
+   if (key->userclip_active && !key->uses_clip_distance) {
+      if (intel->gen < 6) {
+         key->nr_userclip_plane_consts
+            = _mesa_bitcount_64(ctx->Transform.ClipPlanesEnabled);
+         key->userclip_planes_enabled_gen_4_5
+            = ctx->Transform.ClipPlanesEnabled;
+      } else {
+         key->nr_userclip_plane_consts
+            = _mesa_logbase2(ctx->Transform.ClipPlanesEnabled) + 1;
+      }
+   }
+}
+
+
 static void brw_upload_vs_prog(struct brw_context *brw)
 {
    struct intel_context *intel = &brw->intel;
@@ -439,19 +464,7 @@ static void brw_upload_vs_prog(struct brw_context *brw)
     * the inputs it asks for, whether they are varying or not.
     */
    key.base.program_string_id = vp->id;
-   key.base.userclip_active = (ctx->Transform.ClipPlanesEnabled != 0);
-   key.base.uses_clip_distance = vp->program.UsesClipDistance;
-   if (key.base.userclip_active && !key.base.uses_clip_distance) {
-      if (intel->gen < 6) {
-         key.base.nr_userclip_plane_consts
-            = _mesa_bitcount_64(ctx->Transform.ClipPlanesEnabled);
-         key.base.userclip_planes_enabled_gen_4_5
-            = ctx->Transform.ClipPlanesEnabled;
-      } else {
-         key.base.nr_userclip_plane_consts
-            = _mesa_logbase2(ctx->Transform.ClipPlanesEnabled) + 1;
-      }
-   }
+   brw_setup_vec4_key_clip_info(brw, &key.base, vp->program.UsesClipDistance);
 
    /* _NEW_POLYGON */
    if (intel->gen < 6) {

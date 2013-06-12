@@ -1161,7 +1161,7 @@ layout_qualifier_id_list:
 integer_constant:
 	INTCONSTANT { $$ = $1; }
 	| UINTCONSTANT { $$ = $1; }
-	;
+;
 
 layout_qualifier_id:
 	any_identifier
@@ -1228,6 +1228,34 @@ layout_qualifier_id:
 	      }
 	   }
 
+	   /* Layout qualifiers for GLSL 1.50 geometry shaders. */
+	   if (!$$.flags.i) {
+	      struct {
+	         const char *s;
+	         GLenum e;
+	      } map[] = {
+		      { "points", GL_POINTS },
+		      { "lines", GL_LINES },
+		      { "lines_adjacency", GL_LINES_ADJACENCY },
+		      { "line_strip", GL_LINE_STRIP },
+		      { "triangles", GL_TRIANGLES },
+		      { "triangles_adjacency", GL_TRIANGLES_ADJACENCY },
+		      { "triangle_strip", GL_TRIANGLE_STRIP },
+	      };
+	      for (unsigned i = 0; i < Elements(map); i++) {
+	         if (strcmp($1, map[i].s) == 0) {
+	            $$.flags.q.prim_type = 1;
+	            $$.prim_type = map[i].e;
+	            break;
+	         }
+	      }
+
+	      if ($$.flags.i && !state->is_version(150, 0)) {
+	         _mesa_glsl_error(& @1, state, "#version 150 layout "
+	                          "qualifier `%s' used", $1);
+	      }
+	   }
+
 	   if (!$$.flags.i) {
 	      _mesa_glsl_error(& @1, state, "unrecognized layout identifier "
 			       "`%s'\n", $1);
@@ -1265,6 +1293,23 @@ layout_qualifier_id:
                     YYERROR;
                  }
               }
+	   }
+
+	   if (strcmp("max_vertices", $1) == 0) {
+	      $$.flags.q.max_vertices = 1;
+
+	      if ($3 < 0) {
+	         _mesa_glsl_error(& @3, state,
+	                          "invalid max_vertices %d specified\n", $3);
+	         YYERROR;
+	      } else {
+	         $$.max_vertices = $3;
+	         if (!state->is_version(150, 0)) {
+	            _mesa_glsl_error(& @3, state,
+	                             "#version 150 max_vertices qualifier "
+	                             "specified\n", $3);
+	         }
+	      }
 	   }
 
 	   /* If the identifier didn't match any known layout identifiers,
@@ -2177,6 +2222,28 @@ layout_defaults:
 	{
 	   if (!state->default_uniform_qualifier->merge_qualifier(& @1, state,
 								  $1)) {
+	      YYERROR;
+	   }
+	}
+
+	| layout_qualifier IN_TOK ';'
+	{
+	   if (state->target != geometry_shader) {
+	      _mesa_glsl_error(& @1, state,
+	                       "Input layout qualifiers only valid in "
+	                       "geometry shaders.\n");
+	   } else if (!state->in_qualifier->merge_qualifier(& @1, state, $1)) {
+	      YYERROR;
+	   }
+	}
+
+	| layout_qualifier OUT_TOK ';'
+	{
+	   if (state->target != geometry_shader) {
+	      _mesa_glsl_error(& @1, state,
+	                       "Out layout qualifiers only valid in "
+	                       "geometry shaders.\n");
+	   } else if (!state->out_qualifier->merge_qualifier(& @1, state, $1)) {
 	      YYERROR;
 	   }
 	}

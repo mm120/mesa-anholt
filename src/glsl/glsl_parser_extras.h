@@ -165,6 +165,12 @@ struct _mesa_glsl_parse_state {
     */
    struct ast_type_qualifier *default_uniform_qualifier;
 
+   /** Input layout qualifiers from GLSL 1.50. (geometry shader controls)*/
+   struct ast_type_qualifier *in_qualifier;
+
+   /** Output layout qualifiers from GLSL 1.50. (geometry shader controls)*/
+   struct ast_type_qualifier *out_qualifier;
+
    /**
     * Printable list of GLSL versions supported by the current context
     *

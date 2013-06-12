@@ -409,6 +409,12 @@ struct ast_type_qualifier {
          unsigned column_major:1;
          unsigned row_major:1;
 	 /** \} */
+
+	 /** \name Layout qualifiers for GLSL 1.50 geometry shaders */
+	 /** \{ */
+	 unsigned prim_type:1;
+	 unsigned max_vertices:1;
+	 /** \} */
       }
       /** \brief Set of flags, accessed by name. */
       q;
@@ -431,6 +437,12 @@ struct ast_type_qualifier {
     * This field is only valid if \c explicit_index is set.
     */
    int index;
+
+   /** Maximum output vertices in GLSL 1.50 geometry shaders. */
+   int max_vertices;
+
+   /** Input or output primitive type in GLSL 1.50 geometry shaders */
+   GLenum prim_type;
 
    /**
     * Return true if and only if an interpolation qualifier is present.

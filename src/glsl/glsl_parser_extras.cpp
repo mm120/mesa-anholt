@@ -158,6 +158,9 @@ _mesa_glsl_parse_state::_mesa_glsl_parse_state(struct gl_context *_ctx,
    this->default_uniform_qualifier = new(this) ast_type_qualifier();
    this->default_uniform_qualifier->flags.q.shared = 1;
    this->default_uniform_qualifier->flags.q.column_major = 1;
+
+   this->in_qualifier = new(this) ast_type_qualifier();
+   this->out_qualifier = new(this) ast_type_qualifier();
 }
 
 /**

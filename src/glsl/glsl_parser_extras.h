@@ -344,6 +344,8 @@ extern int _mesa_glsl_lex(union YYSTYPE *yylval, YYLTYPE *yylloc,
 
 extern int _mesa_glsl_parse(struct _mesa_glsl_parse_state *);
 
+extern void compile_shader();
+
 /**
  * Process elements of the #extension directive
  *

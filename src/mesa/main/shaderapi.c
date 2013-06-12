@@ -48,11 +48,14 @@
 #include "main/transformfeedback.h"
 #include "main/uniforms.h"
 #include "program/program.h"
+#include "program/prog_print.h"
 #include "program/prog_parameter.h"
 #include "ralloc.h"
 #include <stdbool.h>
 #include "../glsl/glsl_parser_extras.h"
+#include "../glsl/ir.h"
 #include "../glsl/ir_uniform.h"
+#include "../glsl/program.h"
 
 /** Define this to enable shader substitution (see below) */
 #define SHADER_SUBST 0
@@ -731,27 +734,59 @@ shader_source(struct gl_context *ctx, GLuint shader, const GLchar *source)
 static void
 compile_shader(struct gl_context *ctx, GLuint shaderObj)
 {
-   struct gl_shader *sh;
+   struct gl_shader *shader;
    struct gl_shader_compiler_options *options;
 
-   sh = _mesa_lookup_shader_err(ctx, shaderObj, "glCompileShader");
-   if (!sh)
+   shader = _mesa_lookup_shader_err(ctx, shaderObj, "glCompileShader");
+   if (!shader)
       return;
 
-   options = &ctx->ShaderCompilerOptions[_mesa_shader_type_to_index(sh->Type)];
+   options = &ctx->ShaderCompilerOptions[_mesa_shader_type_to_index(shader->Type)];
 
    /* set default pragma state for shader */
-   sh->Pragmas = options->DefaultPragmas;
+   shader->Pragmas = options->DefaultPragmas;
 
-   /* this call will set the sh->CompileStatus field to indicate if
-    * compilation was successful.
-    */
-   _mesa_glsl_compile_shader(ctx, sh);
+   if (!shader->Source) {
+      /* If the user called glCompileShader without first calling
+       * glShaderSource, we should fail to compile, but not raise a GL_ERROR.
+       */
+      shader->CompileStatus = GL_FALSE;
+   } else {
+      if (ctx->Shader.Flags & GLSL_DUMP) {
+         printf("GLSL source for %s shader %d:\n",
+                _mesa_glsl_shader_target_name(shader->Type), shader->Name);
+         printf("%s\n", shader->Source);
+      }
 
-   if (sh->CompileStatus == GL_FALSE && 
+      /* this call will set the shader->CompileStatus field to indicate if
+       * compilation was successful.
+       */
+      _mesa_glsl_compile_shader(ctx, shader, false, false);
+
+      if (ctx->Shader.Flags & GLSL_LOG) {
+         _mesa_write_shader_to_file(shader);
+      }
+
+      if (ctx->Shader.Flags & GLSL_DUMP) {
+         if (shader->CompileStatus) {
+            printf("GLSL IR for shader %d:\n", shader->Name);
+            _mesa_print_ir(shader->ir, NULL);
+            printf("\n\n");
+         } else {
+            printf("GLSL shader %d failed to compile.\n", shader->Name);
+         }
+         if (shader->InfoLog && shader->InfoLog[0] != 0) {
+            printf("GLSL shader %d info log:\n", shader->Name);
+            printf("%s\n", shader->InfoLog);
+         }
+      }
+
+   }
+
+   if (shader->CompileStatus == GL_FALSE &&
        (ctx->Shader.Flags & GLSL_REPORT_ERRORS)) {
       _mesa_debug(ctx, "Error compiling shader %u:\n%s\n",
-                  sh->Name, sh->InfoLog);
+                  shader->Name, shader->InfoLog);
    }
 }
 

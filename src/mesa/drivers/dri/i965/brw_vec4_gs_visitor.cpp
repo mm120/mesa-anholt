@@ -28,7 +28,6 @@
  */
 
 #include "brw_vec4_gs_visitor.h"
-#include "glsl/ir_print_visitor.h"
 
 const unsigned MAX_GS_INPUT_VERTICES = 6;
 

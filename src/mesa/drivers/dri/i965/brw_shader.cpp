@@ -28,7 +28,6 @@ extern "C" {
 #include "brw_vs.h"
 #include "brw_fs.h"
 #include "glsl/ir_optimization.h"
-#include "glsl/ir_print_visitor.h"
 #include "main/shaderapi.h"
 
 struct gl_shader *

@@ -1303,6 +1303,12 @@ initialize_gs_variables(exec_list *instructions,
    case 140:
       generate_130_gs_variables(instructions, state, false);
       break;
+   case 150:
+      generate_130_gs_variables(instructions, state, false);
+      break;
+   default:
+      assert(!"Unexpected language version");
+      break;
    }
 }
 

@@ -31,6 +31,7 @@
 
 #include "main/mtypes.h"
 #include "glsl_symbol_table.h"
+#include "glsl_parser_extras.h"
 #include "ir_optimization.h"
 #include "linker.h"
 #include "link_varyings.h"
@@ -47,8 +48,10 @@ cross_validate_outputs_to_inputs(struct gl_shader_program *prog,
 				 gl_shader *producer, gl_shader *consumer)
 {
    glsl_symbol_table parameters;
-   const char *const producer_stage = get_type_string(producer->Type);
-   const char *const consumer_stage = get_type_string(consumer->Type);
+   const char *const producer_stage =
+      _mesa_glsl_shader_target_name(producer->Type);
+   const char *const consumer_stage =
+      _mesa_glsl_shader_target_name(consumer->Type);
 
    /* Find all shader outputs in the "producer" stage.
     */
@@ -1149,8 +1152,9 @@ assign_varying_locations(struct gl_context *ctx,
 
                linker_error(prog, "%s shader varying %s not written "
                             "by %s shader\n.",
-                            get_type_string(consumer->Type), var->name,
-                            get_type_string(producer->Type));
+                            _mesa_glsl_shader_target_name(consumer->Type),
+			    var->name,
+                            _mesa_glsl_shader_target_name(producer->Type));
             }
 
             /* An 'in' variable is only really a shader input if its

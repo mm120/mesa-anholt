@@ -2171,6 +2171,24 @@ struct gl_shader
    /** Shaders containing built-in functions that are used for linking. */
    struct gl_shader *builtins_to_link[16];
    unsigned num_builtins_to_link;
+
+   /**
+    * Geometry shader state from GLSL 1.50 layout qualifiers.
+    */
+   struct {
+      GLint VerticesOut;
+      /**
+       * GL_POINTS, GL_LINES, GL_LINES_ADJACENCY_ARB, GL_TRIANGLES, or
+       * GL_TRIANGLES_ADJACENCY_ARB, or ~0 if it's not set in this shader
+       * (since GL_POINTS is 0).
+       */
+      GLenum InputType;
+       /**
+        * GL_POINTS, GL_LINE_STRIP or GL_TRIANGLE_STRIP, or ~0 if it's not set
+        * in this shader (since GL_POINTS is 0).
+        */
+      GLenum OutputType;
+   } Geom;
 };
 
 

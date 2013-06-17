@@ -42,11 +42,14 @@ brw_upload_gs_pull_constants(struct brw_context *brw)
       (struct brw_geometry_program *) brw->geometry_program;
    int i;
 
+   if (!gp)
+      return;
+
    /* Updates the ParamaterValues[i] pointers for all parameters of the
     * basic type of PROGRAM_STATE_VAR.
     */
-   if (gp)
-      _mesa_load_state_parameters(&brw->intel.ctx, gp->program.Base.Parameters);
+
+   _mesa_load_state_parameters(&brw->intel.ctx, gp->program.Base.Parameters);
 
    /* CACHE_NEW_GS_PROG */
    if (!brw->vec4_gs.prog_data->base.nr_pull_params) {
@@ -132,6 +135,10 @@ brw_gs_upload_binding_table(struct brw_context *brw)
 {
    uint32_t *bind;
    int i;
+
+   /* If there's no GS, skip changing anything. */
+   if (!brw->vec4_gs.prog_data)
+      return;
 
    if (INTEL_DEBUG & DEBUG_SHADER_TIME) {
       gen7_create_shader_time_surface(brw, &brw->gs.surf_offset[SURF_INDEX_GS_SHADER_TIME]);

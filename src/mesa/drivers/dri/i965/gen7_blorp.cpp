@@ -688,7 +688,7 @@ gen7_blorp_emit_depth_stencil_config(struct brw_context *brw,
       min_array_element /= params->depth.mt->num_samples;
    }
 
-   lod = params->depth.level - params->depth.mt->first_level;
+   lod = params->depth.level;
 
    if (params->hiz_op != GEN6_HIZ_OP_NONE && lod == 0) {
       /* HIZ ops for lod 0 may set the width & height a little

@@ -90,7 +90,7 @@ gen7_emit_depth_stencil_hiz(struct brw_context *brw,
       min_array_element = irb->mt_layer;
    }
 
-   lod = irb ? irb->mt_level - irb->mt->first_level : 0;
+   lod = irb ? irb->mt_level : 0;
 
    if (mt) {
       width = mt->physical_width0;

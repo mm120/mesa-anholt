@@ -89,7 +89,7 @@ intel_blit_texsubimage(struct gl_context * ctx,
 
    struct intel_mipmap_tree *temp_mt =
       intel_miptree_create(brw, GL_TEXTURE_2D, texImage->TexFormat,
-                           0, 0,
+                           0,
                            width, height, 1,
                            false, 0, INTEL_MIPTREE_TILING_NONE);
    if (!temp_mt)

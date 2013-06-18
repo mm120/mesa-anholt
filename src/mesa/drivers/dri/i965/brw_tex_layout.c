@@ -150,7 +150,7 @@ brw_miptree_layout_2d(struct intel_mipmap_tree *mt)
     * constraints of mipmap placement push the right edge of the
     * 2nd mipmap out past the width of its parent.
     */
-   if (mt->first_level != mt->last_level) {
+   if (mt->last_level > 1) {
        unsigned mip1_width;
 
        if (mt->compressed) {
@@ -168,7 +168,7 @@ brw_miptree_layout_2d(struct intel_mipmap_tree *mt)
 
    mt->total_height = 0;
 
-   for (unsigned level = mt->first_level; level <= mt->last_level; level++) {
+   for (unsigned level = 0; level <= mt->last_level; level++) {
       unsigned img_height;
 
       intel_miptree_set_level_info(mt, level, x, y, width,
@@ -185,7 +185,7 @@ brw_miptree_layout_2d(struct intel_mipmap_tree *mt)
 
       /* Layout_below: step right after second mipmap.
        */
-      if (level == mt->first_level + 1) {
+      if (level == 1) {
 	 x += ALIGN(width, mt->align_w);
       } else {
 	 y += img_height;
@@ -214,7 +214,7 @@ brw_miptree_layout_texture_array(struct brw_context *brw,
 
    brw_miptree_layout_2d(mt);
 
-   for (unsigned level = mt->first_level; level <= mt->last_level; level++) {
+   for (unsigned level = 0; level <= mt->last_level; level++) {
       for (int q = 0; q < mt->physical_depth0; q++) {
 	 intel_miptree_set_image_offset(mt, level, q, 0, q * qpitch);
       }
@@ -245,7 +245,7 @@ brw_miptree_layout_texture_3d(struct brw_context *brw,
    pack_x_pitch = width;
    pack_x_nr = 1;
 
-   for (unsigned level = mt->first_level; level <= mt->last_level; level++) {
+   for (unsigned level = 0; level <= mt->last_level; level++) {
       int x = 0;
       int y = 0;
 

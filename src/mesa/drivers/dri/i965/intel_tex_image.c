@@ -94,7 +94,6 @@ intel_miptree_create_for_teximage(struct brw_context *brw,
    return intel_miptree_create(brw,
 			       intelObj->base.Target,
 			       intelImage->Base.TexFormat,
-			       firstLevel,
 			       lastLevel,
 			       width,
 			       height,
@@ -252,7 +251,7 @@ intel_set_texture_image_region(struct gl_context *ctx,
    ctx->Driver.FreeTextureImageBuffer(ctx, image);
 
    intel_image->mt = intel_miptree_create_layout(brw, target, image->TexFormat,
-                                                 0, 0,
+                                                 0,
                                                  width, height, 1,
                                                  true, 0 /* num_samples */);
    if (intel_image->mt == NULL)

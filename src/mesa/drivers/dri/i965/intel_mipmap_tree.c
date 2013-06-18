@@ -217,7 +217,7 @@ intel_is_non_msrt_mcs_buffer_supported(struct brw_context *brw,
       return false;
    if (mt->cpp != 4 && mt->cpp != 8 && mt->cpp != 16)
       return false;
-   if (mt->first_level != 0 || mt->last_level != 0)
+   if (mt->last_level != 0)
       return false;
    if (mt->physical_depth0 != 1)
       return false;
@@ -241,7 +241,6 @@ struct intel_mipmap_tree *
 intel_miptree_create_layout(struct brw_context *brw,
                             GLenum target,
                             gl_format format,
-                            GLuint first_level,
                             GLuint last_level,
                             GLuint width0,
                             GLuint height0,
@@ -253,14 +252,13 @@ intel_miptree_create_layout(struct brw_context *brw,
    if (!mt)
       return NULL;
 
-   DBG("%s target %s format %s level %d..%d <-- %p\n", __FUNCTION__,
+   DBG("%s target %s format %s level 0..%d <-- %p\n", __FUNCTION__,
        _mesa_lookup_enum_by_nr(target),
        _mesa_get_format_name(format),
-       first_level, last_level, mt);
+       last_level, mt);
 
    mt->target = target_to_target(target);
    mt->format = format;
-   mt->first_level = first_level;
    mt->last_level = last_level;
    mt->logical_width0 = width0;
    mt->logical_height0 = height0;
@@ -369,7 +367,6 @@ intel_miptree_create_layout(struct brw_context *brw,
       mt->stencil_mt = intel_miptree_create(brw,
                                             mt->target,
                                             MESA_FORMAT_S8,
-                                            mt->first_level,
                                             mt->last_level,
                                             mt->logical_width0,
                                             mt->logical_height0,
@@ -475,7 +472,6 @@ struct intel_mipmap_tree *
 intel_miptree_create(struct brw_context *brw,
 		     GLenum target,
 		     gl_format format,
-		     GLuint first_level,
 		     GLuint last_level,
 		     GLuint width0,
 		     GLuint height0,
@@ -526,10 +522,9 @@ intel_miptree_create(struct brw_context *brw,
 
    etc_format = (format != tex_format) ? tex_format : MESA_FORMAT_NONE;
 
-   mt = intel_miptree_create_layout(brw, target, format,
-				      first_level, last_level, width0,
-				      height0, depth0,
-				      false, num_samples);
+   mt = intel_miptree_create_layout(brw, target, format, last_level,
+                                    width0, height0, depth0,
+                                    false, num_samples);
    /*
     * pitch == 0 || height == 0  indicates the null texture
     */
@@ -623,7 +618,7 @@ intel_miptree_create_for_bo(struct brw_context *brw,
    assert(pitch >= 0);
 
    mt = intel_miptree_create_layout(brw, GL_TEXTURE_2D, format,
-                                    0, 0,
+                                    0,
                                     width, height, 1,
                                     true, 0 /* num_samples */);
    if (!mt)
@@ -727,7 +722,7 @@ intel_miptree_create_for_renderbuffer(struct brw_context *brw,
    uint32_t depth = 1;
    bool ok;
 
-   mt = intel_miptree_create(brw, GL_TEXTURE_2D, format, 0, 0,
+   mt = intel_miptree_create(brw, GL_TEXTURE_2D, format, 0,
 			     width, height, depth, true, num_samples,
                              INTEL_MIPTREE_TILING_ANY);
    if (!mt)
@@ -1161,7 +1156,6 @@ intel_miptree_alloc_mcs(struct brw_context *brw,
    mt->mcs_mt = intel_miptree_create(brw,
                                      mt->target,
                                      format,
-                                     mt->first_level,
                                      mt->last_level,
                                      mt->logical_width0,
                                      mt->logical_height0,
@@ -1217,7 +1211,6 @@ intel_miptree_alloc_non_msrt_mcs(struct brw_context *brw,
    mt->mcs_mt = intel_miptree_create(brw,
                                      mt->target,
                                      format,
-                                     mt->first_level,
                                      mt->last_level,
                                      mcs_width,
                                      mcs_height,
@@ -1271,7 +1264,6 @@ intel_miptree_alloc_hiz(struct brw_context *brw,
    mt->hiz_mt = intel_miptree_create(brw,
                                      mt->target,
                                      mt->format,
-                                     mt->first_level,
                                      mt->last_level,
                                      mt->logical_width0,
                                      mt->logical_height0,
@@ -1285,7 +1277,7 @@ intel_miptree_alloc_hiz(struct brw_context *brw,
 
    /* Mark that all slices need a HiZ resolve. */
    struct intel_resolve_map *head = &mt->hiz_map;
-   for (int level = mt->first_level; level <= mt->last_level; ++level) {
+   for (int level = 0; level <= mt->last_level; ++level) {
       for (int layer = 0; layer < mt->level[level].depth; ++layer) {
          if (!intel_miptree_slice_enable_hiz(brw, mt, level, layer))
             continue;
@@ -1570,7 +1562,6 @@ static void
 assert_is_flat(struct intel_mipmap_tree *mt)
 {
    assert(mt->target == GL_TEXTURE_2D);
-   assert(mt->first_level == 0);
    assert(mt->last_level == 0);
 }
 
@@ -1707,7 +1698,7 @@ intel_miptree_map_blit(struct brw_context *brw,
 		       unsigned int level, unsigned int slice)
 {
    map->mt = intel_miptree_create(brw, GL_TEXTURE_2D, mt->format,
-                                  0, 0,
+                                  0,
                                   map->w, map->h, 1,
                                   false, 0,
                                   INTEL_MIPTREE_TILING_NONE);
@@ -2193,11 +2184,10 @@ intel_miptree_map_multisample(struct brw_context *brw,
 
    /* Only flat, renderbuffer-like miptrees are supported. */
    if (mt->target != GL_TEXTURE_2D ||
-       mt->first_level != 0 ||
        mt->last_level != 0) {
       _mesa_problem(ctx, "attempt to map a multisample miptree for "
-                    "which (target, first_level, last_level != "
-                    "(GL_TEXTURE_2D, 0, 0)");
+                    "which (target, last_level != "
+                    "(GL_TEXTURE_2D, 0)");
       goto fail;
    }
 

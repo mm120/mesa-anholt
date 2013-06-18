@@ -60,8 +60,6 @@ intel_finalize_mipmap_tree(struct brw_context *brw, GLuint unit)
    /* What levels must the tree include at a minimum?
     */
    intel_update_max_level(intelObj, sampler);
-   if (intelObj->mt && intelObj->mt->first_level != tObj->BaseLevel)
-      intelObj->needs_validate = true;
 
    if (!intelObj->needs_validate)
       return true;
@@ -70,15 +68,9 @@ intel_finalize_mipmap_tree(struct brw_context *brw, GLuint unit)
 
    /* Check tree can hold all active levels.  Check tree matches
     * target, imageFormat, etc.
-    *
-    * For pre-gen4, we have to match first_level == tObj->BaseLevel,
-    * because we don't have the control that gen4 does to make min/mag
-    * determination happen at a nonzero (hardware) baselevel.  Because
-    * of that, we just always relayout on baselevel change.
     */
    if (intelObj->mt &&
        (!intel_miptree_match_image(intelObj->mt, &firstImage->Base) ||
-	intelObj->mt->first_level != tObj->BaseLevel ||
 	intelObj->mt->last_level < intelObj->_MaxLevel)) {
       intel_miptree_release(&intelObj->mt);
    }
@@ -98,7 +90,6 @@ intel_finalize_mipmap_tree(struct brw_context *brw, GLuint unit)
       intelObj->mt = intel_miptree_create(brw,
                                           intelObj->base.Target,
 					  firstImage->Base.TexFormat,
-                                          tObj->BaseLevel,
                                           intelObj->_MaxLevel,
                                           width,
                                           height,

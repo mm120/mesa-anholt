@@ -298,7 +298,6 @@ struct intel_mipmap_tree
    unsigned int align_w;
    unsigned int align_h; /**< \see align_w */
 
-   GLuint first_level;
    GLuint last_level;
 
    /**
@@ -491,7 +490,6 @@ intel_miptree_alloc_non_msrt_mcs(struct brw_context *brw,
 struct intel_mipmap_tree *intel_miptree_create(struct brw_context *brw,
                                                GLenum target,
 					       gl_format format,
-                                               GLuint first_level,
                                                GLuint last_level,
                                                GLuint width0,
                                                GLuint height0,
@@ -504,7 +502,6 @@ struct intel_mipmap_tree *
 intel_miptree_create_layout(struct brw_context *brw,
                             GLenum target,
                             gl_format format,
-                            GLuint first_level,
                             GLuint last_level,
                             GLuint width0,
                             GLuint height0,
@@ -549,7 +546,6 @@ intel_miptree_check_level_layer(struct intel_mipmap_tree *mt,
                                 uint32_t level,
                                 uint32_t layer)
 {
-   assert(level >= mt->first_level);
    assert(level <= mt->last_level);
    assert(layer < mt->level[level].depth);
 }

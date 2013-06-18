@@ -319,8 +319,6 @@ gen7_update_texture_surface(struct gl_context *ctx,
       surf[0] |= GEN7_SURFACE_ARYSPC_LOD0;
 
    surf[1] = mt->region->bo->offset + mt->offset; /* reloc */
-   surf[1] += intel_miptree_get_tile_offsets(intelObj->mt, firstImage->Level, 0,
-                                             &tile_x, &tile_y);
 
    surf[2] = SET_FIELD(mt->logical_width0 - 1, GEN7_SURFACE_WIDTH) |
              SET_FIELD(mt->logical_height0 - 1, GEN7_SURFACE_HEIGHT);
@@ -337,7 +335,7 @@ gen7_update_texture_surface(struct gl_context *ctx,
               (tile_y / 2) << BRW_SURFACE_Y_OFFSET_SHIFT |
               SET_FIELD(mocs, GEN7_SURFACE_MOCS) |
               /* mip count */
-              (intelObj->_MaxLevel - tObj->BaseLevel));
+              intelObj->_MaxLevel);
 
    if (brw->is_haswell) {
       /* Handling GL_ALPHA as a surface format override breaks 1.30+ style
@@ -575,7 +573,7 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
    assert(brw->has_surface_tile_offset);
 
    surf[5] = SET_FIELD(mocs, GEN7_SURFACE_MOCS) |
-             (irb->mt_level - irb->mt->first_level);
+             irb->mt_level;
 
    surf[2] = SET_FIELD(irb->mt->logical_width0 - 1, GEN7_SURFACE_WIDTH) |
              SET_FIELD(irb->mt->logical_height0 - 1, GEN7_SURFACE_HEIGHT);

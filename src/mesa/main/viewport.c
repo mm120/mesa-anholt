@@ -77,6 +77,14 @@ _mesa_set_viewport(struct gl_context *ctx, GLint x, GLint y,
    width  = MIN2(width, (GLsizei) ctx->Const.MaxViewportWidth);
    height = MIN2(height, (GLsizei) ctx->Const.MaxViewportHeight);
 
+   /* Skip state update for no-op viewport changes. */
+   if (ctx->Viewport.X == x &&
+       ctx->Viewport.Width == width &&
+       ctx->Viewport.Y == y &&
+       ctx->Viewport.Height == height) {
+      return;
+   }
+
    ctx->Viewport.X = x;
    ctx->Viewport.Width = width;
    ctx->Viewport.Y = y;

@@ -31,6 +31,9 @@ AM_CPPFLAGS = \
 	$(DEFINES) \
 	-DUSE_DRICORE
 
+AM_CFLAGS = $(LTOFLAGS)
+AM_CXXFLAGS = $(LTOFLAGS)
+
 libdricore@VERSION@_la_SOURCES = \
 	$(MESA_FILES) \
 	$(LIBGLCPP_GENERATED_FILES) \
@@ -38,7 +41,10 @@ libdricore@VERSION@_la_SOURCES = \
 	$(LIBGLSL_FILES) \
 	$(BUILTIN_COMPILER_GENERATED_CXX_FILES) \
 	$(top_builddir)/src/glsl/builtin_function.cpp
-libdricore@VERSION@_la_LDFLAGS = -version-number 1:0
+libdricore@VERSION@_la_LDFLAGS = \
+        -version-number 1:0 \
+        $(LTOFLAGS) \
+        $()
 libdricore@VERSION@_la_LIBADD = \
         ../program/libdricore_program.la \
         $()

@@ -24,8 +24,8 @@ include ../Makefile.sources
 AM_CPPFLAGS = $(DEFINES) $(INCLUDE_DIRS)
 AM_CFLAGS = $(VISIBILITY_CFLAGS)
 AM_CXXFLAGS = $(VISIBILITY_CXXFLAGS)
-libdricore_program_la_CFLAGS = $(NOVISIBILITY_CFLAGS)
-libdricore_program_la_CXXFLAGS = $(NOVISIBILITY_CXXFLAGS)
+libdricore_program_la_CFLAGS = $(NOVISIBILITY_CFLAGS) $(LTOFLAGS)
+libdricore_program_la_CXXFLAGS = $(NOVISIBILITY_CXXFLAGS) $(LTOFLAGS)
 
 SRCDIR = $(top_srcdir)/src/mesa/
 BUILDDIR = $(top_builddir)/src/mesa/

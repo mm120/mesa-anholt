@@ -332,6 +332,37 @@ if test "x$enable_debug" = xyes; then
     fi
 fi
 
+AC_ARG_ENABLE([lto],
+    [AS_HELP_STRING([--disable-lto],
+        [Enable link-time optimization @<:@default=auto, disabled if debug is enabled@:>@])],
+    [enable_lto="$enableval"; echo "$enableval"],
+    [if test "x$enable_debug" = xyes; then
+         enable_lto=no
+     else
+         enable_lto=yes
+     fi
+
+     # gcc 4.8 manpage says that you should expect disaster if trying to use
+     # debug symbols with LTO.  Perhaps some day this can be removed.
+     if echo "$CFLAGS" | grep '\-g ' > /dev/null; then
+         enable_lto=no
+     fi])
+
+if test "x$enable_lto" = "xyes"; then
+    # Enable LTO if the compiler supports it and not disabled by the user,
+    # which allows the compiler to inline Mesa's many small,
+    # non-manually-inlined helper functions.
+    save_CFLAGS="$CFLAGS"
+    AC_MSG_CHECKING([whether $CC supports LTO])
+    LTOFLAGS="-flto -fuse-linker-plugin"
+    CFLAGS="$CFLAGS $LTOFLAGS"
+    AC_LINK_IFELSE([AC_LANG_PROGRAM()],
+		   [AC_MSG_RESULT([yes])],
+		   [AC_MSG_RESULT([no]); LTOFLAGS=""]);
+    CFLAGS="$save_CFLAGS"
+fi
+AC_SUBST([LTOFLAGS])
+
 dnl
 dnl library names
 dnl

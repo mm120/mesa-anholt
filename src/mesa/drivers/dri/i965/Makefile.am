@@ -36,6 +36,7 @@ AM_CFLAGS = \
 	-I$(top_builddir)/src/mesa/drivers/dri/common \
 	$(DEFINES) \
 	$(VISIBILITY_CFLAGS) \
+	$(LTOFLAGS) \
 	$(INTEL_CFLAGS)
 
 if HAVE_OPENGL_ES1

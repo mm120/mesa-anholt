@@ -121,7 +121,7 @@ void *rzalloc_size(const void *ctx, size_t size);
  */
 void *reralloc_size(const void *ctx, void *ptr, size_t size);
 
-/// \defgroup array Array Allocators @{
+/* \defgroup array Array Allocators @{ */
 
 /**
  * \def ralloc_array(ctx, type, count)
@@ -217,7 +217,7 @@ void *rzalloc_array_size(const void *ctx, size_t size, unsigned count);
  */
 void *reralloc_array_size(const void *ctx, void *ptr, size_t size,
 			  unsigned count);
-/// @}
+/* @} */
 
 /**
  * Free a piece of ralloc-managed memory.
@@ -253,7 +253,7 @@ void *ralloc_autofree_context(void);
  */
 void ralloc_set_destructor(const void *ptr, void(*destructor)(void *));
 
-/// \defgroup array String Functions @{
+/* \defgroup array String Functions @{ */
 /**
  * Duplicate a string, allocating the memory from the given context.
  */
@@ -398,7 +398,7 @@ bool ralloc_asprintf_append (char **str, const char *fmt, ...)
  * \return True unless allocation failed.
  */
 bool ralloc_vasprintf_append(char **str, const char *fmt, va_list args);
-/// @}
+/* @} */
 
 #ifdef __cplusplus
 } /* end of extern "C" */

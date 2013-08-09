@@ -468,7 +468,7 @@ ralloc_vasprintf_rewrite_tail(char **str, size_t *start, const char *fmt,
    assert(str != NULL);
 
    if (unlikely(*str == NULL)) {
-      // Assuming a NULL context is probably bad, but it's expected behavior.
+      /* Assuming a NULL context is probably bad, but it's expected behavior. */
       *str = ralloc_vasprintf(NULL, fmt, args);
       return true;
    }

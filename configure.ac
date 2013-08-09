@@ -174,13 +174,16 @@ esac
 
 dnl Add flags for gcc and g++
 if test "x$GCC" = xyes; then
+    CFLAGS="$CFLAGS -Wall"
     case "$host_os" in
     cygwin*)
-        CFLAGS="$CFLAGS -Wall -std=gnu99"
+        C99_CFLAGS="-std=gnu99"
         ;;
     *)
-        CFLAGS_FOR_BUILD="$CFLAGS_FOR_BUILD -Wall -std=c99"
-        CFLAGS="$CFLAGS -Wall -std=c99"
+        CFLAGS_FOR_BUILD="$CFLAGS_FOR_BUILD -Wall"
+
+        C89_CFLAGS=" -W"
+        C99_CFLAGS="-std=c99"
         ;;
     esac
 
@@ -196,6 +199,22 @@ if test "x$GCC" = xyes; then
 		   AC_MSG_RESULT([yes]),
 		   [CFLAGS="$save_CFLAGS -Wmissing-prototypes";
 		    AC_MSG_RESULT([no])]);
+
+    # Mesa core is supposed to be C89-only, to let it compile on MSVC's lame C
+    # compiler.  MSVC does permit // comments, though, and we've got a fair
+    # bit of those in Mesa, so we use c99 with extra warnings for using the
+    # unsupported bits of c99.
+    C89_CFLAGS="$C99_CFLAGS"
+    C89_CFLAGS="$C89_CLFAGS -Wdeclaration-after-statement"
+    C89_CFLAGS="$C89_CLFAGS -Werror=declaration-after-statement"
+    save_CFLAGS="$CFLAGS"
+    CFLAGS="$CFLAGS $C89_CFLAGS"
+    AC_MSG_CHECKING([whether $CC supports MSVC-limited C99])
+    AC_LINK_IFELSE([AC_LANG_PROGRAM()],
+		   AC_MSG_RESULT([yes]),
+		   [C89_CFLAGS="";
+		    AC_MSG_RESULT([no])]);
+    CFLAGS="$save_CFLAGS"
 
     # Enable -fvisibility=hidden if using a gcc that supports it
     save_CFLAGS="$CFLAGS"
@@ -243,6 +262,8 @@ if test "x$GXX" = xyes; then
     CXXFLAGS_FOR_BUILD="$CXXFLAGS_FOR_BUILD -fno-builtin-memcmp"
     CXXFLAGS="$CXXFLAGS -fno-builtin-memcmp"
 fi
+AC_SUBST(C89_CFLAGS)
+AC_SUBST(C99_CFLAGS)
 
 dnl even if the compiler appears to support it, using visibility attributes isn't
 dnl going to do anything useful currently on cygwin apart from emit lots of warnings

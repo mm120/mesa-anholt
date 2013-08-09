@@ -25,7 +25,7 @@ include Makefile.sources
 
 if HAVE_I965_DRI
 
-AM_CFLAGS = \
+AM_CPPFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/src/ \
 	-I$(top_srcdir)/src/mapi \
@@ -34,21 +34,22 @@ AM_CFLAGS = \
 	-I$(top_srcdir)/src/mesa/drivers/dri/intel/server \
 	-I$(top_srcdir)/src/gtest/include \
 	-I$(top_builddir)/src/mesa/drivers/dri/common \
+	$(INTEL_CFLAGS) \
 	$(DEFINES) \
-	$(VISIBILITY_CFLAGS) \
-	$(INTEL_CFLAGS)
+        $()
 
 if HAVE_OPENGL_ES1
-AM_CFLAGS += \
+AM_CPPFLAGS += \
 	-DFEATURE_ES1=1
 endif
 
 if HAVE_OPENGL_ES2
-AM_CFLAGS += \
+AM_CPPFLAGS += \
 	-DFEATURE_ES2=1
 endif
 
-AM_CXXFLAGS = $(AM_CFLAGS)
+AM_CFLAGS = $(VISIBILITY_CFLAGS) $(C99_CFLAGS)
+AM_CXXFLAGS = $(VISIBILITY_CFLAGS)
 
 dridir = $(DRI_DRIVER_INSTALL_DIR)
 

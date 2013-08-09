@@ -31,7 +31,8 @@ AM_CFLAGS = \
 	-I$(top_srcdir)/src/mesa/ \
 	-I$(top_srcdir)/src/mesa/drivers/dri/common \
 	$(DEFINES) \
-	$(VISIBILITY_CFLAGS)
+	$(VISIBILITY_CFLAGS) \
+        $(C99_CFLAGS)
 
 dridir = $(DRI_DRIVER_INSTALL_DIR)
 

@@ -28,7 +28,8 @@ AM_CFLAGS = \
 	-I$(top_srcdir)/src/mesa/ \
 	$(DEFINES) \
 	$(LIBDRM_CFLAGS) \
-	$(VISIBILITY_CFLAGS)
+	$(VISIBILITY_CFLAGS) \
+        $(C99_CFLAGS)
 
 noinst_LTLIBRARIES = \
 	libdricommon.la \

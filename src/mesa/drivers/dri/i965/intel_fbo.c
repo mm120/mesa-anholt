@@ -875,9 +875,9 @@ intel_renderbuffer_move_to_temp(struct brw_context *brw,
    intel_miptree_get_dimensions_for_image(rb->TexImage, &width, &height, &depth);
 
    new_mt = intel_miptree_create(brw, rb->TexImage->TexObject->Target,
-                                 intel_image->base.Base.TexFormat,
-                                 intel_image->base.Base.Level,
-                                 intel_image->base.Base.Level,
+                                 intel_image->Base.TexFormat,
+                                 intel_image->Base.Level,
+                                 intel_image->Base.Level,
                                  width, height, depth,
                                  true,
                                  irb->mt->num_samples,

@@ -52,7 +52,7 @@ intel_copy_texsubimage(struct brw_context *brw,
                        struct intel_renderbuffer *irb,
                        GLint x, GLint y, GLsizei width, GLsizei height)
 {
-   const GLenum internalFormat = intelImage->base.Base.InternalFormat;
+   const GLenum internalFormat = intelImage->Base.InternalFormat;
 
    intel_prepare_render(brw);
 
@@ -65,7 +65,7 @@ intel_copy_texsubimage(struct brw_context *brw,
       return false;
 
    /* glCopyTexSubImage() can't be called on a multisampled texture. */
-   assert(intelImage->base.Base.NumSamples == 0);
+   assert(intelImage->Base.NumSamples == 0);
 
    if (!intelImage->mt || !irb || !irb->mt) {
       if (unlikely(INTEL_DEBUG & DEBUG_PERF))
@@ -78,8 +78,8 @@ intel_copy_texsubimage(struct brw_context *brw,
    if (!intel_miptree_blit(brw,
                            irb->mt, irb->mt_level, irb->mt_layer,
                            x, y, irb->Base.Base.Name == 0,
-                           intelImage->mt, intelImage->base.Base.Level,
-                           intelImage->base.Base.Face + slice,
+                           intelImage->mt, intelImage->Base.Level,
+                           intelImage->Base.Face + slice,
                            dstx, dsty, false,
                            width, height, GL_COPY)) {
       return false;

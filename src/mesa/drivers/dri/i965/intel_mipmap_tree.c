@@ -827,7 +827,7 @@ intel_miptree_match_image(struct intel_mipmap_tree *mt,
                           struct gl_texture_image *image)
 {
    struct intel_texture_image *intelImage = intel_texture_image(image);
-   GLuint level = intelImage->base.Base.Level;
+   GLuint level = intelImage->Base.Level;
    int width, height, depth;
 
    /* glTexImage* choose the texture object based on the target passed in, and
@@ -1106,10 +1106,10 @@ intel_miptree_copy_teximage(struct brw_context *brw,
 {
    struct intel_mipmap_tree *src_mt = intelImage->mt;
    struct intel_texture_object *intel_obj =
-      intel_texture_object(intelImage->base.Base.TexObject);
-   int level = intelImage->base.Base.Level;
-   int face = intelImage->base.Base.Face;
-   GLuint depth = intelImage->base.Base.Depth;
+      intel_texture_object(intelImage->Base.TexObject);
+   int level = intelImage->Base.Level;
+   int face = intelImage->Base.Face;
+   GLuint depth = intelImage->Base.Depth;
 
    if (!invalidate) {
       for (int slice = 0; slice < depth; slice++) {

@@ -40,12 +40,12 @@ intel_miptree_create_for_teximage(struct brw_context *brw,
    int width, height, depth;
    GLuint i;
 
-   intel_miptree_get_dimensions_for_image(&intelImage->base.Base,
+   intel_miptree_get_dimensions_for_image(&intelImage->Base,
                                           &width, &height, &depth);
 
    DBG("%s\n", __FUNCTION__);
 
-   if (intelImage->base.Base.Level > intelObj->base.BaseLevel &&
+   if (intelImage->Base.Level > intelObj->base.BaseLevel &&
        (width == 1 ||
         (intelObj->base.Target != GL_TEXTURE_1D && height == 1) ||
         (intelObj->base.Target == GL_TEXTURE_3D && depth == 1))) {
@@ -54,19 +54,19 @@ intel_miptree_create_for_teximage(struct brw_context *brw,
        * likely base level width/height/depth for a full mipmap stack
        * from this info, so just allocate this one level.
        */
-      firstLevel = intelImage->base.Base.Level;
-      lastLevel = intelImage->base.Base.Level;
+      firstLevel = intelImage->Base.Level;
+      lastLevel = intelImage->Base.Level;
    } else {
       /* If this image disrespects BaseLevel, allocate from level zero.
        * Usually BaseLevel == 0, so it's unlikely to happen.
        */
-      if (intelImage->base.Base.Level < intelObj->base.BaseLevel)
+      if (intelImage->Base.Level < intelObj->base.BaseLevel)
 	 firstLevel = 0;
       else
 	 firstLevel = intelObj->base.BaseLevel;
 
       /* Figure out image dimensions at start level. */
-      for (i = intelImage->base.Base.Level; i > firstLevel; i--) {
+      for (i = intelImage->Base.Level; i > firstLevel; i--) {
 	 width <<= 1;
 	 if (height != 1)
 	    height <<= 1;
@@ -81,7 +81,7 @@ intel_miptree_create_for_teximage(struct brw_context *brw,
        */
       if ((intelObj->base.Sampler.MinFilter == GL_NEAREST ||
 	   intelObj->base.Sampler.MinFilter == GL_LINEAR) &&
-	  intelImage->base.Base.Level == firstLevel &&
+	  intelImage->Base.Level == firstLevel &&
 	  firstLevel == 0) {
 	 lastLevel = firstLevel;
       } else {
@@ -93,14 +93,14 @@ intel_miptree_create_for_teximage(struct brw_context *brw,
 
    return intel_miptree_create(brw,
 			       intelObj->base.Target,
-			       intelImage->base.Base.TexFormat,
+			       intelImage->Base.TexFormat,
 			       firstLevel,
 			       lastLevel,
 			       width,
 			       height,
 			       depth,
 			       expect_accelerated_upload,
-                               intelImage->base.Base.NumSamples,
+                               intelImage->Base.NumSamples,
                                INTEL_MIPTREE_TILING_ANY);
 }
 
@@ -280,7 +280,7 @@ intel_set_texture_image_region(struct gl_context *ctx,
 
    intel_image->mt->offset = offset;
    assert(region->pitch % region->cpp == 0);
-   intel_image->base.RowStride = region->pitch / region->cpp;
+   intel_image->RowStride = region->pitch / region->cpp;
 
    /* Immediately validate the image to the object. */
    intel_miptree_reference(&intel_texobj->mt, intel_image->mt);

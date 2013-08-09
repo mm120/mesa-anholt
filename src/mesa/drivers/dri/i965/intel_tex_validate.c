@@ -77,7 +77,7 @@ intel_finalize_mipmap_tree(struct brw_context *brw, GLuint unit)
     * of that, we just always relayout on baselevel change.
     */
    if (intelObj->mt &&
-       (!intel_miptree_match_image(intelObj->mt, &firstImage->base.Base) ||
+       (!intel_miptree_match_image(intelObj->mt, &firstImage->Base) ||
 	intelObj->mt->first_level != tObj->BaseLevel ||
 	intelObj->mt->last_level < intelObj->_MaxLevel)) {
       intel_miptree_release(&intelObj->mt);
@@ -87,17 +87,17 @@ intel_finalize_mipmap_tree(struct brw_context *brw, GLuint unit)
    /* May need to create a new tree:
     */
    if (!intelObj->mt) {
-      intel_miptree_get_dimensions_for_image(&firstImage->base.Base,
+      intel_miptree_get_dimensions_for_image(&firstImage->Base,
 					     &width, &height, &depth);
 
       perf_debug("Creating new %s %dx%dx%d %d..%d miptree to handle finalized "
                  "texture miptree.\n",
-                 _mesa_get_format_name(firstImage->base.Base.TexFormat),
+                 _mesa_get_format_name(firstImage->Base.TexFormat),
                  width, height, depth, tObj->BaseLevel, intelObj->_MaxLevel);
 
       intelObj->mt = intel_miptree_create(brw,
                                           intelObj->base.Target,
-					  firstImage->base.Base.TexFormat,
+					  firstImage->Base.TexFormat,
                                           tObj->BaseLevel,
                                           intelObj->_MaxLevel,
                                           width,
@@ -130,7 +130,7 @@ intel_finalize_mipmap_tree(struct brw_context *brw, GLuint unit)
           * appropriate, or we'll end up hitting this function again on the
           * next draw
           */
-         assert(intel_miptree_match_image(intelObj->mt, &intelImage->base.Base));
+         assert(intel_miptree_match_image(intelObj->mt, &intelImage->Base));
       }
    }
 

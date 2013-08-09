@@ -60,7 +60,7 @@ struct intel_texture_object
  */
 struct intel_texture_image
 {
-   struct swrast_texture_image base;
+   struct swrast_texture_image;
 
    /* If intelImage->mt != NULL, image data is stored here.
     * Else if intelImage->base.Buffer != NULL, image is stored there.

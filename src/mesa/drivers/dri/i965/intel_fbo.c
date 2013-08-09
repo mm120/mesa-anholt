@@ -599,6 +599,14 @@ intel_validate_framebuffer(struct gl_context *ctx, struct gl_framebuffer *fb)
                            "width, height, depth, LOD and layer\n");
 	 }
       }
+      if ((depthRb->TexImage &&
+           depthRb->TexImage->TexObject->Target != GL_TEXTURE_2D) !=
+          (stencilRb->TexImage &&
+           stencilRb->TexImage->TexObject->Target != GL_TEXTURE_2D)) {
+         fbo_incomplete(fb,
+                        "FBO incomplete: depth and stencil must have the "
+                        "same texture target.\n");
+      }
       if (depth_mt == stencil_mt) {
 	 /* For true packed depth/stencil (not faked on prefers-separate-stencil
 	  * hardware) we need to be sure they're the same level/layer, since

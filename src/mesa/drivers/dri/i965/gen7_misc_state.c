@@ -33,37 +33,19 @@
 void
 gen7_emit_depth_stencil_hiz(struct brw_context *brw,
                             struct intel_mipmap_tree *depth_mt,
-                            uint32_t depth_offset, uint32_t depthbuffer_format,
+                            uint32_t depthbuffer_format,
                             uint32_t depth_surface_type,
                             struct intel_mipmap_tree *stencil_mt,
                             bool hiz, bool separate_stencil,
-                            uint32_t width, uint32_t height,
-                            uint32_t tile_x, uint32_t tile_y)
+                            uint32_t width, uint32_t height, uint32_t depth,
+                            uint32_t lod, uint32_t min_array_element)
 {
    struct gl_context *ctx = &brw->ctx;
    uint8_t mocs = brw->is_haswell ? GEN7_MOCS_L3 : 0;
-   struct gl_framebuffer *fb = ctx->DrawBuffer;
    uint32_t surftype;
-   unsigned int depth = 1;
-   unsigned int min_array_element;
    GLenum gl_target = GL_TEXTURE_2D;
-   unsigned int lod;
-   const struct intel_mipmap_tree *mt = depth_mt ? depth_mt : stencil_mt;
-   const struct intel_renderbuffer *irb = NULL;
-   const struct gl_renderbuffer *rb = NULL;
 
    intel_emit_depth_stall_flushes(brw);
-
-   irb = intel_get_renderbuffer(fb, BUFFER_DEPTH);
-   if (!irb)
-      irb = intel_get_renderbuffer(fb, BUFFER_STENCIL);
-   rb = (struct gl_renderbuffer*) irb;
-
-   if (rb) {
-      depth = MAX2(rb->Depth, 1);
-      if (rb->TexImage)
-         gl_target = rb->TexImage->TexObject->Target;
-   }
 
    switch (gl_target) {
    case GL_TEXTURE_CUBE_MAP_ARRAY:
@@ -79,22 +61,6 @@ gen7_emit_depth_stencil_hiz(struct brw_context *brw,
    default:
       surftype = translate_tex_target(gl_target);
       break;
-   }
-
-   if (fb->Layered || !irb) {
-      min_array_element = 0;
-   } else if (irb->mt->num_samples > 1) {
-      /* Convert physical layer to logical layer. */
-      min_array_element = irb->mt_layer / irb->mt->num_samples;
-   } else {
-      min_array_element = irb->mt_layer;
-   }
-
-   lod = irb ? irb->mt_level - irb->mt->first_level : 0;
-
-   if (mt) {
-      width = mt->physical_width0;
-      height = mt->physical_height0;
    }
 
    /* _NEW_DEPTH, _NEW_STENCIL, _NEW_BUFFERS */

@@ -583,29 +583,27 @@ intel_validate_framebuffer(struct gl_context *ctx, struct gl_framebuffer *fb)
    }
 
    if (depth_mt && stencil_mt) {
-      if (brw->gen >= 7) {
-         /* For gen >= 7, we are using the lod/minimum-array-element fields
-          * and supportting layered rendering. This means that we must restrict
-          * the depth & stencil attachments to match in various more retrictive
-          * ways. (width, height, depth, LOD and layer)
-          */
-	 if (depth_mt->physical_width0 != stencil_mt->physical_width0 ||
-             depth_mt->physical_height0 != stencil_mt->physical_height0 ||
-             depth_mt->physical_depth0 != stencil_mt->physical_depth0 ||
-             depthRb->mt_level != stencilRb->mt_level ||
-	     depthRb->mt_layer != stencilRb->mt_layer) {
-	    fbo_incomplete(fb,
-                           "FBO incomplete: depth and stencil must match in"
-                           "width, height, depth, LOD and layer\n");
-	 }
-      }
-      if ((depthRb->TexImage &&
-           depthRb->TexImage->TexObject->Target != GL_TEXTURE_2D) !=
-          (stencilRb->TexImage &&
-           stencilRb->TexImage->TexObject->Target != GL_TEXTURE_2D)) {
+      GLenum depth_target = GL_TEXTURE_2D;
+      if (depthRb->Base.Base.TexImage)
+         depth_target = depthRb->Base.Base.TexImage->TexObject->Target;
+      GLenum stencil_target = GL_TEXTURE_2D;
+      if (stencilRb->Base.Base.TexImage)
+         stencil_target = stencilRb->Base.Base.TexImage->TexObject->Target;
+
+      /* We are using the lod/minimum-array-element fields and supporting
+       * layered rendering. This means that we must restrict the depth &
+       * stencil attachments to match in various more retrictive ways. (width,
+       * height, depth, LOD and layer)
+       */
+      if (depth_target != stencil_target ||
+          depth_mt->physical_width0 != stencil_mt->physical_width0 ||
+          depth_mt->physical_height0 != stencil_mt->physical_height0 ||
+          depth_mt->physical_depth0 != stencil_mt->physical_depth0 ||
+          depthRb->mt_level != stencilRb->mt_level ||
+          depthRb->mt_layer != stencilRb->mt_layer) {
          fbo_incomplete(fb,
-                        "FBO incomplete: depth and stencil must have the "
-                        "same texture target.\n");
+                        "FBO incomplete: depth and stencil must match in"
+                        "target, width, height, depth, LOD and layer\n");
       }
       if (depth_mt == stencil_mt) {
 	 /* For true packed depth/stencil (not faked on prefers-separate-stencil

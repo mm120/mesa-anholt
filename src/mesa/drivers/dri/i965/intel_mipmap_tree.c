@@ -1243,6 +1243,10 @@ intel_miptree_slice_enable_hiz(struct brw_context *brw,
 {
    assert(mt->hiz_mt);
 
+   /* XXX: spec quote */
+   if (brw->gen < 7 && level != 0)
+      return false;
+
    if (brw->is_haswell) {
       const struct intel_mipmap_level *l = &mt->level[level];
 

@@ -820,13 +820,13 @@ struct brw_context
        */
       void (*emit_depth_stencil_hiz)(struct brw_context *brw,
                                      struct intel_mipmap_tree *depth_mt,
-                                     uint32_t depth_offset,
                                      uint32_t depthbuffer_format,
                                      uint32_t depth_surface_type,
                                      struct intel_mipmap_tree *stencil_mt,
                                      bool hiz, bool separate_stencil,
                                      uint32_t width, uint32_t height,
-                                     uint32_t tile_x, uint32_t tile_y);
+                                     uint32_t depth, uint32_t lod,
+                                     uint32_t min_array_element);
 
    } vtbl;
 
@@ -1242,20 +1242,6 @@ struct brw_context
       bool enable_cut_index;
    } prim_restart;
 
-   /** Computed depth/stencil/hiz state from the current attached
-    * renderbuffers, valid only during the drawing state upload loop after
-    * brw_workaround_depthstencil_alignment().
-    */
-   struct {
-      struct intel_mipmap_tree *depth_mt;
-      struct intel_mipmap_tree *stencil_mt;
-
-      /* Inter-tile (page-aligned) byte offsets. */
-      uint32_t depth_offset, hiz_offset, stencil_offset;
-      /* Intra-tile x,y offsets for drawing to depth/stencil/hiz */
-      uint32_t tile_x, tile_y;
-   } depthstencil;
-
    uint32_t num_instances;
    int basevertex;
 
@@ -1302,8 +1288,6 @@ void brw_get_depthstencil_tile_masks(struct intel_mipmap_tree *depth_mt,
                                      struct intel_mipmap_tree *stencil_mt,
                                      uint32_t *out_tile_mask_x,
                                      uint32_t *out_tile_mask_y);
-void brw_workaround_depthstencil_alignment(struct brw_context *brw,
-                                           GLbitfield clear_mask);
 
 /*======================================================================
  * brw_queryobj.c
@@ -1515,22 +1499,22 @@ brw_emit_depthbuffer(struct brw_context *brw);
 void
 brw_emit_depth_stencil_hiz(struct brw_context *brw,
                            struct intel_mipmap_tree *depth_mt,
-                           uint32_t depth_offset, uint32_t depthbuffer_format,
+                           uint32_t depthbuffer_format,
                            uint32_t depth_surface_type,
                            struct intel_mipmap_tree *stencil_mt,
                            bool hiz, bool separate_stencil,
-                           uint32_t width, uint32_t height,
-                           uint32_t tile_x, uint32_t tile_y);
+                           uint32_t width, uint32_t height, uint32_t depth,
+                           uint32_t lod, uint32_t min_array_element);
 
 void
 gen7_emit_depth_stencil_hiz(struct brw_context *brw,
                             struct intel_mipmap_tree *depth_mt,
-                            uint32_t depth_offset, uint32_t depthbuffer_format,
+                            uint32_t depthbuffer_format,
                             uint32_t depth_surface_type,
                             struct intel_mipmap_tree *stencil_mt,
                             bool hiz, bool separate_stencil,
-                            uint32_t width, uint32_t height,
-                            uint32_t tile_x, uint32_t tile_y);
+                            uint32_t width, uint32_t height, uint32_t depth,
+                            uint32_t lod, uint32_t min_array_element);
 
 #ifdef __cplusplus
 }

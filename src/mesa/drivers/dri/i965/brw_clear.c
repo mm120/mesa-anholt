@@ -127,6 +127,14 @@ brw_fast_clear_depth(struct gl_context *ctx)
       return false;
    }
 
+   if (depth_irb->mt_level != 0 &&
+       (mt->level[depth_irb->mt_level].width % 8 != 0 ||
+        mt->level[depth_irb->mt_level].height % 4 != 0)) {
+      perf_debug("Failed to fast clear depth due to non-8x4-aligned mip "
+                 "level size.\n");
+      return false;
+   }
+
    uint32_t depth_clear_value;
    switch (mt->format) {
    case MESA_FORMAT_Z32_FLOAT_X24S8:

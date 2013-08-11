@@ -509,7 +509,7 @@ intel_miptree_create_layout(struct brw_context *brw,
                             GLuint width0,
                             GLuint height0,
                             GLuint depth0,
-                            bool for_bo,
+                            bool force_no_separate_stencil,
                             GLuint num_samples);
 
 struct intel_mipmap_tree *

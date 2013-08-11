@@ -246,7 +246,7 @@ intel_miptree_create_layout(struct brw_context *brw,
                             GLuint width0,
                             GLuint height0,
                             GLuint depth0,
-                            bool for_bo,
+                            bool force_no_separate_stencil,
                             GLuint num_samples)
 {
    struct intel_mipmap_tree *mt = calloc(sizeof(*mt), 1);
@@ -362,7 +362,13 @@ intel_miptree_create_layout(struct brw_context *brw,
    mt->physical_height0 = height0;
    mt->physical_depth0 = depth0;
 
-   if (!for_bo &&
+   /* On pre-gen6, we can't do HiZ for LOD > 0, and we can't do separate
+    * stencil for non-HIZ.
+    */
+   if (brw->gen < 7 && mt->last_level != 0)
+      force_no_separate_stencil = true;
+
+   if (!force_no_separate_stencil &&
        _mesa_get_format_base_format(format) == GL_DEPTH_STENCIL &&
        (brw->must_use_separate_stencil ||
 	(brw->has_separate_stencil && brw_is_hiz_depth_format(brw, format)))) {
@@ -527,9 +533,9 @@ intel_miptree_create(struct brw_context *brw,
    etc_format = (format != tex_format) ? tex_format : MESA_FORMAT_NONE;
 
    mt = intel_miptree_create_layout(brw, target, format,
-				      first_level, last_level, width0,
-				      height0, depth0,
-				      false, num_samples);
+                                    first_level, last_level, width0,
+                                    height0, depth0,
+                                    false, num_samples);
    /*
     * pitch == 0 || height == 0  indicates the null texture
     */
@@ -1271,6 +1277,12 @@ bool
 intel_miptree_alloc_hiz(struct brw_context *brw,
 			struct intel_mipmap_tree *mt)
 {
+   /* We can't do HIZ without separate stencil. */
+   if (mt->format == MESA_FORMAT_S8_Z24 ||
+       mt->format == MESA_FORMAT_Z32_FLOAT_X24S8) {
+      return false;
+   }
+
    assert(mt->hiz_mt == NULL);
    mt->hiz_mt = intel_miptree_create(brw,
                                      mt->target,
@@ -1713,7 +1725,7 @@ intel_miptree_map_blit(struct brw_context *brw,
    map->mt = intel_miptree_create(brw, GL_TEXTURE_2D, mt->format,
                                   0, 0,
                                   map->w, map->h, 1,
-                                  false, 0,
+                                  !mt->stencil_mt, 0,
                                   INTEL_MIPTREE_TILING_NONE);
    if (!map->mt) {
       fprintf(stderr, "Failed to allocate blit temporary\n");

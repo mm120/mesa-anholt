@@ -544,7 +544,6 @@ void brw_init_common_queryobj_functions(struct dd_function_table *functions)
 {
    functions->NewQueryObject = brw_new_query_object;
    functions->DeleteQuery = brw_delete_query;
-   functions->QueryCounter = brw_query_counter;
    functions->GetTimestamp = brw_get_timestamp;
 }
 
@@ -553,6 +552,7 @@ void gen4_init_queryobj_functions(struct dd_function_table *functions)
 {
    functions->BeginQuery = brw_begin_query;
    functions->EndQuery = brw_end_query;
+   functions->QueryCounter = brw_query_counter;
    functions->CheckQuery = brw_check_query;
    functions->WaitQuery = brw_wait_query;
 }

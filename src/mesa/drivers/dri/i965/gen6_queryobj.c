@@ -30,6 +30,13 @@
  * Support for query objects (GL_ARB_occlusion_query, GL_ARB_timer_query,
  * GL_EXT_transform_feedback, and friends) on platforms that support
  * hardware contexts (Gen6+).
+ *
+ * The query object gets the starting value of some counter written in the
+ * first uint64_t of the query BO, and the end value written in the second
+ * uint64_t.  Pipelined after that is a "1" field that gets written to the
+ * next uint64_t, which indicates that the query has been completed (We don't
+ * know for sure that the end value will be non-zero, and thus can't check it
+ * to see if it's been written or not).
  */
 #include "main/imports.h"
 
@@ -38,6 +45,8 @@
 #include "brw_state.h"
 #include "intel_batchbuffer.h"
 #include "intel_reg.h"
+
+#define QUERY_DONE_OFFSET (2 * 8)
 
 /**
  * Emit PIPE_CONTROLs to write the current GPU timestamp into a buffer.
@@ -94,6 +103,30 @@ write_depth_count(struct brw_context *brw, drm_intel_bo *query_bo, int idx)
    ADVANCE_BATCH();
 }
 
+/**
+ * Emit PIPE_CONTROLs to write a "1" into the "is it done?" field of the query
+ * object's BO.
+ */
+static void
+write_query_done(struct brw_context *brw, drm_intel_bo *query_bo)
+{
+   /* Emit Sandybridge workaround flush: */
+   if (brw->gen == 6)
+      intel_emit_post_sync_nonzero_flush(brw);
+
+   BEGIN_BATCH(5);
+   OUT_BATCH(_3DSTATE_PIPE_CONTROL | (5 - 2));
+   OUT_BATCH(PIPE_CONTROL_DEPTH_STALL |
+             PIPE_CONTROL_WRITE_IMMEDIATE);
+   OUT_RELOC(query_bo,
+             I915_GEM_DOMAIN_INSTRUCTION, I915_GEM_DOMAIN_INSTRUCTION,
+             PIPE_CONTROL_GLOBAL_GTT_WRITE |
+             QUERY_DONE_OFFSET);
+   OUT_BATCH(1);
+   OUT_BATCH(0);
+   ADVANCE_BATCH();
+}
+
 /*
  * Write an arbitrary 64-bit register to a buffer via MI_STORE_REGISTER_MEM.
  *
@@ -145,6 +178,39 @@ write_xfb_primitives_written(struct brw_context *brw,
    }
 }
 
+static void
+allocate_query_bo(struct brw_context *brw, struct brw_query_object *query)
+{
+   /* Since we're starting a new query, we need to throw away previous
+    * uncollected results if there are any.
+    */
+   drm_intel_bo_unreference(query->bo);
+
+   query->bo = drm_intel_bo_alloc(brw->bufmgr, "query results", 4096, 4096);
+
+   /* Clear the "done" field that we'll use as a low-latency "is this query
+    * finished?" test.
+    *
+    * We can safely use _unsynchronized here (and possibly avoid bothering the
+    * kernel for this mapping at all on a cached buffer on an LLC system),
+    * because drm_intel_bo_alloc() guarantees you an idle BO.
+    */
+   drm_intel_gem_bo_map_unsynchronized(query->bo);
+   *(uint32_t *)(query->bo->virtual + QUERY_DONE_OFFSET) = 0;
+   drm_intel_bo_unmap(query->bo);
+}
+
+#include <unistd.h>
+static bool
+query_reports_done(drm_intel_bo *query_bo)
+{
+   uint32_t value = *(uint32_t *)(query_bo->virtual + QUERY_DONE_OFFSET);
+
+   assert(value == 0 || value == 1);
+
+   return value != 0;
+}
+
 /**
  * Wait on the query object's BO and calculate the final result.
  */
@@ -154,23 +220,19 @@ gen6_queryobj_get_results(struct gl_context *ctx,
 {
    struct brw_context *brw = brw_context(ctx);
 
-   if (query->bo == NULL)
-      return;
-
-   /* If the application has requested the query result, but this batch is
-    * still contributing to it, flush it now so the results will be present
-    * when mapped.
-    */
-   if (drm_intel_bo_references(brw->batch.bo, query->bo))
-      intel_batchbuffer_flush(brw);
-
-   if (unlikely(brw->perf_debug)) {
-      if (drm_intel_bo_busy(query->bo)) {
-         perf_debug("Stalling on the GPU waiting for a query object.\n");
+   /* optimistic_check_query() may call us while already mapped. */
+   if (!query->bo->virtual) {
+      if (unlikely(brw->perf_debug)) {
+         if (drm_intel_bo_busy(query->bo)) {
+            perf_debug("Stalling on the GPU waiting for a query object.\n");
+         }
       }
+      drm_intel_bo_map(query->bo, false);
    }
 
-   drm_intel_bo_map(query->bo, false);
+   /* Sanity check that the done flag has landed. */
+   assert(query_reports_done(query->bo));
+
    uint64_t *results = query->bo->virtual;
    switch (query->Base.Target) {
    case GL_TIME_ELAPSED:
@@ -225,13 +287,14 @@ gen6_queryobj_get_results(struct gl_context *ctx,
       assert(!"Unrecognized query target in brw_queryobj_get_results()");
       break;
    }
-   drm_intel_bo_unmap(query->bo);
 
    /* Now that we've processed the data stored in the query's buffer object,
     * we can release it.
     */
+   drm_intel_bo_unmap(query->bo);
    drm_intel_bo_unreference(query->bo);
    query->bo = NULL;
+   query->Base.Ready = true;
 }
 
 /**
@@ -246,9 +309,7 @@ gen6_begin_query(struct gl_context *ctx, struct gl_query_object *q)
    struct brw_context *brw = brw_context(ctx);
    struct brw_query_object *query = (struct brw_query_object *)q;
 
-   /* Since we're starting a new query, we need to throw away old results. */
-   drm_intel_bo_unreference(query->bo);
-   query->bo = drm_intel_bo_alloc(brw->bufmgr, "query results", 4096, 4096);
+   allocate_query_bo(brw, query);
 
    switch (query->Base.Target) {
    case GL_TIME_ELAPSED:
@@ -331,6 +392,61 @@ gen6_end_query(struct gl_context *ctx, struct gl_query_object *q)
       assert(!"Unrecognized query target in brw_end_query()");
       break;
    }
+
+   write_query_done(brw, query->bo);
+}
+
+/**
+ * Tries to immediately get the query results by checking if the done flag has
+ * already been written to the query BO.
+ *
+ * In the common case of the app succeeding at pipelining its queries, we end
+ * up reading our 3 values out (done, start, and end) with no need to bother
+ * the kernel.  This also allows us to succeed at answering a query before the
+ * rest of the batch that included the EndQuery has finished.
+ */
+static bool
+optimistic_query_check(struct gl_context *ctx,
+                       struct brw_query_object *query)
+{
+   struct brw_context *brw = brw_context(ctx);
+
+   /* We can only do the unsynced mapping on LLC hardware, currently.  We
+    * could potentially flip the query BO into cache coherent, but we need
+    * some libdrm work to do so.
+    */
+   assert(brw->has_llc);
+
+   drm_intel_gem_bo_map_unsynchronized(query->bo);
+   if (query_reports_done(query->bo)) {
+      gen6_queryobj_get_results(ctx, query);
+      /* Note that the BO was unmapped and freed by get_results() */
+      return true;
+   }
+   drm_intel_bo_unmap(query->bo);
+
+   return false;
+}
+
+/**
+ * Driver hook for glQueryCounter().
+ *
+ * This handles GL_TIMESTAMP queries, which perform a pipelined read of the
+ * current GPU time.  This is unlike GL_TIME_ELAPSED, which measures the
+ * time while the query is active.
+ */
+static void
+gen6_query_counter(struct gl_context *ctx, struct gl_query_object *q)
+{
+   struct brw_context *brw = brw_context(ctx);
+   struct brw_query_object *query = (struct brw_query_object *) q;
+
+   assert(q->Target == GL_TIMESTAMP);
+
+   allocate_query_bo(brw, query);
+
+   write_timestamp(brw, query->bo, 0);
+   write_query_done(brw, query->bo);
 }
 
 /**
@@ -341,10 +457,25 @@ gen6_end_query(struct gl_context *ctx, struct gl_query_object *q)
  */
 static void gen6_wait_query(struct gl_context *ctx, struct gl_query_object *q)
 {
+   struct brw_context *brw = brw_context(ctx);
    struct brw_query_object *query = (struct brw_query_object *)q;
 
+   if (!query->bo) {
+      query->Base.Ready = true;
+      return;
+   }
+
+   if (brw->has_llc && optimistic_query_check(ctx, query))
+      return;
+
+   /* If the application has requested the query result, but this batch is
+    * still contributing to it, flush it now so the results will be present
+    * when mapped.
+    */
+   if (drm_intel_bo_references(brw->batch.bo, query->bo))
+      intel_batchbuffer_flush(brw);
+
    gen6_queryobj_get_results(ctx, query);
-   query->Base.Ready = true;
 }
 
 /**
@@ -358,6 +489,14 @@ static void gen6_check_query(struct gl_context *ctx, struct gl_query_object *q)
    struct brw_context *brw = brw_context(ctx);
    struct brw_query_object *query = (struct brw_query_object *)q;
 
+   /* If no BeginQuery was called, or the result has already been collected,
+    * do nothing.
+    */
+   if (!query->bo) {
+      query->Base.Ready = true;
+      return;
+   }
+
    /* From the GL_ARB_occlusion_query spec:
     *
     *     "Instead of allowing for an infinite loop, performing a
@@ -365,13 +504,20 @@ static void gen6_check_query(struct gl_context *ctx, struct gl_query_object *q)
     *      not ready yet on the first time it is queried.  This ensures that
     *      the async query will return true in finite time.
     */
-   if (query->bo && drm_intel_bo_references(brw->batch.bo, query->bo))
-      intel_batchbuffer_flush(brw);
-
-   if (query->bo == NULL || !drm_intel_bo_busy(query->bo)) {
-      gen6_queryobj_get_results(ctx, query);
-      query->Base.Ready = true;
+   if (brw->has_llc) {
+      if (optimistic_query_check(ctx, query))
+         return;
+      if (drm_intel_bo_references(brw->batch.bo, query->bo))
+         intel_batchbuffer_flush(brw);
+   } else {
+      if (drm_intel_bo_references(brw->batch.bo, query->bo))
+         intel_batchbuffer_flush(brw);
+      if (!drm_intel_bo_busy(query->bo)) {
+         gen6_queryobj_get_results(ctx, query);
+         return;
+      }
    }
+
 }
 
 /* Initialize Gen6+-specific query object functions. */
@@ -379,6 +525,7 @@ void gen6_init_queryobj_functions(struct dd_function_table *functions)
 {
    functions->BeginQuery = gen6_begin_query;
    functions->EndQuery = gen6_end_query;
+   functions->QueryCounter = gen6_query_counter;
    functions->CheckQuery = gen6_check_query;
    functions->WaitQuery = gen6_wait_query;
 }

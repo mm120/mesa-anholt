@@ -1022,11 +1022,13 @@ gen6_blorp_exec(struct brw_context *brw,
    uint32_t wm_bind_bo_offset = 0;
 
    uint32_t prog_offset = params->get_wm_prog(brw, &prog_data);
-   gen6_emit_3dstate_multisample(brw, params->num_samples);
-   gen6_emit_3dstate_sample_mask(brw, params->num_samples, 1.0, false, ~0u);
+
    gen6_blorp_emit_state_base_address(brw, params);
-   gen6_blorp_emit_vertices(brw, params);
+
+   gen6_blorp_emit_viewport_state(brw, params);
+
    gen6_blorp_emit_urb_config(brw, params);
+
    if (params->use_wm_prog) {
       cc_blend_state_offset = gen6_blorp_emit_blend_state(brw, params);
       cc_state_offset = gen6_blorp_emit_cc_state(brw, params);
@@ -1034,10 +1036,19 @@ gen6_blorp_exec(struct brw_context *brw,
    depthstencil_offset = gen6_blorp_emit_depth_stencil_state(brw, params);
    gen6_blorp_emit_cc_state_pointers(brw, params, cc_blend_state_offset,
                                      depthstencil_offset, cc_state_offset);
+
+   if (params->use_wm_prog) {
+      uint32_t sampler_offset;
+      sampler_offset = gen6_blorp_emit_sampler_state(brw, params);
+      gen6_blorp_emit_sampler_state_pointers(brw, params, sampler_offset);
+   }
+
+   gen6_emit_3dstate_multisample(brw, params->num_samples);
+   gen6_emit_3dstate_sample_mask(brw, params->num_samples, 1.0, false, ~0u);
+
    if (params->use_wm_prog) {
       uint32_t wm_surf_offset_renderbuffer;
       uint32_t wm_surf_offset_texture = 0;
-      uint32_t sampler_offset;
       wm_push_const_offset = gen6_blorp_emit_wm_constants(brw, params);
       intel_miptree_used_for_rendering(params->dst.mt);
       wm_surf_offset_renderbuffer =
@@ -1053,9 +1064,9 @@ gen6_blorp_exec(struct brw_context *brw,
          gen6_blorp_emit_binding_table(brw, params,
                                        wm_surf_offset_renderbuffer,
                                        wm_surf_offset_texture);
-      sampler_offset = gen6_blorp_emit_sampler_state(brw, params);
-      gen6_blorp_emit_sampler_state_pointers(brw, params, sampler_offset);
+      gen6_blorp_emit_binding_table_pointers(brw, params, wm_bind_bo_offset);
    }
+
    gen6_blorp_emit_vs_disable(brw, params);
    gen6_blorp_emit_gs_disable(brw, params);
    gen6_blorp_emit_clip_disable(brw, params);
@@ -1065,16 +1076,20 @@ gen6_blorp_exec(struct brw_context *brw,
    else
       gen6_blorp_emit_constant_ps_disable(brw, params);
    gen6_blorp_emit_wm_config(brw, params, prog_offset, prog_data);
-   if (params->use_wm_prog)
-      gen6_blorp_emit_binding_table_pointers(brw, params, wm_bind_bo_offset);
-   gen6_blorp_emit_viewport_state(brw, params);
+
+   /* normal draw loop does scissor, but we never set scissor enable */
 
    if (params->depth.mt)
       gen6_blorp_emit_depth_stencil_config(brw, params);
    else
       gen6_blorp_emit_depth_disable(brw, params);
    gen6_blorp_emit_clear_params(brw, params);
+
+   /* normal draw loop does polygon stipple/offset */
+   /* normal draw loop does line stipple/parameters */
+
    gen6_blorp_emit_drawing_rectangle(brw, params);
+   gen6_blorp_emit_vertices(brw, params);
    gen6_blorp_emit_primitive(brw, params);
 }
 

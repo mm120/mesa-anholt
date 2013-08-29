@@ -440,8 +440,7 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
    gl_format rb_format = _mesa_get_render_format(ctx, intel_rb_format(irb));
    uint32_t surftype;
    bool is_array = false;
-   int depth = MAX2(rb->Depth, 1);
-   int min_array_element;
+   int depth, view_extent, min_array_element;
    const uint8_t mocs = GEN7_MOCS_L3;
 
    uint32_t surf_index =
@@ -480,11 +479,14 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
    case GL_TEXTURE_CUBE_MAP:
       surftype = BRW_SURFACE_2D;
       is_array = true;
-      depth *= 6;
+      depth = irb->mt->logical_depth0 * 6;
+      view_extent = rb->Depth * 6;
       break;
    default:
       surftype = translate_tex_target(irb->mt->target);
       is_array = _mesa_tex_target_is_array(irb->mt->target);
+      depth = irb->mt->logical_depth0;
+      view_extent = rb->Depth;
       break;
    }
 
@@ -524,7 +526,8 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
    surf[4] = (gen7_surface_msaa_bits(irb->mt->num_samples,
                                      irb->mt->msaa_layout) |
               SET_FIELD(min_array_element, GEN7_SURFACE_MIN_ARRAY_ELEMENT) |
-              SET_FIELD(depth - 1, GEN7_SURFACE_RENDER_TARGET_VIEW_EXTENT));
+              SET_FIELD(view_extent - 1,
+                        GEN7_SURFACE_RENDER_TARGET_VIEW_EXTENT));
 
    surf[5] = (SET_FIELD(mocs, GEN7_SURFACE_MOCS) |
               SET_FIELD(irb->mt_level - irb->mt->first_level,

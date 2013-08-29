@@ -63,6 +63,9 @@ gen6_blorp_emit_state_base_address(struct brw_context *brw,
 {
    uint8_t mocs = brw->gen == 7 ? GEN7_MOCS_L3 : 0;
 
+   if (brw->gen == 6)
+      intel_emit_post_sync_nonzero_flush(brw);
+
    BEGIN_BATCH(10);
    OUT_BATCH(CMD_STATE_BASE_ADDRESS << 16 | (10 - 2));
    OUT_BATCH(mocs << 8 | /* GeneralStateMemoryObjectControlState */

@@ -64,6 +64,9 @@ gen6_emit_3dstate_multisample(struct brw_context *brw,
    uint32_t sample_positions_3210 = 0;
    uint32_t sample_positions_7654 = 0;
 
+   if (brw->gen == 6)
+      intel_emit_post_sync_nonzero_flush(brw);
+
    switch (num_samples) {
    case 0:
    case 1:

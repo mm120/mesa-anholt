@@ -507,8 +507,6 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
    int depth = MAX2(rb->Depth, 1);
    int min_array_element;
    const uint8_t mocs = GEN7_MOCS_L3;
-   GLenum gl_target = rb->TexImage ?
-                         rb->TexImage->TexObject->Target : GL_TEXTURE_2D;
 
    uint32_t surf_index =
       brw->wm.prog_data->binding_table.render_target_start + unit;
@@ -529,7 +527,7 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
                     __FUNCTION__, _mesa_get_format_name(rb_format));
    }
 
-   switch (gl_target) {
+   switch (irb->mt->target) {
    case GL_TEXTURE_CUBE_MAP_ARRAY:
    case GL_TEXTURE_CUBE_MAP:
       surftype = BRW_SURFACE_2D;
@@ -537,8 +535,8 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
       depth *= 6;
       break;
    default:
-      surftype = translate_tex_target(gl_target);
-      is_array = _mesa_tex_target_is_array(gl_target);
+      surftype = translate_tex_target(irb->mt->target);
+      is_array = _mesa_tex_target_is_array(irb->mt->target);
       break;
    }
 

@@ -702,29 +702,11 @@ brw_update_renderbuffer_surface_miplevels(struct brw_context *brw,
    struct intel_mipmap_tree *mt = irb->mt;
    struct intel_region *region;
    uint32_t *surf;
-   uint32_t tile_x, tile_y;
    uint32_t format = 0;
    /* _NEW_BUFFERS */
    gl_format rb_format = _mesa_get_render_format(ctx, intel_rb_format(irb));
    uint32_t surf_index =
       brw->wm.prog_data->binding_table.render_target_start + unit;
-
-   assert(!layered);
-
-   if (rb->TexImage && !brw->has_surface_tile_offset) {
-      intel_renderbuffer_get_tile_offsets(irb, &tile_x, &tile_y);
-
-      if (tile_x != 0 || tile_y != 0) {
-	 /* Original gen4 hardware couldn't draw to a non-tile-aligned
-	  * destination in a miptree unless you actually setup your renderbuffer
-	  * as a miptree and used the fragile lod/array_index/etc. controls to
-	  * select the image.  So, instead, we just make a new single-level
-	  * miptree and render into that.
-	  */
-	 intel_renderbuffer_move_to_temp(brw, irb, false);
-	 mt = irb->mt;
-      }
-   }
 
    intel_miptree_used_for_rendering(irb->mt);
 
@@ -739,30 +721,56 @@ brw_update_renderbuffer_surface_miplevels(struct brw_context *brw,
                     __FUNCTION__, _mesa_get_format_name(rb_format));
    }
 
-   surf[0] = (SET_FIELD(BRW_SURFACE_2D, BRW_SURFACE_TYPE) |
+   /* From the SNB PRM, Vol4 part 1, page 81 about the Depth field:
+    *
+    *     "For SURFTYPE_CUBE: [DevSNB+]: for Sampling Engine Surfaces, the
+    *      range of this field is [0,84], indicating the number of cube array
+    *      elements (equal to the number of underlying 2D array elements
+    *      divided by 6). For other surfaces, this field must be zero."
+    *
+    * and there's a similar note in Minimum Array Element, which means we
+    * can't use cube surfaces for render targets.  Similar text exists back to
+    * gen4.  Since the HW lays out cubes as either 3D textures (without depth
+    * minification) or 2D arrays, just adjust our surface state parameters
+    * appropriately.
+    */
+   uint32_t surftype, depth, view_extent;
+
+   if (irb->mt->target == GL_TEXTURE_CUBE_MAP_ARRAY ||
+       irb->mt->target == GL_TEXTURE_CUBE_MAP) {
+      if (brw->gen > 4)
+         surftype = BRW_SURFACE_2D;
+      else
+         surftype = BRW_SURFACE_3D;
+      depth = irb->mt->logical_depth0 * 6;
+      view_extent = rb->Depth * 6;
+   } else {
+      surftype = translate_tex_target(irb->mt->target);
+      depth = irb->mt->logical_depth0;
+      view_extent = rb->Depth;
+   }
+
+   surf[0] = (SET_FIELD(surftype, BRW_SURFACE_TYPE) |
 	      SET_FIELD(format, BRW_SURFACE_FORMAT));
 
    /* reloc */
-   surf[1] = (intel_renderbuffer_get_tile_offsets(irb, &tile_x, &tile_y) +
-	      region->bo->offset);
+   surf[1] = region->bo->offset;
 
-   surf[2] = (SET_FIELD(rb->Width - 1, BRW_SURFACE_WIDTH) |
-	      SET_FIELD(rb->Height - 1, BRW_SURFACE_HEIGHT));
+   surf[2] = (SET_FIELD(mt->logical_width0 - 1, BRW_SURFACE_WIDTH) |
+              SET_FIELD(mt->logical_height0 - 1, BRW_SURFACE_HEIGHT) |
+              SET_FIELD(irb->mt_level - irb->mt->first_level,
+                        BRW_SURFACE_MIP_COUNT_LOD));
 
    surf[3] = (brw_get_surface_tiling_bits(region->tiling) |
+	      SET_FIELD(depth - 1, BRW_SURFACE_DEPTH) |
 	      SET_FIELD(region->pitch - 1, BRW_SURFACE_PITCH));
 
-   surf[4] = brw_get_surface_num_multisamples(mt->num_samples);
+   surf[4] = (brw_get_surface_num_multisamples(mt->num_samples) |
+              SET_FIELD(layered ? 0 : irb->mt_layer,
+                        BRW_SURFACE_MIN_ARRAY_ELEMENT) |
+              SET_FIELD(view_extent - 1, BRW_SURFACE_RENDER_TARGET_VIEW_EXTENT));
 
-   assert(brw->has_surface_tile_offset || (tile_x == 0 && tile_y == 0));
-   /* Note that the low bits of these fields are missing, so
-    * there's the possibility of getting in trouble.
-    */
-   assert(tile_x % 4 == 0);
-   assert(tile_y % 2 == 0);
-   surf[5] = (SET_FIELD(tile_x / 4, BRW_SURFACE_X_OFFSET) |
-	      SET_FIELD(tile_y / 2, BRW_SURFACE_Y_OFFSET) |
-	      (mt->align_h == 4 ? BRW_SURFACE_VERTICAL_ALIGN_ENABLE : 0));
+   surf[5] = (mt->align_h == 4 ? BRW_SURFACE_VERTICAL_ALIGN_ENABLE : 0);
 
    if (brw->gen < 6) {
       /* _NEW_COLOR */

@@ -463,6 +463,18 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
                     __FUNCTION__, _mesa_get_format_name(rb_format));
    }
 
+   /* From the IVB PRM, Vol4 part 1, page 70 about the Depth field:
+    *
+    *     "For SURFTYPE_CUBE: For Sampling Engine Surfaces, the range of this
+    *      field is [0,340], indicating the number of cube array elements
+    *      (equal to the number of underlying 2D array elements divided by
+    *      6). For other surfaces, this field must be zero."
+    *
+    * and there's a similar note in Minimum Array Element, which means we
+    * can't use cube surfaces for render targets.  Since the HW lays out cubes
+    * as arrays, tell the hardware it's an array and scale our parameters
+    * appropriately.
+    */
    switch (irb->mt->target) {
    case GL_TEXTURE_CUBE_MAP_ARRAY:
    case GL_TEXTURE_CUBE_MAP:

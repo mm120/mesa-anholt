@@ -180,7 +180,7 @@ static void dump_surface_state(struct brw_context *brw, uint32_t offset)
    batch_out(brw, name, offset, 2, "%dx%d size, %d mips\n",
 	     GET_FIELD(surf[2], BRW_SURFACE_WIDTH) + 1,
 	     GET_FIELD(surf[2], BRW_SURFACE_HEIGHT) + 1,
-	     GET_FIELD(surf[2], BRW_SURFACE_LOD));
+	     GET_FIELD(surf[2], BRW_SURFACE_MIP_COUNT_LOD));
    batch_out(brw, name, offset, 3, "pitch %d, %s tiled\n",
 	     GET_FIELD(surf[3], BRW_SURFACE_PITCH) + 1,
 	     (surf[3] & BRW_SURFACE_TILED) ?

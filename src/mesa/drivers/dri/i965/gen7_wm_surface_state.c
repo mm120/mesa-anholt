@@ -569,10 +569,6 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
 
    assert(brw->has_surface_tile_offset);
 
-   surf[5] = (SET_FIELD(mocs, GEN7_SURFACE_MOCS) |
-              SET_FIELD(irb->mt_level - irb->mt->first_level,
-                        GEN7_SURFACE_MIP_COUNT_LOD));
-
    surf[2] = SET_FIELD(irb->mt->logical_width0 - 1, GEN7_SURFACE_WIDTH) |
              SET_FIELD(irb->mt->logical_height0 - 1, GEN7_SURFACE_HEIGHT);
 
@@ -583,6 +579,10 @@ gen7_update_renderbuffer_surface(struct brw_context *brw,
                                      irb->mt->msaa_layout) |
               SET_FIELD(min_array_element, GEN7_SURFACE_MIN_ARRAY_ELEMENT) |
               SET_FIELD(depth - 1, GEN7_SURFACE_RENDER_TARGET_VIEW_EXTENT));
+
+   surf[5] = (SET_FIELD(mocs, GEN7_SURFACE_MOCS) |
+              SET_FIELD(irb->mt_level - irb->mt->first_level,
+                        GEN7_SURFACE_MIP_COUNT_LOD));
 
    if (irb->mt->mcs_mt) {
       gen7_set_surface_mcs_info(brw, surf, brw->wm.base.surf_offset[surf_index],

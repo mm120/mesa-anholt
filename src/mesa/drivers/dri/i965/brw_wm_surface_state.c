@@ -284,25 +284,25 @@ brw_update_texture_surface(struct gl_context *ctx,
 
    (void) for_gather;   /* no w/a to apply for this gen */
 
-   surf[0] = (translate_tex_target(tObj->Target) << BRW_SURFACE_TYPE_SHIFT |
+   surf[0] = (SET_FIELD(translate_tex_target(tObj->Target), BRW_SURFACE_TYPE) |
 	      BRW_SURFACE_MIPMAPLAYOUT_BELOW << BRW_SURFACE_MIPLAYOUT_SHIFT |
 	      BRW_SURFACE_CUBEFACE_ENABLES |
-	      (translate_tex_format(brw,
-                                    mt->format,
-				    tObj->DepthMode,
-				    sampler->sRGBDecode) <<
-	       BRW_SURFACE_FORMAT_SHIFT));
+	      SET_FIELD(translate_tex_format(brw,
+                                             mt->format,
+                                             tObj->DepthMode,
+                                             sampler->sRGBDecode),
+                        BRW_SURFACE_FORMAT));
 
    surf[1] = intelObj->mt->region->bo->offset + intelObj->mt->offset; /* reloc */
 
-   surf[2] = ((intelObj->_MaxLevel - tObj->BaseLevel) << BRW_SURFACE_MIP_COUNT_LOD_SHIFT |
-	      (mt->logical_width0 - 1) << BRW_SURFACE_WIDTH_SHIFT |
-	      (mt->logical_height0 - 1) << BRW_SURFACE_HEIGHT_SHIFT);
+   surf[2] = (SET_FIELD(intelObj->_MaxLevel - tObj->BaseLevel,
+                        BRW_SURFACE_MIP_COUNT_LOD) |
+	      SET_FIELD(mt->logical_width0 - 1, BRW_SURFACE_WIDTH) |
+	      SET_FIELD(mt->logical_height0 - 1, BRW_SURFACE_HEIGHT));
 
    surf[3] = (brw_get_surface_tiling_bits(intelObj->mt->region->tiling) |
-	      (mt->logical_depth0 - 1) << BRW_SURFACE_DEPTH_SHIFT |
-	      (intelObj->mt->region->pitch - 1) <<
-	      BRW_SURFACE_PITCH_SHIFT);
+	      SET_FIELD(mt->logical_depth0 - 1, BRW_SURFACE_DEPTH) |
+	      SET_FIELD(intelObj->mt->region->pitch - 1, BRW_SURFACE_PITCH));
 
    surf[4] = (brw_get_surface_num_multisamples(intelObj->mt->num_samples) |
               SET_FIELD(tObj->BaseLevel - mt->first_level, BRW_SURFACE_MIN_LOD));
@@ -548,8 +548,8 @@ brw_update_null_renderbuffer_surface(struct brw_context *brw, unsigned int unit)
          brw_get_surface_num_multisamples(fb->Visual.samples);
    }
 
-   surf[0] = (surface_type << BRW_SURFACE_TYPE_SHIFT |
-	      BRW_SURFACEFORMAT_B8G8R8A8_UNORM << BRW_SURFACE_FORMAT_SHIFT);
+   surf[0] = (SET_FIELD(surface_type, BRW_SURFACE_TYPE) |
+	      SET_FIELD(BRW_SURFACEFORMAT_B8G8R8A8_UNORM, BRW_SURFACE_FORMAT));
    if (brw->gen < 6) {
       surf[0] |= (1 << BRW_SURFACE_WRITEDISABLE_R_SHIFT |
 		  1 << BRW_SURFACE_WRITEDISABLE_G_SHIFT |
@@ -557,8 +557,8 @@ brw_update_null_renderbuffer_surface(struct brw_context *brw, unsigned int unit)
 		  1 << BRW_SURFACE_WRITEDISABLE_A_SHIFT);
    }
    surf[1] = bo ? bo->offset : 0;
-   surf[2] = ((fb->Width - 1) << BRW_SURFACE_WIDTH_SHIFT |
-              (fb->Height - 1) << BRW_SURFACE_HEIGHT_SHIFT);
+   surf[2] = (SET_FIELD(fb->Width - 1, BRW_SURFACE_WIDTH) |
+              SET_FIELD(fb->Height - 1, BRW_SURFACE_HEIGHT));
 
    /* From Sandy bridge PRM, Vol4 Part1 p82 (Tiled Surface: Programming
     * Notes):
@@ -566,7 +566,7 @@ brw_update_null_renderbuffer_surface(struct brw_context *brw, unsigned int unit)
     *     If Surface Type is SURFTYPE_NULL, this field must be TRUE
     */
    surf[3] = (BRW_SURFACE_TILED | BRW_SURFACE_TILED_Y |
-              pitch_minus_1 << BRW_SURFACE_PITCH_SHIFT);
+              SET_FIELD(pitch_minus_1, BRW_SURFACE_PITCH));
    surf[4] = multisampling_state;
    surf[5] = 0;
 
@@ -631,18 +631,18 @@ brw_update_renderbuffer_surface(struct brw_context *brw,
                     __FUNCTION__, _mesa_get_format_name(rb_format));
    }
 
-   surf[0] = (BRW_SURFACE_2D << BRW_SURFACE_TYPE_SHIFT |
-	      format << BRW_SURFACE_FORMAT_SHIFT);
+   surf[0] = (SET_FIELD(BRW_SURFACE_2D, BRW_SURFACE_TYPE) |
+	      SET_FIELD(format, BRW_SURFACE_FORMAT));
 
    /* reloc */
    surf[1] = (intel_renderbuffer_get_tile_offsets(irb, &tile_x, &tile_y) +
 	      region->bo->offset);
 
-   surf[2] = ((rb->Width - 1) << BRW_SURFACE_WIDTH_SHIFT |
-	      (rb->Height - 1) << BRW_SURFACE_HEIGHT_SHIFT);
+   surf[2] = (SET_FIELD(rb->Width - 1, BRW_SURFACE_WIDTH) |
+	      SET_FIELD(rb->Height - 1, BRW_SURFACE_HEIGHT));
 
    surf[3] = (brw_get_surface_tiling_bits(region->tiling) |
-	      (region->pitch - 1) << BRW_SURFACE_PITCH_SHIFT);
+	      SET_FIELD(region->pitch - 1, BRW_SURFACE_PITCH));
 
    surf[4] = brw_get_surface_num_multisamples(mt->num_samples);
 
@@ -652,8 +652,8 @@ brw_update_renderbuffer_surface(struct brw_context *brw,
     */
    assert(tile_x % 4 == 0);
    assert(tile_y % 2 == 0);
-   surf[5] = ((tile_x / 4) << BRW_SURFACE_X_OFFSET_SHIFT |
-	      (tile_y / 2) << BRW_SURFACE_Y_OFFSET_SHIFT |
+   surf[5] = (SET_FIELD(tile_x / 4, BRW_SURFACE_X_OFFSET) |
+	      SET_FIELD(tile_y / 2, BRW_SURFACE_Y_OFFSET) |
 	      (mt->align_h == 4 ? BRW_SURFACE_VERTICAL_ALIGN_ENABLE : 0));
 
    if (brw->gen < 6) {

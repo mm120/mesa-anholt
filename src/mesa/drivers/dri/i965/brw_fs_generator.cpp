@@ -160,6 +160,11 @@ fs_generator::generate_fb_write(fs_inst *inst)
 	 brw_MOV(p,
 		 brw_message_reg(inst->base_mrf + 1),
 		 brw_vec8_grf(1, 0));
+	 brw_MOV(p,
+		 retype(brw_vec1_reg(BRW_MESSAGE_REGISTER_FILE,
+                                     inst->base_mrf + 1, 7),
+                        BRW_REGISTER_TYPE_UD),
+		 brw_imm_ud(0));
       }
    } else {
       implied_header = brw_null_reg();

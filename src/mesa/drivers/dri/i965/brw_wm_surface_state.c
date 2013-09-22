@@ -623,8 +623,8 @@ brw_update_renderbuffer_surface(struct brw_context *brw,
     */
    uint32_t surftype, depth, view_extent;
 
-   if (irb->mt->target == GL_TEXTURE_CUBE_MAP_ARRAY ||
-       irb->mt->target == GL_TEXTURE_CUBE_MAP) {
+   if (brw->gen > 4 && (irb->mt->target == GL_TEXTURE_CUBE_MAP_ARRAY ||
+                        irb->mt->target == GL_TEXTURE_CUBE_MAP)) {
       if (brw->gen > 4)
          surftype = BRW_SURFACE_2D;
       else

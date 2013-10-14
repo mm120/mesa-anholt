@@ -353,6 +353,13 @@ public:
       this->instructions_to_schedule = 0;
       this->post_reg_alloc = post_reg_alloc;
       this->time = 0;
+      if (!post_reg_alloc) {
+         this->remaining_grf_uses = rzalloc_array(mem_ctx, int, grf_count);
+         this->grf_active = rzalloc_array(mem_ctx, bool, grf_count);
+      } else {
+         this->remaining_grf_uses = NULL;
+         this->grf_active = NULL;
+      }
    }
 
    ~instruction_scheduler()
@@ -377,6 +384,9 @@ public:
     */
    virtual int issue_time(backend_instruction *inst) = 0;
 
+   virtual void mod_remaining_grf_uses(backend_instruction *inst, int mod) = 0;
+   virtual int get_grf_pressure_benefit(backend_instruction *inst) = 0;
+
    void schedule_instructions(backend_instruction *next_block_header);
 
    void *mem_ctx;
@@ -387,6 +397,17 @@ public:
    int time;
    exec_list instructions;
    backend_visitor *bv;
+
+   /** Number of instructions left to schedule that reference each vgrf. */
+   int *remaining_grf_uses;
+
+   /**
+    * Tracks whether each VGRF has had an instruction scheduled that uses it.
+    *
+    * This is used to estimate whether scheduling a new instruction will
+    * increase register pressure.
+    */
+   bool *grf_active;
 };
 
 class fs_instruction_scheduler : public instruction_scheduler
@@ -398,6 +419,9 @@ public:
    schedule_node *choose_instruction_to_schedule();
    int issue_time(backend_instruction *inst);
    fs_visitor *v;
+
+   void mod_remaining_grf_uses(backend_instruction *inst, int mod);
+   int get_grf_pressure_benefit(backend_instruction *inst);
 };
 
 fs_instruction_scheduler::fs_instruction_scheduler(fs_visitor *v,
@@ -408,6 +432,57 @@ fs_instruction_scheduler::fs_instruction_scheduler(fs_visitor *v,
 {
 }
 
+void
+fs_instruction_scheduler::mod_remaining_grf_uses(backend_instruction *be,
+                                                 int mod)
+{
+   fs_inst *inst = (fs_inst *)be;
+
+   if (!remaining_grf_uses)
+      return;
+
+   if (inst->dst.file == GRF) {
+      remaining_grf_uses[inst->dst.reg] += mod;
+      if (mod < 0 && !grf_active[inst->dst.reg])
+         grf_active[inst->dst.reg] = true;
+   }
+
+   for (int i = 0; i < 3; i++) {
+      if (inst->src[i].file != GRF)
+         continue;
+
+      remaining_grf_uses[inst->src[i].reg] += mod;
+      if (mod < 0 && !grf_active[inst->src[i].reg])
+         grf_active[inst->src[i].reg] = true;
+   }
+}
+
+int
+fs_instruction_scheduler::get_grf_pressure_benefit(backend_instruction *be)
+{
+   fs_inst *inst = (fs_inst *)be;
+   int benefit = 0;
+
+   if (inst->dst.file == GRF) {
+      if (remaining_grf_uses[inst->dst.reg] == 1)
+         benefit += v->virtual_grf_sizes[inst->dst.reg];
+      if (!grf_active[inst->dst.reg])
+         benefit -= v->virtual_grf_sizes[inst->dst.reg];
+   }
+
+   for (int i = 0; i < 3; i++) {
+      if (inst->src[i].file != GRF)
+         continue;
+
+      if (remaining_grf_uses[inst->src[i].reg] == 1)
+         benefit += v->virtual_grf_sizes[inst->src[i].reg];
+      if (!grf_active[inst->src[i].reg])
+         benefit -= v->virtual_grf_sizes[inst->src[i].reg];
+   }
+
+   return benefit;
+}
+
 class vec4_instruction_scheduler : public instruction_scheduler
 {
 public:
@@ -416,6 +491,9 @@ public:
    schedule_node *choose_instruction_to_schedule();
    int issue_time(backend_instruction *inst);
    vec4_visitor *v;
+
+   void mod_remaining_grf_uses(backend_instruction *inst, int mod);
+   int get_grf_pressure_benefit(backend_instruction *inst);
 };
 
 vec4_instruction_scheduler::vec4_instruction_scheduler(vec4_visitor *v,
@@ -423,6 +501,18 @@ vec4_instruction_scheduler::vec4_instruction_scheduler(vec4_visitor *v,
    : instruction_scheduler(v, grf_count, true),
      v(v)
 {
+}
+
+void
+vec4_instruction_scheduler::mod_remaining_grf_uses(backend_instruction *be,
+                                                   int mod)
+{
+}
+
+int
+vec4_instruction_scheduler::get_grf_pressure_benefit(backend_instruction *be)
+{
+   return 0;
 }
 
 void
@@ -946,23 +1036,18 @@ fs_instruction_scheduler::choose_instruction_to_schedule()
          }
       }
    } else {
+      int chosen_score = -1000000; /* Any instruction is better than nothing */
+
       /* Before register allocation, we don't care about the latencies of
        * instructions.  All we care about is reducing live intervals of
        * variables so that we can avoid register spilling, or get 16-wide
        * shaders which naturally do a better job of hiding instruction
        * latency.
        *
-       * To do so, schedule our instructions in a roughly LIFO/depth-first
-       * order: when new instructions become available as a result of
-       * scheduling something, choose those first so that our result
-       * hopefully is consumed quickly.
-       *
-       * The exception is messages that generate more than one result
-       * register (AKA texturing).  In those cases, the LIFO search would
-       * normally tend to choose them quickly (because scheduling the
-       * previous message not only unblocked the children using its result,
-       * but also the MRF setup for the next sampler message, which in turn
-       * unblocks the next sampler message).
+       * If this instruction would be the last use of any GRFs, we bump up its
+       * score since it means it should be reducing register pressure.  If
+       * it's the first use of a GRF, reduce its score since it means it
+       * should be increasing register pressure.
        */
       for (schedule_node *node = (schedule_node *)instructions.get_tail();
            node != instructions.get_head()->prev;
@@ -970,9 +1055,12 @@ fs_instruction_scheduler::choose_instruction_to_schedule()
          schedule_node *n = (schedule_node *)node;
          fs_inst *inst = (fs_inst *)n->inst;
 
-         chosen = n;
-         if (inst->regs_written <= 1)
-            break;
+         int this_score = get_grf_pressure_benefit(inst);
+
+         if (this_score > chosen_score) {
+            chosen = n;
+            chosen_score = this_score;
+         }
       }
    }
 
@@ -1036,6 +1124,7 @@ instruction_scheduler::schedule_instructions(backend_instruction *next_block_hea
       chosen->remove();
       next_block_header->insert_before(chosen->inst);
       instructions_to_schedule--;
+      mod_remaining_grf_uses(chosen->inst, -1);
 
       /* Update the clock for how soon an instruction could start after the
        * chosen one.
@@ -1103,6 +1192,14 @@ instruction_scheduler::run(exec_list *all_instructions)
    if (debug) {
       printf("\nInstructions before scheduling (reg_alloc %d)\n", post_reg_alloc);
       bv->dump_instructions();
+   }
+
+   /* Populate the remaining GRF uses array to improve the pre-regalloc
+    * scheduling.
+    */
+   if (remaining_grf_uses) {
+      foreach_list(node, &instructions)
+         mod_remaining_grf_uses((backend_instruction *)node, 1);
    }
 
    while (!next_block_header->is_tail_sentinel()) {

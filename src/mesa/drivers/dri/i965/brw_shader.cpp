@@ -438,6 +438,11 @@ brw_instruction_name(enum opcode op)
    case SHADER_OPCODE_TXF_MS:
       return "txf_ms";
 
+   case SHADER_OPCODE_GEN4_SCRATCH_READ:
+      return "gen4_scratch_read";
+   case SHADER_OPCODE_GEN4_SCRATCH_WRITE:
+      return "gen4_scratch_write";
+
    case FS_OPCODE_DDX:
       return "ddx";
    case FS_OPCODE_DDY:
@@ -452,11 +457,6 @@ brw_instruction_name(enum opcode op)
       return "cinterp";
    case FS_OPCODE_LINTERP:
       return "linterp";
-
-   case FS_OPCODE_SPILL:
-      return "spill";
-   case FS_OPCODE_UNSPILL:
-      return "unspill";
 
    case FS_OPCODE_UNIFORM_PULL_CONSTANT_LOAD:
       return "uniform_pull_const";
@@ -487,10 +487,6 @@ brw_instruction_name(enum opcode op)
 
    case VS_OPCODE_URB_WRITE:
       return "vs_urb_write";
-   case VS_OPCODE_SCRATCH_READ:
-      return "scratch_read";
-   case VS_OPCODE_SCRATCH_WRITE:
-      return "scratch_write";
    case VS_OPCODE_PULL_CONSTANT_LOAD:
       return "pull_constant_load";
    case VS_OPCODE_PULL_CONSTANT_LOAD_GEN7:

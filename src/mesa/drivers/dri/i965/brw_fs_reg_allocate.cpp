@@ -541,7 +541,7 @@ fs_visitor::emit_unspill(fs_inst *inst, fs_reg dst, uint32_t spill_offset,
       inst->insert_before(unspill_inst);
 
       dst.reg_offset++;
-      spill_offset += REG_SIZE;
+      spill_offset += dispatch_width * sizeof(float);
    }
 }
 
@@ -625,10 +625,11 @@ fs_visitor::choose_spill_reg(struct ra_graph *g)
 void
 fs_visitor::spill_reg(int spill_reg)
 {
+   int reg_size = dispatch_width * sizeof(float);
    int size = virtual_grf_sizes[spill_reg];
    unsigned int spill_offset = c->last_scratch;
    assert(ALIGN(spill_offset, 16) == spill_offset); /* oword read/write req. */
-   c->last_scratch += size * REG_SIZE;
+   c->last_scratch += size * reg_size;
 
    /* Generate spill/unspill instructions for the objects being
     * spilled.  Right now, we spill or unspill the whole thing to a
@@ -647,7 +648,7 @@ fs_visitor::spill_reg(int spill_reg)
             inst->src[i].reg_offset = 0;
 
             emit_unspill(inst, inst->src[i],
-                         spill_offset + REG_SIZE * inst->src[i].reg_offset,
+                         spill_offset + reg_size * inst->src[i].reg_offset,
                          regs_read);
 	 }
       }
@@ -655,7 +656,7 @@ fs_visitor::spill_reg(int spill_reg)
       if (inst->dst.file == GRF &&
 	  inst->dst.reg == spill_reg) {
          int subset_spill_offset = (spill_offset +
-                                    REG_SIZE * inst->dst.reg_offset);
+                                    reg_size * inst->dst.reg_offset);
          inst->dst.reg = virtual_grf_alloc(inst->regs_written);
          inst->dst.reg_offset = 0;
 
@@ -678,11 +679,11 @@ fs_visitor::spill_reg(int spill_reg)
 	    fs_inst *spill_inst = new(mem_ctx) fs_inst(FS_OPCODE_SPILL,
 						       reg_null_f, spill_src);
 	    spill_src.reg_offset++;
-	    spill_inst->offset = subset_spill_offset + chan * REG_SIZE;
+	    spill_inst->offset = subset_spill_offset + chan * reg_size;
 	    spill_inst->ir = inst->ir;
 	    spill_inst->annotation = inst->annotation;
-	    spill_inst->base_mrf = 14;
-	    spill_inst->mlen = 2; /* header, value */
+	    spill_inst->mlen = 1 + dispatch_width / 8; /* header, value */
+	    spill_inst->base_mrf = 16 - spill_inst->mlen;
 	    inst->insert_after(spill_inst);
 	 }
       }

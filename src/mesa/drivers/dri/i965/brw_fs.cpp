@@ -354,6 +354,7 @@ fs_inst::is_send_from_grf()
 {
    return (opcode == FS_OPCODE_VARYING_PULL_CONSTANT_LOAD_GEN7 ||
            opcode == SHADER_OPCODE_SHADER_TIME_ADD ||
+           opcode == SHADER_OPCODE_GEN7_SCRATCH_WRITE ||
            (opcode == FS_OPCODE_UNIFORM_PULL_CONSTANT_LOAD &&
             src[1].file == GRF) ||
            (is_tex() && src[0].file == GRF));

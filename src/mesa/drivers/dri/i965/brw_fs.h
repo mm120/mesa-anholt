@@ -359,6 +359,7 @@ public:
    void emit_if_gen6(ir_if *ir);
    void emit_unspill(fs_inst *inst, fs_reg reg, uint32_t spill_offset,
                      int count);
+   fs_reg get_gen7_global_spill_reg();
 
    void emit_fragment_program_code();
    void setup_fp_regs();
@@ -462,6 +463,8 @@ public:
    fs_reg delta_y[BRW_WM_BARYCENTRIC_INTERP_MODE_COUNT];
    fs_reg shader_start_time;
 
+   fs_reg gen7_global_spill_reg;
+
    int grf_used;
 
    const unsigned dispatch_width; /**< 8 or 16 */
@@ -521,6 +524,7 @@ private:
                      bool negate_value);
    void generate_scratch_write(fs_inst *inst, struct brw_reg src);
    void generate_scratch_read(fs_inst *inst, struct brw_reg dst);
+   void generate_scratch_write_gen7(fs_inst *inst, struct brw_reg src);
    void generate_scratch_read_gen7(fs_inst *inst, struct brw_reg dst);
    void generate_uniform_pull_constant_load(fs_inst *inst, struct brw_reg dst,
                                             struct brw_reg index,

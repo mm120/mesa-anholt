@@ -2706,6 +2706,8 @@ fs_visitor::fs_visitor(struct brw_context *brw,
    this->force_uncompressed_stack = 0;
    this->force_sechalf_stack = 0;
 
+   this->gen7_global_spill_reg = fs_reg();
+
    memset(&this->param_size, 0, sizeof(this->param_size));
 }
 

@@ -2055,11 +2055,14 @@ brw_oword_block_read_scratch(struct brw_compile *p,
    }
 }
 
-void
-gen7_block_read_scratch(struct brw_compile *p,
-                        struct brw_reg dest,
-                        int num_regs,
-                        GLuint offset)
+static void
+gen7_block_scratch(struct brw_compile *p,
+                   uint32_t msg_control,
+                   struct brw_reg dest,
+                   struct brw_reg src,
+                   int num_regs,
+                   int mlen, int rlen,
+                   GLuint offset)
 {
    dest = retype(dest, BRW_REGISTER_TYPE_UW);
 
@@ -2074,16 +2077,16 @@ gen7_block_read_scratch(struct brw_compile *p,
     * scratch offset.
     */
    bool header_present = true;
-   brw_set_src0(p, insn, brw_vec8_grf(0, 0));
+   brw_set_src0(p, insn, src);
 
    brw_set_message_descriptor(p, insn,
                               GEN7_SFID_DATAPORT_DATA_CACHE,
-                              1, /* mlen: just g0 */
-                              num_regs,
+                              mlen,
+                              rlen,
                               header_present,
                               false);
 
-   insn->bits3.ud |= GEN7_DATAPORT_SCRATCH_READ;
+   insn->bits3.ud |= msg_control;
 
    assert(num_regs == 1 || num_regs == 2 || num_regs == 4);
    insn->bits3.ud |= (num_regs - 1) << GEN7_DATAPORT_SCRATCH_NUM_REGS_SHIFT;
@@ -2092,6 +2095,32 @@ gen7_block_read_scratch(struct brw_compile *p,
    offset /= REG_SIZE;
    assert(offset < (1 << 12));
    insn->bits3.ud |= offset;
+}
+
+void
+gen7_block_write_scratch(struct brw_compile *p,
+                         struct brw_reg src,
+                         int num_regs,
+                         GLuint offset)
+{
+   gen7_block_scratch(p, GEN7_DATAPORT_SCRATCH_WRITE,
+                      brw_null_reg(), src,
+                      num_regs,
+                      1 + num_regs, 0,
+                      offset);
+}
+
+void
+gen7_block_read_scratch(struct brw_compile *p,
+                        struct brw_reg dest,
+                        int num_regs,
+                        GLuint offset)
+{
+   gen7_block_scratch(p, GEN7_DATAPORT_SCRATCH_READ,
+                      dest, brw_vec8_grf(0, 0),
+                      num_regs,
+                      1, num_regs,
+                      offset);
 }
 
 /**

@@ -463,7 +463,7 @@ fs_visitor::assign_regs()
 
 
    /* Debug of register spilling: Go spill everything. */
-   if (0) {
+   if (1) {
       int reg = choose_spill_reg(g);
 
       if (reg != -1) {
@@ -609,6 +609,7 @@ fs_visitor::choose_spill_reg(struct ra_graph *g)
 	 break;
 
       case SHADER_OPCODE_GEN4_SCRATCH_WRITE:
+      case SHADER_OPCODE_GEN7_SCRATCH_WRITE:
 	 if (inst->src[0].file == GRF)
 	    no_spill[inst->src[0].reg] = true;
 	 break;
@@ -618,6 +619,15 @@ fs_visitor::choose_spill_reg(struct ra_graph *g)
 	 if (inst->dst.file == GRF)
 	    no_spill[inst->dst.reg] = true;
 	 break;
+
+      case BRW_OPCODE_MOV:
+         /* Avoid an infinite loop when the register spilling debug code is
+          * enabled.
+          */
+         if (inst->dst.file == GRF &&
+             inst->dst.reg == gen7_global_spill_reg.reg)
+            no_spill[inst->src[0].reg] = true;
+         break;
 
       default:
 	 break;
@@ -632,6 +642,26 @@ fs_visitor::choose_spill_reg(struct ra_graph *g)
    return ra_get_best_spill_node(g);
 }
 
+fs_reg
+fs_visitor::get_gen7_global_spill_reg()
+{
+   if (gen7_global_spill_reg.file != BAD_FILE)
+      return gen7_global_spill_reg;
+
+   gen7_global_spill_reg = fs_reg(this, glsl_type::vec2_type);
+
+   assert(dispatch_width == 8);
+   fs_inst *mov = new(mem_ctx) fs_inst(BRW_OPCODE_MOV,
+                                       gen7_global_spill_reg,
+                                       brw_vec8_grf(0, 0));
+   mov->ir = NULL;
+   mov->annotation = "spill setup";
+   mov->force_writemask_all = true;
+   instructions.push_head(mov);
+
+   return gen7_global_spill_reg;
+}
+
 void
 fs_visitor::spill_reg(int spill_reg)
 {
@@ -640,6 +670,9 @@ fs_visitor::spill_reg(int spill_reg)
    unsigned int spill_offset = c->last_scratch;
    assert(ALIGN(spill_offset, 16) == spill_offset); /* oword read/write req. */
    c->last_scratch += size * reg_size;
+
+   dump_instructions();
+   printf("\nspilling %d\n", spill_reg);
 
    /* Generate spill/unspill instructions for the objects being
     * spilled.  Right now, we spill or unspill the whole thing to a
@@ -686,16 +719,39 @@ fs_visitor::spill_reg(int spill_reg)
 	 spill_src.smear = -1;
 
 	 for (int chan = 0; chan < inst->regs_written; chan++) {
-	    fs_inst *spill_inst =
-               new(mem_ctx) fs_inst(SHADER_OPCODE_GEN4_SCRATCH_WRITE,
-                                    reg_null_f, spill_src);
-	    spill_src.reg_offset++;
-	    spill_inst->offset = subset_spill_offset + chan * reg_size;
-	    spill_inst->ir = inst->ir;
-	    spill_inst->annotation = inst->annotation;
-	    spill_inst->mlen = 1 + dispatch_width / 8; /* header, value */
-	    spill_inst->base_mrf = 16 - spill_inst->mlen;
-	    inst->insert_after(spill_inst);
+            uint32_t chan_offset = subset_spill_offset + chan * reg_size;
+            if (brw->gen >= 7 &&
+                spill_offset < (1 << 12) * REG_SIZE &&
+                dispatch_width == 8) {
+               fs_reg spill_payload = get_gen7_global_spill_reg();
+
+               spill_payload.reg_offset++;
+               fs_inst *mov = new(mem_ctx) fs_inst(BRW_OPCODE_MOV,
+                                                   spill_payload, spill_src);
+               spill_payload.reg_offset--;
+               mov->ir = inst->ir;
+               mov->annotation = inst->annotation;
+               inst->insert_after(mov);
+
+               fs_inst *spill_inst =
+                  new(mem_ctx) fs_inst(SHADER_OPCODE_GEN7_SCRATCH_WRITE,
+                                       reg_null_f, spill_payload);
+               spill_inst->offset = chan_offset;
+               spill_inst->ir = inst->ir;
+               spill_inst->annotation = inst->annotation;
+               mov->insert_after(spill_inst);
+            } else {
+               fs_inst *spill_inst =
+                  new(mem_ctx) fs_inst(SHADER_OPCODE_GEN4_SCRATCH_WRITE,
+                                       reg_null_f, spill_src);
+               spill_inst->offset = chan_offset;
+               spill_inst->ir = inst->ir;
+               spill_inst->annotation = inst->annotation;
+               spill_inst->mlen = 1 + dispatch_width / 8; /* header, value */
+               spill_inst->base_mrf = 16 - spill_inst->mlen;
+               inst->insert_after(spill_inst);
+            }
+            spill_src.reg_offset++;
 	 }
       }
    }

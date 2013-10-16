@@ -444,6 +444,8 @@ brw_instruction_name(enum opcode op)
       return "gen4_scratch_write";
    case SHADER_OPCODE_GEN7_SCRATCH_READ:
       return "gen7_scratch_read";
+   case SHADER_OPCODE_GEN7_SCRATCH_WRITE:
+      return "gen7_scratch_write";
 
    case FS_OPCODE_DDX:
       return "ddx";

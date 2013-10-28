@@ -427,8 +427,8 @@ public:
    void add_inst(backend_instruction *inst, int ip);
    void compute_delay(schedule_node *node);
    virtual void calculate_deps() = 0;
-   schedule_node *choose_instruction_to_schedule();
-   schedule_node *normal_heuristic();
+   schedule_node *choose_instruction_to_schedule(int time);
+   schedule_node *normal_heuristic(int time);
    schedule_node *register_pressure_heuristic();
 
    /**
@@ -571,7 +571,6 @@ public:
    vec4_instruction_scheduler(vec4_visitor *v, int grf_count,
                               enum instruction_scheduler_mode mode);
    void calculate_deps();
-   schedule_node *choose_instruction_to_schedule();
    int issue_time(backend_instruction *inst);
    vec4_visitor *v;
 
@@ -1244,35 +1243,141 @@ instruction_scheduler::register_pressure_heuristic()
 }
 
 schedule_node *
-instruction_scheduler::normal_heuristic()
+instruction_scheduler::normal_heuristic(int current_time)
 {
-   schedule_node *chosen = NULL;
-   int chosen_time = 0;
-
    assert(mode == SCHEDULE_PRE || mode == SCHEDULE_POST);
 
-   /* Of the instructions ready to execute or the closest to being ready,
-    * choose the oldest one.
+   /* First, we figure out what the conditions would be for the ecands and
+    * mcands lists from Muchnick.  ecands is the set of instructions that are
+    * ready to execute without any stalls.  mcands is the set of instructions
+    * with the highest maximum delay to program termination of any
+    * instruction.
     */
+   int maxdelay = 0, ecand_maxdelay = 0;
+   unsigned min_unblocked_time = ~0;
+   schedule_node *single_mcand = NULL;
+   bool found_an_ecand = false;
    foreach_list(node, &instructions) {
       schedule_node *n = (schedule_node *)node;
-
-      if (!chosen || n->unblocked_time < chosen_time) {
-         chosen = n;
-         chosen_time = n->unblocked_time;
+      if (n->delay > maxdelay) {
+         single_mcand = n;
+         maxdelay = n->delay;
+      } else if (n->delay == maxdelay) {
+         single_mcand = NULL;
       }
+
+      if (n->unblocked_time <= current_time) {
+         found_an_ecand = true;
+         ecand_maxdelay = MAX2(ecand_maxdelay, n->delay);
+      }
+      min_unblocked_time = MIN2(min_unblocked_time,
+                                (unsigned)n->unblocked_time);
+   }
+
+   /* If there's a single instruction with the highest delay of any
+    * instruction out there, then always choose it.  This helps ensure that we
+    * don't prioritize instructions
+    */
+   if (single_mcand) {
+      if (debug) {
+         printf("Choosing mcand: %4d: %8d ",
+                single_mcand->ip, single_mcand->delay);
+         bv->dump_instruction(single_mcand->inst);
+      }
+      return single_mcand;
+   }
+
+   /* Get the list of either mcands or ecands.  We'll prune this list by
+    * moving things back to &instructions, according to our heuristics.
+    */
+   exec_list cands_subset;
+   foreach_list_safe(node, &instructions) {
+      schedule_node *n = (schedule_node *)node;
+      if (found_an_ecand) {
+         if (n->unblocked_time <= current_time) {
+            n->remove();
+            cands_subset.push_tail(n);
+         }
+      } else {
+         if (n->delay == maxdelay) {
+            n->remove();
+            cands_subset.push_tail(n);
+         }
+      }
+   }
+   if (debug) {
+      /* Print the list of instructions we're considering. */
+      printf("%s\n", found_an_ecand ? "ecand" : "mcand");
+      foreach_list_safe(node, &cands_subset) {
+         schedule_node *n = (schedule_node *)node;
+         printf("%4d: %8d ", n->ip, n->delay);
+         bv->dump_instruction(n->inst);
+      }
+      printf("\n");
+   }
+
+   if (found_an_ecand) {
+      /* Cull instructions that don't have the maximum delay of any
+       * ready-to-execute instruction.
+       */
+      foreach_list_safe(node, &cands_subset) {
+         schedule_node *n = (schedule_node *)node;
+         if (n->delay != ecand_maxdelay) {
+            n->remove();
+            instructions.push_tail(n);
+         }
+      }
+   } else {
+      /* Cull instructions that aren't the closest to being ready to execute
+       * without stalls.  Instruction issue is cheap, and generally there
+       * aren't that many children of any one instruction, so this standard
+       * heuristic is probably a very good one for us.
+       */
+      foreach_list_safe(node, &cands_subset) {
+         schedule_node *n = (schedule_node *)node;
+         if (n->unblocked_time != (unsigned)min_unblocked_time) {
+            n->remove();
+            instructions.push_tail(n);
+         }
+      }
+   }
+
+   /* Of the instructions that passed the previous heuristic, choose the
+    * oldest one.
+    *
+    * We track the ip in the scheduler node to keep track of it as we move the
+    * instruction around between cands_subset and instructions across many
+    * normal_heuristic() calls.  Note that the ip won't be the same across
+    * schedule_instructions() calls, though.
+    */
+   unsigned min_ip = ~0;
+   schedule_node *chosen = NULL;
+   foreach_list(node, &cands_subset) {
+      schedule_node *n = (schedule_node *)node;
+      if (n->ip < min_ip) {
+         min_ip = n->ip;
+         chosen = n;
+      }
+   }
+
+   /* Put the nodes back onto the candidates list. */
+   instructions.append_list(&cands_subset);
+
+   if (debug) {
+      printf("Choosing: %4d: %8d ", chosen->ip, chosen->delay);
+      bv->dump_instruction(chosen->inst);
    }
 
    return chosen;
 }
 
 schedule_node *
-instruction_scheduler::choose_instruction_to_schedule()
+instruction_scheduler::choose_instruction_to_schedule(int current_time)
 {
    switch (mode) {
    case SCHEDULE_PRE:
    case SCHEDULE_POST:
-      return normal_heuristic();
+      return normal_heuristic(current_time);
    case SCHEDULE_PRE_LIFO:
    case SCHEDULE_PRE_NON_LIFO:
       return register_pressure_heuristic();
@@ -1311,7 +1416,7 @@ instruction_scheduler::schedule_instructions(backend_instruction *next_block_hea
 
    unsigned cand_generation = 1;
    while (!instructions.is_empty()) {
-      schedule_node *chosen = choose_instruction_to_schedule();
+      schedule_node *chosen = choose_instruction_to_schedule(time);
 
       /* Schedule this instruction. */
       assert(chosen);

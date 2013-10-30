@@ -105,9 +105,12 @@ public:
 
       int used = 0;
       used |= 1 << ir->mask.x;
-      used |= 1 << ir->mask.y;
-      used |= 1 << ir->mask.z;
-      used |= 1 << ir->mask.w;
+      if (ir->type->vector_elements >= 2)
+         used |= 1 << ir->mask.y;
+      if (ir->type->vector_elements >= 3)
+         used |= 1 << ir->mask.z;
+      if (ir->type->vector_elements >= 4)
+         used |= 1 << ir->mask.w;
 
       use_channels(deref->var, used);
 

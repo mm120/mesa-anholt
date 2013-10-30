@@ -97,7 +97,7 @@ public:
       return visit_continue;
    }
 
-   virtual ir_visitor_status visit(ir_swizzle *ir)
+   virtual ir_visitor_status visit_enter(ir_swizzle *ir)
    {
       ir_dereference_variable *deref = ir->val->as_dereference_variable();
       if (!deref)

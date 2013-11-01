@@ -37,6 +37,7 @@
 #include "ir_hierarchical_visitor.h"
 #include "program/hash_table.h"
 #include "glsl_types.h"
+#include "main/macros.h"
 
 namespace {
 
@@ -561,9 +562,15 @@ ir_validate::visit_leave(ir_expression *ir)
 
    case ir_triop_csel:
       assert(ir->operands[0]->type->base_type == GLSL_TYPE_BOOL);
-      assert(ir->type->vector_elements == ir->operands[0]->type->vector_elements);
-      assert(ir->type == ir->operands[1]->type);
-      assert(ir->type == ir->operands[2]->type);
+      assert(ir->operands[1]->type->base_type ==
+             ir->operands[2]->type->base_type);
+      for (int i = 0; i < 3; i++) {
+         assert(ir->operands[i]->type->is_scalar() ||
+                (ir->operands[i]->type->components() ==
+                 MAX3(ir->operands[0]->type->components(),
+                      ir->operands[1]->type->components(),
+                      ir->operands[2]->type->components())));
+      }
       break;
 
    case ir_triop_bfi:

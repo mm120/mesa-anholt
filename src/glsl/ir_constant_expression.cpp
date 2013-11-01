@@ -427,12 +427,14 @@ ir_expression::constant_expression_value(struct hash_table *variable_context)
 
    bool op0_scalar = op[0]->type->is_scalar();
    bool op1_scalar = op[1] != NULL && op[1]->type->is_scalar();
+   bool op2_scalar = op[2] != NULL && op[2]->type->is_scalar();
 
    /* When iterating over a vector or matrix's components, we want to increase
     * the loop counter.  However, for scalars, we want to stay at 0.
     */
    unsigned c0_inc = op0_scalar ? 0 : 1;
    unsigned c1_inc = op1_scalar ? 0 : 1;
+   unsigned c2_inc = op2_scalar ? 0 : 1;
    unsigned components;
    if (op1_scalar || !op[1]) {
       components = op[0]->type->components();
@@ -1431,9 +1433,12 @@ ir_expression::constant_expression_value(struct hash_table *variable_context)
    }
 
    case ir_triop_csel:
-      for (unsigned c = 0; c < components; c++) {
-         data.u[c] = op[0]->value.b[c] ? op[1]->value.u[c]
-                                       : op[2]->value.u[c];
+      for (unsigned c = 0, c0 = 0, c1 = 0, c2 = 0; c < components; c++) {
+         data.u[c] = op[0]->value.b[c0] ? op[1]->value.u[c1]
+                                        : op[2]->value.u[c2];
+         c0 += c0_inc;
+         c1 += c1_inc;
+         c2 += c2_inc;
       }
       break;
 

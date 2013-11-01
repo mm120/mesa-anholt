@@ -765,7 +765,9 @@ fs_visitor::visit(ir_expression *ir)
       break;
 
    case ir_triop_csel:
-      emit(CMP(reg_null_d, op[0], fs_reg(0), BRW_CONDITIONAL_NZ));
+      emit_bool_to_cond_code(ir->operands[0]);
+      /* We lost our ->result from the accept() in emit_bool_to_cond_code(). */
+      this->result = fs_reg(this, ir->type);
       inst = emit(BRW_OPCODE_SEL, this->result, op[1], op[2]);
       inst->predicate = BRW_PREDICATE_NORMAL;
       break;

@@ -56,6 +56,9 @@
 #include "glsl_types.h"
 #include "program/hash_table.h"
 #include "ir.h"
+#include "ir_builder.h"
+
+using namespace ir_builder;
 
 static void
 detect_conflicting_assignments(struct _mesa_glsl_parse_state *state,
@@ -1512,14 +1515,9 @@ ast_expression::hir(exec_list *instructions,
 	 error_emitted = true;
       }
 
-      ir_constant *cond_val = op[0]->constant_expression_value();
-      ir_constant *then_val = op[1]->constant_expression_value();
-      ir_constant *else_val = op[2]->constant_expression_value();
-
-      if (then_instructions.is_empty()
-	  && else_instructions.is_empty()
-	  && (cond_val != NULL) && (then_val != NULL) && (else_val != NULL)) {
-	 result = (cond_val->value.b[0]) ? then_val : else_val;
+      /* If there are no side effects, we can just use the csel expression. */
+      if (then_instructions.is_empty() && else_instructions.is_empty()) {
+         result = csel(op[0], op[1], op[2]);
       } else {
 	 ir_variable *const tmp =
 	    new(ctx) ir_variable(type, "conditional_tmp", ir_var_temporary);

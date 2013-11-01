@@ -62,6 +62,8 @@ struct brw_compile {
    GLuint flag_value;
    bool single_program_flow;
    bool compressed;
+   /** Cleared when we generate an instruction that can't be used in SPF mode */
+   bool spf;
    struct brw_context *brw;
 
    /* Control flow stacks:

@@ -109,6 +109,8 @@ brw_upload_wm_unit(struct brw_context *brw)
 			brw->wm.prog_data->prog_offset_16 +
 			(wm->wm9.grf_reg_count_2 << 1)) >> 6;
 
+   wm->thread1.single_program_flow = brw->wm.prog_data->spf;
+
    wm->thread1.depth_coef_urb_read_offset = 1;
    /* Use ALT floating point mode for ARB fragment programs, because they
     * require 0^0 == 1.  Even though _CurrentFragmentProgram is used for

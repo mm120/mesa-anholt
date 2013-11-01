@@ -1149,6 +1149,9 @@ brw_IF(struct brw_compile *p, GLuint execute_size)
    struct brw_context *brw = p->brw;
    struct brw_instruction *insn;
 
+   /* We could potentially enable SPF if the control flow is uniform. */
+   p->spf = false;
+
    insn = next_insn(p, BRW_OPCODE_IF);
 
    /* Override the defaults for this instruction:
@@ -1516,6 +1519,9 @@ struct brw_instruction *gen6_HALT(struct brw_compile *p)
 {
    struct brw_instruction *insn;
 
+   /* We could potentially enable SPF if the control flow is uniform. */
+   p->spf = false;
+
    insn = next_insn(p, BRW_OPCODE_HALT);
    brw_set_dest(p, insn, retype(brw_null_reg(), BRW_REGISTER_TYPE_D));
    brw_set_src0(p, insn, retype(brw_null_reg(), BRW_REGISTER_TYPE_D));
@@ -1549,6 +1555,9 @@ struct brw_instruction *gen6_HALT(struct brw_compile *p)
 struct brw_instruction *brw_DO(struct brw_compile *p, GLuint execute_size)
 {
    struct brw_context *brw = p->brw;
+
+   /* We could potentially enable SPF if the control flow is uniform. */
+   p->spf = false;
 
    if (brw->gen >= 6 || p->single_program_flow) {
       push_loop_stack(p, &p->store[p->nr_insn]);

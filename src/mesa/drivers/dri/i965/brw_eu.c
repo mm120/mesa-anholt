@@ -123,8 +123,14 @@ brw_set_compression_control(struct brw_compile *p,
 	 p->current->header.compression_control = GEN6_COMPRESSION_1Q;
 	 break;
       case BRW_COMPRESSION_2NDHALF:
-	 /* For 8-wide, this is "use the second set of 8 bits." */
+	 /* For 8-wide, this is "use the second set of 8 bits."
+          *
+          * From the IVB PRM:
+          *
+          *     "Only H1/Q1/N1 are allowed in SPF mode."
+          */
 	 p->current->header.compression_control = GEN6_COMPRESSION_2Q;
+         p->spf = false;
 	 break;
       case BRW_COMPRESSION_COMPRESSED:
 	 /* For 16-wide instruction compression, use the first set of 16 bits
@@ -192,6 +198,7 @@ brw_init_compile(struct brw_context *brw, struct brw_compile *p, void *mem_ctx)
    p->nr_insn = 0;
    p->current = p->stack;
    p->compressed = false;
+   p->spf = true;
    memset(p->current, 0, sizeof(p->current[0]));
 
    p->mem_ctx = mem_ctx;

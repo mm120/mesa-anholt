@@ -1736,5 +1736,7 @@ fs_generator::generate_assembly(exec_list *simd8_instructions,
       generate_code(simd16_instructions);
    }
 
+   c->prog_data.spf = p->spf;
+
    return brw_get_program(p, assembly_size);
 }

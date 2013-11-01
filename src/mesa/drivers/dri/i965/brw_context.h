@@ -383,6 +383,13 @@ struct brw_wm_prog_data {
    GLuint nr_params;       /**< number of float params/constants */
    GLuint nr_pull_params;
    bool dual_src_blend;
+
+   /* Set if we can set the Single Program Flow field of the shader state
+    * packet, to save power and possibly execution speed by telling the HW
+    * that all branches branch the same way.
+    */
+   bool spf;
+
    uint32_t prog_offset_16;
 
    /**

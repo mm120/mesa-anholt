@@ -145,6 +145,8 @@ upload_wm_state(struct brw_context *brw)
    /* CACHE_NEW_SAMPLER */
    dw2 |= (ALIGN(brw->wm.base.sampler_count, 4) / 4) <<
            GEN6_WM_SAMPLER_COUNT_SHIFT;
+   if (brw->wm.prog_data->spf)
+      dw2 |= GEN6_WM_SPF_MODE;
    dw4 |= (brw->wm.prog_data->first_curbe_grf <<
 	   GEN6_WM_DISPATCH_START_GRF_SHIFT_0);
    dw4 |= (brw->wm.prog_data->first_curbe_grf_16 <<

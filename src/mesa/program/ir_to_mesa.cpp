@@ -1489,6 +1489,10 @@ ir_to_mesa_visitor::visit(ir_expression *ir)
       emit(ir, OPCODE_LRP, result_dst, op[2], op[1], op[0]);
       break;
 
+   case ir_triop_csel:
+      emit(ir, OPCODE_CMP, result_dst, op[0], op[1], op[2]);
+      break;
+
    case ir_binop_vector_extract:
    case ir_binop_bfm:
    case ir_triop_fma:
@@ -1497,7 +1501,6 @@ ir_to_mesa_visitor::visit(ir_expression *ir)
    case ir_triop_vector_insert:
    case ir_quadop_bitfield_insert:
    case ir_binop_ldexp:
-   case ir_triop_csel:
    case ir_binop_carry:
    case ir_binop_borrow:
    case ir_binop_imul_high:

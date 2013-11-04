@@ -227,7 +227,8 @@ public:
    void visit(ir_end_primitive *);
 
    uint32_t gather_channel(ir_texture *ir, int sampler);
-   void swizzle_result(ir_texture *ir, fs_reg orig_val, int sampler);
+   void swizzle_result(ir_texture *ir, int needed_dst_channels, fs_reg orig_val,
+                       int sampler);
 
    bool can_do_source_mods(fs_inst *inst);
 
@@ -458,6 +459,8 @@ public:
    const char *current_annotation;
    const void *base_ir;
    /** @} */
+
+   const ir_swizzle *last_swizzle;
 
    bool failed;
    char *fail_msg;

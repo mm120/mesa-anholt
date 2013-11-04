@@ -1546,6 +1546,24 @@ fs_visitor::visit(ir_texture *ir)
       }
    }
 
+   /* By default we will produce all 4 channels of a texture result, but if
+    * there's a swizzle wrapping our texture rvalue, we can skip some of the
+    * swizzle movs.  This becomes more interesting when we do writemasking of
+    * the texture SENDs themselves.
+    */
+   int needed_dst_channels;
+   if (last_swizzle && last_swizzle->val == ir) {
+      needed_dst_channels = 1 << last_swizzle->mask.x;
+      if (last_swizzle->type->vector_elements >= 2)
+         needed_dst_channels |= 1 << last_swizzle->mask.y;
+      if (last_swizzle->type->vector_elements >= 3)
+         needed_dst_channels |= 1 << last_swizzle->mask.z;
+      if (last_swizzle->type->vector_elements >= 4)
+         needed_dst_channels |= 1 << last_swizzle->mask.w;
+   } else {
+      needed_dst_channels = 0xf;
+   }
+
    /* Should be lowered by do_lower_texture_projection */
    assert(!ir->projector);
 
@@ -1642,7 +1660,7 @@ fs_visitor::visit(ir_texture *ir)
       }
    }
 
-   swizzle_result(ir, dst, sampler);
+   swizzle_result(ir, needed_dst_channels, dst, sampler);
 }
 
 /**
@@ -1675,7 +1693,8 @@ fs_visitor::gather_channel(ir_texture *ir, int sampler)
  * EXT_texture_swizzle as well as DEPTH_TEXTURE_MODE for shadow comparisons.
  */
 void
-fs_visitor::swizzle_result(ir_texture *ir, fs_reg orig_val, int sampler)
+fs_visitor::swizzle_result(ir_texture *ir, int needed_dst_channels,
+                           fs_reg orig_val, int sampler)
 {
    if (ir->op == ir_query_levels) {
       /* # levels is in .w */
@@ -1699,6 +1718,12 @@ fs_visitor::swizzle_result(ir_texture *ir, fs_reg orig_val, int sampler)
       fs_reg swizzled_result = fs_reg(this, glsl_type::vec4_type);
 
       for (int i = 0; i < 4; i++) {
+         /* If we know the dst channel won't be used, don't emit it, instead
+          * of relying on dead code elimination figuring it out.
+          */
+         if (!(needed_dst_channels & (1 << i)))
+            continue;
+
 	 int swiz = GET_SWZ(c->key.tex.swizzles[sampler], i);
 	 fs_reg l = swizzled_result;
 	 l.reg_offset += i;
@@ -1720,6 +1745,11 @@ fs_visitor::swizzle_result(ir_texture *ir, fs_reg orig_val, int sampler)
 void
 fs_visitor::visit(ir_swizzle *ir)
 {
+   /* Track the last swizzle seen, so that ir_texture handling can see if its
+    * result is going to immediately get swizzled away to something smaller.
+    */
+   last_swizzle = ir;
+
    ir->val->accept(this);
    fs_reg val = this->result;
 
@@ -2727,6 +2757,7 @@ fs_visitor::fs_visitor(struct brw_context *brw,
 
    this->current_annotation = NULL;
    this->base_ir = NULL;
+   this->last_swizzle = NULL;
 
    this->virtual_grf_sizes = NULL;
    this->virtual_grf_count = 0;

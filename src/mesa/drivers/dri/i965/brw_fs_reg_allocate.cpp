@@ -422,11 +422,13 @@ fs_visitor::setup_mrf_hack_interference(struct ra_graph *g, int first_mrf_node)
  */
 void
 fs_visitor::setup_texture_interference(struct ra_graph *g,
+                                       int first_low_grf_node,
                                        int last_high_grf_node)
 {
    for (int i = 0; i < 4; i++) {
       ra_set_node_reg(g, last_high_grf_node - i, BRW_MAX_GRF - i - 1);
    }
+   /* first_low_grf_node is reused from payload setup */
 
    foreach_list(node, &this->instructions) {
       fs_inst *inst = (fs_inst *)node;
@@ -526,7 +528,7 @@ fs_visitor::assign_regs()
    }
 
    setup_payload_interference(g, payload_node_count, first_payload_node);
-   setup_texture_interference(g, last_high_grf_node);
+   setup_texture_interference(g, first_payload_node, last_high_grf_node);
    if (brw->gen >= 7)
       setup_mrf_hack_interference(g, first_mrf_hack_node);
 

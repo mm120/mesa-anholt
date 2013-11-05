@@ -388,7 +388,23 @@ fs_generator::generate_tex(fs_inst *inst, struct brw_reg dst, struct brw_reg src
       simd_mode = BRW_SAMPLER_SIMD_MODE_SIMD16;
       rlen = inst->regs_written * dispatch_width / 8;
    } else {
+      /* The hardware doesn't pack writemasked destination channels in SIMD8
+       * mode -- they're all present, just some don't get written.
+       */
       rlen = 4;
+
+      int writemask = ~((inst->m0_2 >> 12) & 0xf);
+
+      /* For any initial channels we were skipping at the IR level, we need to
+       * move the inital GRF down so that the first written GRF is the one we
+       * wanted.
+       */
+      int start_grf_offset;
+      for (start_grf_offset = 0; start_grf_offset < 4; start_grf_offset++) {
+         if (writemask & (1 << start_grf_offset))
+            break;
+      }
+      dst.nr -= start_grf_offset;
    }
 
    if (brw->gen >= 5) {

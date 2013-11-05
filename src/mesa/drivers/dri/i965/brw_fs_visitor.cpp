@@ -1575,18 +1575,18 @@ fs_visitor::visit(ir_texture *ir)
     * shaders).
     *
     * On SIMD8, the return length is always 4, and the message's writemask
-    * only determines which of those channels are modified.  This means that
-    * we can reduce destination register size only if there are unused
-    * channels starting from the end.  Also, because I'm concerned that the hw
-    * might try to reference the unwritten registers in some way, we'll make
-    * these texture destinations not get register allocated to the end of
-    * register space.
+    * only determines which of those channels are modified.  Because I'm
+    * concerned that the hw might try to reference the unwritten registers in
+    * some way, we'll make these texture destinations not get register
+    * allocated to the end of register space.
     *
     * This could use porting back to pre-gen7.
     */
    int dst_size = 4;
    bool needs_writemask_reswizzle = false;
    if (brw->gen >= 7 && ir->op != ir_txs && ir->op != ir_tg4) {
+      int first_used_channel = 4;
+      int last_used_channel = 0;
       writemask = 0;
       for (int i = 0; i < 4; i++) {
          int swiz = GET_SWZ(c->key.tex.swizzles[sampler], i);
@@ -1594,11 +1594,18 @@ fs_visitor::visit(ir_texture *ir)
           * needed_dst_channels.
           */
          if (needed_dst_channels & (1 << swiz)) {
-            if (dispatch_width == 16)
-               writemask |= 1 << swiz;
-            else
-               writemask |= (1 << (swiz + 1)) - 1;
+            writemask |= 1 << swiz;
+            first_used_channel = MIN2(swiz, last_used_channel);
+            last_used_channel = MAX2(swiz, first_used_channel);
          }
+      }
+
+      if (dispatch_width == 8) {
+         /* Set any middle bits in between the high and low used bits for
+          * SIMD8, since we need to allocate the register space anyway.
+          */
+         writemask = (((1 << last_used_channel) - 1) &
+                      ~((1 << first_used_channel) - 1));
       }
 
       if (writemask != 0 && writemask != 0xf) {

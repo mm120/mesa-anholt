@@ -85,9 +85,11 @@ DRI2CopyRegion(Display * dpy, XID drawable,
                XserverRegion region,
                CARD32 dest, CARD32 src);
 
+struct glx_screen;
+
 _X_HIDDEN int
 dri2_query_renderer_integer(struct glx_screen *base, int attribute,
-                            unsigned int *value);
+                            int *value);
 
 _X_HIDDEN int
 dri2_query_renderer_string(struct glx_screen *base, int attribute,

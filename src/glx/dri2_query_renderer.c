@@ -60,7 +60,7 @@ dri2_convert_glx_query_renderer_attribs(int attribute)
 
 _X_HIDDEN int
 dri2_query_renderer_integer(struct glx_screen *base, int attribute,
-                            unsigned int *value)
+                            int *value)
 {
    struct dri2_screen *const psc = (struct dri2_screen *) base;
 
@@ -75,7 +75,7 @@ dri2_query_renderer_integer(struct glx_screen *base, int attribute,
       return -1;
 
    return psc->rendererQuery->queryInteger(psc->driScreen, dri_attribute,
-                                           value);
+                                           (unsigned int *)value);
 }
 
 _X_HIDDEN int

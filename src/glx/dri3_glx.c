@@ -1500,13 +1500,10 @@ static const struct glx_context_vtable dri3_context_vtable = {
  */
 static void
 dri3_bind_extensions(struct dri3_screen *psc, struct glx_display * priv,
-                     const char *driverName)
+                     const __DRIextension **extensions)
 {
-   const __DRIextension **extensions;
    unsigned mask;
    int i;
-
-   extensions = psc->core->getExtensions(psc->driScreen);
 
    __glXEnableDirectExtension(&psc->base, "GLX_SGI_video_sync");
    __glXEnableDirectExtension(&psc->base, "GLX_SGI_swap_control");
@@ -1674,7 +1671,7 @@ dri3_create_screen(int screen, struct glx_display * priv)
       goto handle_error;
    }
 
-   dri3_bind_extensions(psc, priv, driverName);
+   dri3_bind_extensions(psc, priv, extensions);
 
    if (!psc->f || psc->f->base.version < 4) {
       ErrorMessageF("Version 4 or later of flush extension not found\n");

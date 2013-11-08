@@ -42,6 +42,7 @@
 
 #include <GL/gl.h>
 #include <GL/internal/dri_interface.h>
+#include "dri_loader_common.h"
 
 #ifdef HAVE_DRM_PLATFORM
 #include <gbm_driint.h>
@@ -86,6 +87,7 @@ struct dri2_egl_driver
 
 struct dri2_egl_display
 {
+   struct dri_loader         dri;
    int                       dri2_major;
    int                       dri2_minor;
    __DRIscreen              *dri_screen;
@@ -98,8 +100,8 @@ struct dri2_egl_display
    __DRI2flushExtension     *flush;
    __DRItexBufferExtension  *tex_buffer;
    __DRIimageExtension      *image;
-   __DRIrobustnessExtension *robustness;
-   __DRI2configQueryExtension *config;
+   const __DRIrobustnessExtension *robustness;
+   const __DRI2configQueryExtension *config;
    int                       fd;
 
    int                       own_device;

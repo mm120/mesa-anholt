@@ -35,6 +35,7 @@ endif
 AM_CFLAGS = \
 	-I$(top_srcdir)/include \
 	-I$(top_srcdir)/include/GL/internal \
+	-I$(top_srcdir)/src/dri \
 	-I$(top_srcdir)/src/mapi \
 	-I$(top_srcdir)/src/mapi/glapi \
 	-I$(top_builddir)/src/mapi \
@@ -109,7 +110,7 @@ GL_LDFLAGS = \
 	-version-number 1:2 -no-undefined
 
 lib@GL_LIB@_la_SOURCES =
-lib@GL_LIB@_la_LIBADD = $(GL_LIBS)
+lib@GL_LIB@_la_LIBADD = $(GL_LIBS) ../dri/libdriloader.la
 lib@GL_LIB@_la_LDFLAGS = $(GL_LDFLAGS)
 
 # Provide compatibility with scripts for the old Mesa build system for

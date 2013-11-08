@@ -27,6 +27,7 @@
 #include "glxclient.h"
 #include <dlfcn.h>
 #include "dri_common.h"
+#include "dri_loader_common.h"
 
 struct drisw_display
 {
@@ -43,6 +44,7 @@ struct drisw_context
 struct drisw_screen
 {
    struct glx_screen base;
+   struct dri_loader dri;
 
    __DRIscreen *driScreen;
    __GLXDRIscreen vtable;
@@ -618,8 +620,6 @@ static const struct glx_screen_vtable drisw_screen_vtable = {
 static void
 driswBindExtensions(struct drisw_screen *psc, const __DRIextension **extensions)
 {
-   int i;
-
    __glXEnableDirectExtension(&psc->base, "GLX_SGI_make_current_read");
 
    if (psc->swrast->base.version >= 3) {
@@ -633,11 +633,9 @@ driswBindExtensions(struct drisw_screen *psc, const __DRIextension **extensions)
    }
 
    /* FIXME: Figure out what other extensions can be ported here from dri2. */
-   for (i = 0; extensions[i]; i++) {
-      if ((strcmp(extensions[i]->name, __DRI_TEX_BUFFER) == 0)) {
-	 psc->texBuffer = (__DRItexBufferExtension *) extensions[i];
-	 __glXEnableDirectExtension(&psc->base, "GLX_EXT_texture_from_pixmap");
-      }
+   if (psc->dri.driver_extensions.tex_buffer) {
+      psc->texBuffer = psc->dri.driver_extensions.tex_buffer;
+      __glXEnableDirectExtension(&psc->base, "GLX_EXT_texture_from_pixmap");
    }
 }
 
@@ -649,7 +647,6 @@ driswCreateScreen(int screen, struct glx_display *priv)
    const __DRIextension **extensions;
    struct drisw_screen *psc;
    struct glx_config *configs = NULL, *visuals = NULL;
-   int i;
 
    psc = calloc(1, sizeof *psc);
    if (psc == NULL)
@@ -668,13 +665,9 @@ driswCreateScreen(int screen, struct glx_display *priv)
    if (extensions == NULL)
       goto handle_error;
 
-   for (i = 0; extensions[i]; i++) {
-      if (strcmp(extensions[i]->name, __DRI_CORE) == 0)
-	 psc->core = (__DRIcoreExtension *) extensions[i];
-      if (strcmp(extensions[i]->name, __DRI_SWRAST) == 0)
-	 psc->swrast = (__DRIswrastExtension *) extensions[i];
-   }
-
+   dri_bind_driver_extensions_to_loader(&psc->dri, extensions);
+   psc->core = psc->dri.driver_extensions.core;
+   psc->swrast = psc->dri.driver_extensions.swrast;
    if (psc->core == NULL || psc->swrast == NULL) {
       ErrorMessageF("core dri extension not found\n");
       goto handle_error;
@@ -696,6 +689,7 @@ driswCreateScreen(int screen, struct glx_display *priv)
    }
 
    extensions = psc->core->getExtensions(psc->driScreen);
+   dri_bind_driver_extensions_to_loader(&psc->dri, extensions);
    driswBindExtensions(psc, extensions);
 
    configs = driConvertConfigs(psc->core, psc->base.configs, driver_configs);

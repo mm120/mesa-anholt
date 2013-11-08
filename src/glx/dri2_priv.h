@@ -30,8 +30,11 @@
  *   Kristian Høgsberg (krh@redhat.com)
  */
 
+#include "dri_loader_common.h"
+
 struct dri2_screen {
    struct glx_screen base;
+   struct dri_loader dri;
 
    __DRIscreen *driScreen;
    __GLXDRIscreen vtable;

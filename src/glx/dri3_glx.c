@@ -1503,7 +1503,6 @@ dri3_bind_extensions(struct dri3_screen *psc, struct glx_display * priv,
                      const __DRIextension **extensions)
 {
    unsigned mask;
-   int i;
 
    __glXEnableDirectExtension(&psc->base, "GLX_SGI_video_sync");
    __glXEnableDirectExtension(&psc->base, "GLX_SGI_swap_control");
@@ -1536,23 +1535,17 @@ dri3_bind_extensions(struct dri3_screen *psc, struct glx_display * priv,
       __glXEnableDirectExtension(&psc->base,
                                  "GLX_EXT_create_context_es2_profile");
 
-   for (i = 0; extensions[i]; i++) {
-      if ((strcmp(extensions[i]->name, __DRI_TEX_BUFFER) == 0)) {
-         psc->texBuffer = (__DRItexBufferExtension *) extensions[i];
-         __glXEnableDirectExtension(&psc->base, "GLX_EXT_texture_from_pixmap");
-      }
+   if (psc->dri.driver_extensions.tex_buffer) {
+      psc->texBuffer = psc->dri.driver_extensions.tex_buffer;
+      __glXEnableDirectExtension(&psc->base, "GLX_EXT_texture_from_pixmap");
+   }
 
-      if ((strcmp(extensions[i]->name, __DRI2_FLUSH) == 0)) {
-         psc->f = (__DRI2flushExtension *) extensions[i];
-         /* internal driver extension, no GL extension exposed */
-      }
+   psc->config = psc->dri.driver_extensions.config_query;
+   psc->f = psc->dri.driver_extensions.flush;
 
-      if ((strcmp(extensions[i]->name, __DRI2_CONFIG_QUERY) == 0))
-         psc->config = (__DRI2configQueryExtension *) extensions[i];
-
-      if (strcmp(extensions[i]->name, __DRI2_ROBUSTNESS) == 0)
-         __glXEnableDirectExtension(&psc->base,
-                                    "GLX_ARB_create_context_robustness");
+   if (psc->dri.driver_extensions.robustness) {
+      __glXEnableDirectExtension(&psc->base,
+                                 "GLX_ARB_create_context_robustness");
    }
 }
 
@@ -1585,7 +1578,6 @@ dri3_create_screen(int screen, struct glx_display * priv)
    __GLXDRIscreen *psp;
    struct glx_config *configs = NULL, *visuals = NULL;
    char *driverName, *deviceName;
-   int i;
 
    psc = calloc(1, sizeof *psc);
    if (psc == NULL)
@@ -1629,13 +1621,9 @@ dri3_create_screen(int screen, struct glx_display * priv)
    if (extensions == NULL)
       goto handle_error;
 
-   for (i = 0; extensions[i]; i++) {
-      if (strcmp(extensions[i]->name, __DRI_CORE) == 0)
-         psc->core = (__DRIcoreExtension *) extensions[i];
-      if (strcmp(extensions[i]->name, __DRI_IMAGE_DRIVER) == 0)
-         psc->image_driver = (__DRIimageDriverExtension *) extensions[i];
-   }
-
+   dri_bind_driver_extensions_to_loader(&psc->dri, extensions);
+   psc->core = psc->dri.driver_extensions.core;
+   psc->image_driver = psc->dri.driver_extensions.image_driver;
 
    if (psc->core == NULL) {
       ErrorMessageF("core dri driver extension not found\n");
@@ -1660,11 +1648,8 @@ dri3_create_screen(int screen, struct glx_display * priv)
    }
 
    extensions = (*psc->core->getExtensions)(psc->driScreen);
-
-   for (i = 0; extensions[i]; i++) {
-      if (strcmp(extensions[i]->name, __DRI_IMAGE) == 0)
-         psc->image = (__DRIimageExtension *) extensions[i];
-   }
+   dri_bind_driver_extensions_to_loader(&psc->dri, extensions);
+   psc->image = psc->dri.driver_extensions.image;
 
    if (psc->image == NULL) {
       ErrorMessageF("image extension not found\n");

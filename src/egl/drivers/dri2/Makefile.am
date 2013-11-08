@@ -21,6 +21,7 @@
 
 AM_CFLAGS = \
 	-I$(top_srcdir)/include \
+	-I$(top_srcdir)/src/dri \
 	-I$(top_srcdir)/src/egl/main \
 	-I$(top_srcdir)/src/gbm/main \
 	-I$(top_srcdir)/src/gbm/backends/dri \
@@ -41,6 +42,7 @@ libegl_dri2_la_SOURCES = \
 	common.c
 
 libegl_dri2_la_LIBADD = \
+        $(top_srcdir)/src/dri/libdriloader.la \
 	$(EGL_LIB_DEPS)
 
 if HAVE_SHARED_GLAPI

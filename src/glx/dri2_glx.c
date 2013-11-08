@@ -1056,9 +1056,9 @@ dri2BindExtensions(struct dri2_screen *psc, struct glx_display * priv,
    const struct dri2_display *const pdp = (struct dri2_display *)
       priv->dri2Display;
    const __DRIextension **extensions;
-   int i;
 
    extensions = psc->core->getExtensions(psc->driScreen);
+   dri_bind_driver_extensions_to_loader(&psc->dri, extensions);
 
    __glXEnableDirectExtension(&psc->base, "GLX_SGI_video_sync");
    __glXEnableDirectExtension(&psc->base, "GLX_SGI_swap_control");
@@ -1093,39 +1093,31 @@ dri2BindExtensions(struct dri2_screen *psc, struct glx_display * priv,
 				    "GLX_EXT_create_context_es2_profile");
    }
 
-   for (i = 0; extensions[i]; i++) {
-      if ((strcmp(extensions[i]->name, __DRI_TEX_BUFFER) == 0)) {
-	 psc->texBuffer = (__DRItexBufferExtension *) extensions[i];
-	 __glXEnableDirectExtension(&psc->base, "GLX_EXT_texture_from_pixmap");
-      }
+   if (psc->dri.driver_extensions.tex_buffer) {
+      psc->texBuffer = psc->dri.driver_extensions.tex_buffer;
+      __glXEnableDirectExtension(&psc->base, "GLX_EXT_texture_from_pixmap");
+   }
 
-      if ((strcmp(extensions[i]->name, __DRI2_FLUSH) == 0)) {
-	 psc->f = (__DRI2flushExtension *) extensions[i];
-	 /* internal driver extension, no GL extension exposed */
-      }
+   psc->config = psc->dri.driver_extensions.config_query;
+   psc->f = psc->dri.driver_extensions.flush;
+   psc->throttle = psc->dri.driver_extensions.throttle;
 
-      if ((strcmp(extensions[i]->name, __DRI2_CONFIG_QUERY) == 0))
-	 psc->config = (__DRI2configQueryExtension *) extensions[i];
+   /* DRI2 version 3 is also required because
+    * GLX_ARB_create_context_robustness requires GLX_ARB_create_context.
+    */
+   if (psc->dri2->base.version >= 3 &&
+       psc->dri.driver_extensions.robustness) {
+      __glXEnableDirectExtension(&psc->base,
+                                 "GLX_ARB_create_context_robustness");
+   }
 
-      if (((strcmp(extensions[i]->name, __DRI2_THROTTLE) == 0)))
-	 psc->throttle = (__DRI2throttleExtension *) extensions[i];
-
-      /* DRI2 version 3 is also required because
-       * GLX_ARB_create_context_robustness requires GLX_ARB_create_context.
-       */
-      if (psc->dri2->base.version >= 3
-          && strcmp(extensions[i]->name, __DRI2_ROBUSTNESS) == 0)
-         __glXEnableDirectExtension(&psc->base,
-                                    "GLX_ARB_create_context_robustness");
-
-      /* DRI2 version 3 is also required because GLX_MESA_query_renderer
-       * requires GLX_ARB_create_context_profile.
-       */
-      if (psc->dri2->base.version >= 3
-          && strcmp(extensions[i]->name, __DRI2_RENDERER_QUERY) == 0) {
-         psc->rendererQuery = (__DRI2rendererQueryExtension *) extensions[i];
-         __glXEnableDirectExtension(&psc->base, "GLX_MESA_query_renderer");
-      }
+   /* DRI2 version 3 is also required because GLX_MESA_query_renderer
+    * requires GLX_ARB_create_context_profile.
+    */
+   if (psc->dri2->base.version >= 3 &&
+       psc->dri.driver_extensions.renderer_query) {
+      psc->rendererQuery = psc->dri.driver_extensions.renderer_query;
+      __glXEnableDirectExtension(&psc->base, "GLX_MESA_query_renderer");
    }
 }
 
@@ -1148,7 +1140,6 @@ dri2CreateScreen(int screen, struct glx_display * priv)
    struct glx_config *configs = NULL, *visuals = NULL;
    char *driverName, *deviceName, *tmp;
    drm_magic_t magic;
-   int i;
 
    psc = calloc(1, sizeof *psc);
    if (psc == NULL)
@@ -1179,12 +1170,9 @@ dri2CreateScreen(int screen, struct glx_display * priv)
    if (extensions == NULL)
       goto handle_error;
 
-   for (i = 0; extensions[i]; i++) {
-      if (strcmp(extensions[i]->name, __DRI_CORE) == 0)
-	 psc->core = (__DRIcoreExtension *) extensions[i];
-      if (strcmp(extensions[i]->name, __DRI_DRI2) == 0)
-	 psc->dri2 = (__DRIdri2Extension *) extensions[i];
-   }
+   dri_bind_driver_extensions_to_loader(&psc->dri, extensions);
+   psc->core = psc->dri.driver_extensions.core;
+   psc->dri2 = psc->dri.driver_extensions.dri2;
 
    if (psc->core == NULL || psc->dri2 == NULL) {
       ErrorMessageF("core dri or dri2 extension not found\n");

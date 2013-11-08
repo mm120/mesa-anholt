@@ -19,47 +19,20 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-SUBDIRS = gtest mapi
+AM_CPPFLAGS = \
+	-I$(top_srcdir)/include \
+	-I$(top_srcdir)/include/GL/internal \
+	-I$(top_srcdir)/src/mapi \
+	-I$(top_srcdir)/src/mapi/glapi \
+	$(VISIBILITY_CFLAGS) \
+	$(DEFINES) \
+	$(LIBDRM_CFLAGS) \
+	$(X11_INCLUDES)
 
-if NEED_OPENGL_COMMON
-SUBDIRS += glsl mesa
-endif
+noinst_LTLIBRARIES = libdriloader.la
 
-if HAVE_DRI_GLX
-SUBDIRS += dri
-else
-if HAVE_EGL_DRIVER_DRI2
-SUBDIRS += dri
-endif
-endif
+libdriloader_la_SOURCES = \
+        dri_loader_common.c \
+        dri_loader_common.h \
+        $()
 
-if HAVE_DRI_GLX
-SUBDIRS += glx
-endif
-
-if HAVE_EGL_PLATFORM_WAYLAND
-SUBDIRS += egl/wayland
-endif
-
-if HAVE_GBM
-SUBDIRS += gbm
-endif
-
-if HAVE_EGL
-SUBDIRS += egl
-endif
-
-if HAVE_GALLIUM
-SUBDIRS +=			\
-	gallium/auxiliary	\
-	gallium/drivers		\
-	gallium/state_trackers	\
-	gallium/winsys		\
-	gallium/targets
-
-if HAVE_GALLIUM_TESTS
-SUBDIRS +=			\
-	gallium/tests/trivial	\
-	gallium/tests/unit
-endif
-endif

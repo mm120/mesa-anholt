@@ -432,6 +432,8 @@ dri2_open_driver(_EGLDisplay *disp)
       dlclose(dri2_dpy->driver);
    }
 
+   dri_bind_driver_extensions_to_loader(&dri2_dpy->dri, extensions);
+
    return extensions;
 }
 
@@ -570,21 +572,14 @@ dri2_create_screen(_EGLDisplay *disp)
    dri2_dpy->own_dri_screen = 1;
 
    extensions = dri2_dpy->core->getExtensions(dri2_dpy->dri_screen);
-   
+   dri_bind_driver_extensions_to_loader(&dri2_dpy->dri, extensions);
+
    if (dri2_dpy->dri2) {
-      unsigned i;
+      dri2_dpy->robustness = dri2_dpy->dri.driver_extensions.robustness;
+      dri2_dpy->config = dri2_dpy->dri.driver_extensions.config_query;
 
       if (!dri2_bind_extensions(dri2_dpy, dri2_core_extensions, extensions))
          goto cleanup_dri_screen;
-
-      for (i = 0; extensions[i]; i++) {
-	 if (strcmp(extensions[i]->name, __DRI2_ROBUSTNESS) == 0) {
-            dri2_dpy->robustness = (__DRIrobustnessExtension *) extensions[i];
-	 }
-	 if (strcmp(extensions[i]->name, __DRI2_CONFIG_QUERY) == 0) {
-	    dri2_dpy->config = (__DRI2configQueryExtension *) extensions[i];
-	 }
-      }
    } else {
       assert(dri2_dpy->swrast);
       if (!dri2_bind_extensions(dri2_dpy, swrast_core_extensions, extensions))

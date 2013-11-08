@@ -59,6 +59,8 @@
 #include <xcb/present.h>
 #include <xcb/sync.h>
 
+#include "dri_loader_common.h"
+
 /* From xmlpool/options.h, user exposed so should be stable */
 #define DRI_CONF_VBLANK_NEVER 0
 #define DRI_CONF_VBLANK_DEF_INTERVAL_0 1
@@ -118,6 +120,7 @@ struct dri3_display
 
 struct dri3_screen {
    struct glx_screen base;
+   struct dri_loader dri;
 
    __DRIscreen *driScreen;
    __GLXDRIscreen vtable;

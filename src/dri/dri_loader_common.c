@@ -69,3 +69,35 @@ dri_bind_driver_extensions_to_loader(struct dri_loader *loader,
       }
    }
 }
+
+/**
+ * Implements the flush_with_flags interface with either new or old drivers.
+ *
+ * Asks the driver to flush any queued work necessary for serializing with the
+ * X command stream, and optionally the slightly more strict requirement of
+ * glFlush() equivalence (which would require flushing even if nothing had
+ * been drawn to a window system framebuffer, for example).
+ */
+void
+dri_flush(struct dri_loader *loader,
+          __DRIcontext *ctx,
+          __DRIdrawable *drawable,
+          unsigned flags,
+          enum __DRI2throttleReason throttle_reason)
+{
+   if (loader->driver_extensions.flush &&
+       loader->driver_extensions.flush->base.version >= 4) {
+      loader->driver_extensions.flush->flush_with_flags(ctx, drawable, flags,
+                                                        throttle_reason);
+   } else {
+      if (flags & __DRI2_FLUSH_CONTEXT)
+         loader->glFlush();
+
+      if (loader->driver_extensions.flush)
+         loader->driver_extensions.flush->flush(drawable);
+
+      if (loader->driver_extensions.throttle)
+         loader->driver_extensions.throttle->throttle(ctx, drawable,
+                                                      throttle_reason);
+   }
+}

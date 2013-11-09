@@ -534,32 +534,6 @@ dri2Throttle(struct dri2_screen *psc,
    }
 }
 
-/**
- * Asks the driver to flush any queued work necessary for serializing with the
- * X command stream, and optionally the slightly more strict requirement of
- * glFlush() equivalence (which would require flushing even if nothing had
- * been drawn to a window system framebuffer, for example).
- */
-static void
-dri2Flush(struct dri2_screen *psc,
-          __DRIcontext *ctx,
-          struct dri2_drawable *draw,
-          unsigned flags,
-          enum __DRI2throttleReason throttle_reason)
-{
-   if (ctx && psc->f && psc->f->base.version >= 4) {
-      psc->f->flush_with_flags(ctx, draw->driDrawable, flags, throttle_reason);
-   } else {
-      if (flags & __DRI2_FLUSH_CONTEXT)
-         glFlush();
-
-      if (psc->f)
-         psc->f->flush(draw->driDrawable);
-
-      dri2Throttle(psc, draw, throttle_reason);
-   }
-}
-
 static void
 __dri2CopySubBuffer(__GLXDRIdrawable *pdraw, int x, int y,
 		    int width, int height,
@@ -584,7 +558,8 @@ __dri2CopySubBuffer(__GLXDRIdrawable *pdraw, int x, int y,
    flags = __DRI2_FLUSH_DRAWABLE;
    if (flush)
       flags |= __DRI2_FLUSH_CONTEXT;
-   dri2Flush(psc, ctx, priv, flags, __DRI2_THROTTLE_SWAPBUFFER);
+   dri_flush(&psc->dri, ctx, priv->driDrawable,
+             flags, __DRI2_THROTTLE_SWAPBUFFER);
 
    region = XFixesCreateRegion(psc->base.dpy, &xrect, 1);
    DRI2CopyRegion(psc->base.dpy, pdraw->xDrawable, region,
@@ -836,7 +811,8 @@ dri2SwapBuffers(__GLXDRIdrawable *pdraw, int64_t target_msc, int64_t divisor,
        unsigned flags = __DRI2_FLUSH_DRAWABLE;
        if (flush)
           flags |= __DRI2_FLUSH_CONTEXT;
-       dri2Flush(psc, ctx, priv, flags, __DRI2_THROTTLE_SWAPBUFFER);
+       dri_flush(&psc->dri, ctx, priv->driDrawable, flags,
+                 __DRI2_THROTTLE_SWAPBUFFER);
 
        ret = dri2XcbSwapBuffers(pdraw->psc->dpy, pdraw,
                                 target_msc, divisor, remainder);
@@ -1169,6 +1145,8 @@ dri2CreateScreen(int screen, struct glx_display * priv)
    extensions = driGetDriverExtensions(psc->driver, driverName);
    if (extensions == NULL)
       goto handle_error;
+
+   psc->dri.glFlush = glFlush;
 
    dri_bind_driver_extensions_to_loader(&psc->dri, extensions);
    psc->core = psc->dri.driver_extensions.core;

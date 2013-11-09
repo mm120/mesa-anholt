@@ -991,6 +991,7 @@ dri2_x11_create_image_khr(_EGLDriver *drv, _EGLDisplay *disp,
 static EGLBoolean
 dri2_initialize_x11_swrast(_EGLDriver *drv, _EGLDisplay *disp)
 {
+   struct dri2_egl_driver *dri2_drv = dri2_egl_driver(drv);
    struct dri2_egl_display *dri2_dpy;
 
    drv->API.CreateWindowSurface = dri2_create_window_surface;
@@ -1009,6 +1010,8 @@ dri2_initialize_x11_swrast(_EGLDriver *drv, _EGLDisplay *disp)
    dri2_dpy = calloc(1, sizeof *dri2_dpy);
    if (!dri2_dpy)
       return _eglError(EGL_BAD_ALLOC, "eglInitialize");
+
+   dri2_dpy->dri.glFlush = dri2_drv->glFlush;
 
    disp->DriverData = (void *) dri2_dpy;
    if (disp->PlatformDisplay == NULL) {
@@ -1112,6 +1115,7 @@ dri2_setup_swap_interval(struct dri2_egl_display *dri2_dpy)
 static EGLBoolean
 dri2_initialize_x11_dri2(_EGLDriver *drv, _EGLDisplay *disp)
 {
+   struct dri2_egl_driver *dri2_drv = dri2_egl_driver(drv);
    struct dri2_egl_display *dri2_dpy;
 
    drv->API.CreateWindowSurface = dri2_create_window_surface;
@@ -1128,6 +1132,8 @@ dri2_initialize_x11_dri2(_EGLDriver *drv, _EGLDisplay *disp)
    dri2_dpy = calloc(1, sizeof *dri2_dpy);
    if (!dri2_dpy)
       return _eglError(EGL_BAD_ALLOC, "eglInitialize");
+
+   dri2_dpy->dri.glFlush = dri2_drv->glFlush;
 
    disp->DriverData = (void *) dri2_dpy;
    if (disp->PlatformDisplay == NULL) {

@@ -495,7 +495,8 @@ dri3_flush(struct dri3_screen *psc,
    if (gc) {
       struct dri3_context *dri3Ctx = (struct dri3_context *)gc;
 
-      (*psc->f->flush_with_flags)(dri3Ctx->driContext, draw->driDrawable, flags, throttle_reason);
+      dri_flush(&psc->dri, dri3Ctx->driContext,
+                draw->driDrawable, flags, throttle_reason);
    }
 }
 

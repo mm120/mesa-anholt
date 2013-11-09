@@ -55,10 +55,20 @@ struct dri_loader {
       const __DRIrobustnessExtension *robustness;
       const __DRI2throttleExtension *throttle;
    } driver_extensions;
+
+   /** dlsymmed glFlush, for use by dri_flush_wrapper(). */
+   void (*glFlush)(void);
 };
 
 void
 dri_bind_driver_extensions_to_loader(struct dri_loader *loader,
                                      const __DRIextension **extensions);
+
+void
+dri_flush(struct dri_loader *loader,
+          __DRIcontext *ctx,
+          __DRIdrawable *drawable,
+          unsigned flags,
+          enum __DRI2throttleReason throttle_reason);
 
 #endif /* DRI_LOADER_H */

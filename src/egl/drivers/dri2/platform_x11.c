@@ -708,8 +708,7 @@ dri2_copy_region(_EGLDriver *drv, _EGLDisplay *disp,
    if (draw->Type == EGL_PIXMAP_BIT || draw->Type == EGL_PBUFFER_BIT)
       return EGL_TRUE;
 
-   if (dri2_dpy->flush)
-      (*dri2_dpy->flush->flush)(dri2_surf->dri_drawable);
+   dri2_flush_for_swap(dri2_dpy, dri2_surf);
 
    if (dri2_surf->have_fake_front)
       render_attachment = XCB_DRI2_ATTACHMENT_BUFFER_FAKE_FRONT_LEFT;
@@ -749,8 +748,7 @@ dri2_swap_buffers_msc(_EGLDriver *drv, _EGLDisplay *disp, _EGLSurface *draw,
    if (draw->SwapBehavior == EGL_BUFFER_PRESERVED || !dri2_dpy->swap_available)
       return dri2_copy_region(drv, disp, draw, dri2_surf->region) ? 0 : -1;
 
-   if (dri2_dpy->flush)
-      (*dri2_dpy->flush->flush)(dri2_surf->dri_drawable);
+   dri2_flush_for_swap(dri2_dpy, dri2_surf);
 
    cookie = xcb_dri2_swap_buffers_unchecked(dri2_dpy->conn, dri2_surf->drawable,
                   msc_hi, msc_lo, divisor_hi, divisor_lo, remainder_hi, remainder_lo);
@@ -866,7 +864,7 @@ dri2_copy_buffers(_EGLDriver *drv, _EGLDisplay *disp, _EGLSurface *surf,
 
    (void) drv;
 
-   (*dri2_dpy->flush->flush)(dri2_surf->dri_drawable);
+   dri2_flush_for_swap(dri2_dpy, dri2_surf);
 
    gc = xcb_generate_id(dri2_dpy->conn);
    xcb_create_gc(dri2_dpy->conn, gc, target, 0, NULL);

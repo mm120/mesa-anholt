@@ -269,6 +269,10 @@ dri2_initialize_wayland(_EGLDriver *drv, _EGLDisplay *disp);
 EGLBoolean
 dri2_initialize_android(_EGLDriver *drv, _EGLDisplay *disp);
 
+void
+dri2_flush_for_swap(struct dri2_egl_display *dri2_dpy,
+                    struct dri2_egl_surface *dri2_surf);
+
 char *
 dri2_get_driver_for_fd(int fd);
 char *

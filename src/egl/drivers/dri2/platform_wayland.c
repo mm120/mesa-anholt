@@ -531,7 +531,7 @@ dri2_swap_buffers_with_damage(_EGLDriver *drv,
       return EGL_FALSE;
    }
 
-   (*dri2_dpy->flush->flush)(dri2_surf->dri_drawable);
+   dri2_flush_for_swap(dri2_dpy, dri2_surf);
 
    dri2_surf->back->age = 1;
    dri2_surf->current = dri2_surf->back;

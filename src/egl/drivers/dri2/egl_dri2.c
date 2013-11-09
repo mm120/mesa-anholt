@@ -102,6 +102,38 @@ EGLint dri2_to_egl_attribute_map[] = {
    0,				/* __DRI_ATTRIB_FRAMEBUFFER_SRGB_CAPABLE */
 };
 
+/**
+ * Tells the driver to flush as necessary for a SwapBuffers-related request.
+ *
+ * Note the following text from EGL 1.4, which also applies to
+ * EGL_NV_post_sub_buffer and EGL_EXT_swap_buffers_with_damage:
+ *
+ *     "surface must be bound to the calling thread’s current context, for
+ *      the current rendering API. This restriction may be lifted in future
+ *      EGL revisions.  If dpy and surface are the display and surface for
+ *      the calling thread’s current context, eglSwapBuffers and
+ *      eglCopyBuffers perform an implicit flush operation on the context
+ *      (glFlush for an OpenGL or OpenGL ES context, vgFlush for an OpenVG
+ *      context)."
+ */
+void
+dri2_flush_for_swap(struct dri2_egl_display *dri2_dpy,
+                    struct dri2_egl_surface *dri2_surf)
+{
+   _EGLContext *ctx = _eglGetCurrentContext();
+   struct dri2_egl_context *dri2_ctx = dri2_egl_context(ctx);
+
+   /* The spec threatens to lift the restriction that surf is current to our
+    * thread, but we're relying on it by always passing __DRI2_FLUSH_CONTEXT.
+    */
+   assert(ctx->DrawSurface == &dri2_surf->base ||
+          ctx->ReadSurface == &dri2_surf->base);
+
+   dri_flush(&dri2_dpy->dri, dri2_ctx->dri_context, dri2_surf->dri_drawable,
+             __DRI2_FLUSH_DRAWABLE | __DRI2_FLUSH_CONTEXT,
+             __DRI2_THROTTLE_SWAPBUFFER);
+}
+
 static EGLBoolean
 dri2_match_config(const _EGLConfig *conf, const _EGLConfig *criteria)
 {

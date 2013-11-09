@@ -316,13 +316,7 @@ droid_swap_buffers(_EGLDriver *drv, _EGLDisplay *disp, _EGLSurface *draw)
    if (dri2_surf->base.Type != EGL_WINDOW_BIT)
       return EGL_TRUE;
 
-   if (dri2_drv->glFlush) {
-      ctx = _eglGetCurrentContext();
-      if (ctx && ctx->DrawSurface == &dri2_surf->base)
-         dri2_drv->glFlush();
-   }
-
-   (*dri2_dpy->flush->flush)(dri2_surf->dri_drawable);
+   dri2_flush_for_swap(dri2_dpy, dri2_surf);
 
    if (dri2_surf->buffer)
       droid_window_enqueue_buffer(dri2_surf);

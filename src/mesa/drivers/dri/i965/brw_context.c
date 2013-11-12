@@ -203,8 +203,6 @@ intel_glFlush(struct gl_context *ctx)
 
    intel_batchbuffer_flush(brw);
    intel_flush_front(ctx);
-   if (brw->is_front_buffer_rendering)
-      brw->need_throttle = true;
 }
 
 void
@@ -853,8 +851,8 @@ intelDestroyContext(__DRIcontext * driContextPriv)
 
    intel_batchbuffer_free(brw);
 
-   drm_intel_bo_unreference(brw->first_post_swapbuffers_batch);
-   brw->first_post_swapbuffers_batch = NULL;
+   drm_intel_bo_unreference(brw->last_swapbuffers_batch);
+   brw->last_swapbuffers_batch = NULL;
 
    driDestroyOptionCache(&brw->optionCache);
 
@@ -1137,29 +1135,6 @@ intel_prepare_render(struct brw_context *brw)
     */
    if (brw->is_front_buffer_rendering)
       brw->front_buffer_dirty = true;
-
-   /* Wait for the swapbuffers before the one we just emitted, so we
-    * don't get too many swaps outstanding for apps that are GPU-heavy
-    * but not CPU-heavy.
-    *
-    * We're using intelDRI2Flush (called from the loader before
-    * swapbuffer) and glFlush (for front buffer rendering) as the
-    * indicator that a frame is done and then throttle when we get
-    * here as we prepare to render the next frame.  At this point for
-    * round trips for swap/copy and getting new buffers are done and
-    * we'll spend less time waiting on the GPU.
-    *
-    * Unfortunately, we don't have a handle to the batch containing
-    * the swap, and getting our hands on that doesn't seem worth it,
-    * so we just us the first batch we emitted after the last swap.
-    */
-   if (brw->need_throttle && brw->first_post_swapbuffers_batch) {
-      if (!brw->disable_throttling)
-         drm_intel_bo_wait_rendering(brw->first_post_swapbuffers_batch);
-      drm_intel_bo_unreference(brw->first_post_swapbuffers_batch);
-      brw->first_post_swapbuffers_batch = NULL;
-      brw->need_throttle = false;
-   }
 }
 
 /**

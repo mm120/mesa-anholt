@@ -1064,8 +1064,7 @@ struct brw_context
    bool is_front_buffer_reading;
 
    /** Framerate throttling: @{ */
-   drm_intel_bo *first_post_swapbuffers_batch;
-   bool need_throttle;
+   drm_intel_bo *last_swapbuffers_batch;
    /** @} */
 
    GLuint stats_wm;

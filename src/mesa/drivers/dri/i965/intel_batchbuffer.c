@@ -300,11 +300,6 @@ _intel_batchbuffer_flush(struct brw_context *brw,
    if (brw->batch.used == 0)
       return 0;
 
-   if (brw->first_post_swapbuffers_batch == NULL) {
-      brw->first_post_swapbuffers_batch = brw->batch.bo;
-      drm_intel_bo_reference(brw->first_post_swapbuffers_batch);
-   }
-
    if (unlikely(INTEL_DEBUG & DEBUG_BATCH)) {
       int bytes_for_commands = 4 * brw->batch.used;
       int bytes_for_state = brw->batch.bo->size - brw->batch.state_batch_offset;

@@ -182,12 +182,22 @@ intel_dri2_flush_with_flags(__DRIcontext *cPriv,
    if (flags & __DRI2_FLUSH_DRAWABLE)
       intel_resolve_for_dri2_flush(brw, dPriv);
 
-   if (reason == __DRI2_THROTTLE_SWAPBUFFER ||
-       reason == __DRI2_THROTTLE_FLUSHFRONT) {
-      brw->need_throttle = true;
-   }
-
    intel_batchbuffer_flush(brw);
+
+   /* Wait for the swapbuffers before the one we just emitted, so we
+    * don't get too many swaps outstanding for apps that are GPU-heavy
+    * but not CPU-heavy.
+    */
+   if ((reason == __DRI2_THROTTLE_SWAPBUFFER ||
+        reason == __DRI2_THROTTLE_FLUSHFRONT) &&
+      !brw->disable_throttling) {
+      if (brw->last_swapbuffers_batch) {
+         drm_intel_bo_wait_rendering(brw->last_swapbuffers_batch);
+         drm_intel_bo_unreference(brw->last_swapbuffers_batch);
+      }
+      brw->last_swapbuffers_batch = brw->batch.last_bo;
+      drm_intel_bo_reference(brw->last_swapbuffers_batch);
+   }
 
    if (INTEL_DEBUG & DEBUG_AUB) {
       aub_dump_bmp(ctx);

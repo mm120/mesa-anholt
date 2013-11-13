@@ -584,10 +584,118 @@ brw_update_null_renderbuffer_surface(struct brw_context *brw, unsigned int unit)
  * usable for further buffers when doing ARB_draw_buffer support.
  */
 static void
-brw_update_renderbuffer_surface(struct brw_context *brw,
-				struct gl_renderbuffer *rb,
-				bool layered,
-				unsigned int unit)
+brw_update_renderbuffer_surface_tileoffsets(struct brw_context *brw,
+                                            struct gl_renderbuffer *rb,
+                                            bool layered,
+                                            unsigned int unit)
+{
+   struct gl_context *ctx = &brw->ctx;
+   struct intel_renderbuffer *irb = intel_renderbuffer(rb);
+   struct intel_mipmap_tree *mt = irb->mt;
+   struct intel_region *region;
+   uint32_t *surf;
+   uint32_t tile_x, tile_y;
+   uint32_t format = 0;
+   /* _NEW_BUFFERS */
+   gl_format rb_format = _mesa_get_render_format(ctx, intel_rb_format(irb));
+   uint32_t surf_index =
+      brw->wm.prog_data->binding_table.render_target_start + unit;
+
+   assert(!layered);
+
+   if (rb->TexImage && !brw->has_surface_tile_offset) {
+      intel_renderbuffer_get_tile_offsets(irb, &tile_x, &tile_y);
+
+      if (tile_x != 0 || tile_y != 0) {
+	 /* Original gen4 hardware couldn't draw to a non-tile-aligned
+	  * destination in a miptree unless you actually setup your renderbuffer
+	  * as a miptree and used the fragile lod/array_index/etc. controls to
+	  * select the image.  So, instead, we just make a new single-level
+	  * miptree and render into that.
+	  */
+	 intel_renderbuffer_move_to_temp(brw, irb, false);
+	 mt = irb->mt;
+      }
+   }
+
+   intel_miptree_used_for_rendering(irb->mt);
+
+   region = irb->mt->region;
+
+   surf = brw_state_batch(brw, AUB_TRACE_SURFACE_STATE, 6 * 4, 32,
+                          &brw->wm.base.surf_offset[surf_index]);
+
+   format = brw->render_target_format[rb_format];
+   if (unlikely(!brw->format_supported_as_render_target[rb_format])) {
+      _mesa_problem(ctx, "%s: renderbuffer format %s unsupported\n",
+                    __FUNCTION__, _mesa_get_format_name(rb_format));
+   }
+
+   surf[0] = (SET_FIELD(BRW_SURFACE_2D, BRW_SURFACE_TYPE) |
+	      SET_FIELD(format, BRW_SURFACE_FORMAT));
+
+   /* reloc */
+   surf[1] = (intel_renderbuffer_get_tile_offsets(irb, &tile_x, &tile_y) +
+	      region->bo->offset);
+
+   surf[2] = (SET_FIELD(rb->Width - 1, BRW_SURFACE_WIDTH) |
+	      SET_FIELD(rb->Height - 1, BRW_SURFACE_HEIGHT));
+
+   surf[3] = (brw_get_surface_tiling_bits(region->tiling) |
+	      SET_FIELD(region->pitch - 1, BRW_SURFACE_PITCH));
+
+   surf[4] = brw_get_surface_num_multisamples(mt->num_samples);
+
+   assert(brw->has_surface_tile_offset || (tile_x == 0 && tile_y == 0));
+   /* Note that the low bits of these fields are missing, so
+    * there's the possibility of getting in trouble.
+    */
+   assert(tile_x % 4 == 0);
+   assert(tile_y % 2 == 0);
+   surf[5] = (SET_FIELD(tile_x / 4, BRW_SURFACE_X_OFFSET) |
+	      SET_FIELD(tile_y / 2, BRW_SURFACE_Y_OFFSET) |
+	      (mt->align_h == 4 ? BRW_SURFACE_VERTICAL_ALIGN_ENABLE : 0));
+
+   if (brw->gen < 6) {
+      /* _NEW_COLOR */
+      if (!ctx->Color.ColorLogicOpEnabled &&
+	  (ctx->Color.BlendEnabled & (1 << unit)))
+	 surf[0] |= BRW_SURFACE_BLEND_ENABLED;
+
+      if (!ctx->Color.ColorMask[unit][0])
+	 surf[0] |= 1 << BRW_SURFACE_WRITEDISABLE_R_SHIFT;
+      if (!ctx->Color.ColorMask[unit][1])
+	 surf[0] |= 1 << BRW_SURFACE_WRITEDISABLE_G_SHIFT;
+      if (!ctx->Color.ColorMask[unit][2])
+	 surf[0] |= 1 << BRW_SURFACE_WRITEDISABLE_B_SHIFT;
+
+      /* As mentioned above, disable writes to the alpha component when the
+       * renderbuffer is XRGB.
+       */
+      if (ctx->DrawBuffer->Visual.alphaBits == 0 ||
+	  !ctx->Color.ColorMask[unit][3]) {
+	 surf[0] |= 1 << BRW_SURFACE_WRITEDISABLE_A_SHIFT;
+      }
+   }
+
+   drm_intel_bo_emit_reloc(brw->batch.bo,
+			   brw->wm.base.surf_offset[surf_index] + 4,
+			   region->bo,
+			   surf[1] - region->bo->offset,
+			   I915_GEM_DOMAIN_RENDER,
+			   I915_GEM_DOMAIN_RENDER);
+}
+
+/**
+ * Sets up a surface state structure to point at the given region.
+ * While it is only used for the front/back buffer currently, it should be
+ * usable for further buffers when doing ARB_draw_buffer support.
+ */
+static void
+brw_update_renderbuffer_surface_miplevels(struct brw_context *brw,
+                                          struct gl_renderbuffer *rb,
+                                          bool layered,
+                                          unsigned int unit)
 {
    struct gl_context *ctx = &brw->ctx;
    struct intel_renderbuffer *irb = intel_renderbuffer(rb);
@@ -928,7 +1036,11 @@ void
 gen4_init_vtable_surface_functions(struct brw_context *brw)
 {
    brw->vtbl.update_texture_surface = brw_update_texture_surface;
-   brw->vtbl.update_renderbuffer_surface = brw_update_renderbuffer_surface;
+   if (brw->gen >= 6)
+      brw->vtbl.update_renderbuffer_surface = brw_update_renderbuffer_surface_miplevels;
+   else
+      brw->vtbl.update_renderbuffer_surface = brw_update_renderbuffer_surface_tileoffsets;
+
    brw->vtbl.update_null_renderbuffer_surface =
       brw_update_null_renderbuffer_surface;
    brw->vtbl.emit_buffer_surface_state = gen4_emit_buffer_surface_state;

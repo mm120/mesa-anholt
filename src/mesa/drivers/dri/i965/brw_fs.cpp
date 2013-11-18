@@ -1351,7 +1351,8 @@ fs_visitor::emit_math(enum opcode opcode, fs_reg dst, fs_reg src0, fs_reg src1)
        * "Operand1[7].  For the INT DIV functions, this operand is the
        *  numerator."
        */
-      bool is_int_div = opcode != SHADER_OPCODE_POW;
+      bool is_int_div = (opcode == SHADER_OPCODE_INT_QUOTIENT ||
+                         opcode == SHADER_OPCODE_INT_REMAINDER);
       fs_reg &op0 = is_int_div ? src1 : src0;
       fs_reg &op1 = is_int_div ? src0 : src1;
 

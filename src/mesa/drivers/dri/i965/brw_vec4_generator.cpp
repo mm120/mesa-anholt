@@ -251,7 +251,8 @@ vec4_generator::generate_math2_gen4(vec4_instruction *inst,
     * "Operand1[7].  For the INT DIV functions, this operand is the
     *  numerator."
     */
-   bool is_int_div = inst->opcode != SHADER_OPCODE_POW;
+   bool is_int_div = (inst->opcode == SHADER_OPCODE_INT_QUOTIENT ||
+                      inst->opcode == SHADER_OPCODE_INT_REMAINDER);
    struct brw_reg &op0 = is_int_div ? src1 : src0;
    struct brw_reg &op1 = is_int_div ? src0 : src1;
 

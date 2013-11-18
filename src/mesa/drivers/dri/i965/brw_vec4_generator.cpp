@@ -1124,6 +1124,7 @@ vec4_generator::generate_vec4_instruction(vec4_instruction *instruction,
       break;
 
    case SHADER_OPCODE_POW:
+   case SHADER_OPCODE_FDIV:
    case SHADER_OPCODE_INT_QUOTIENT:
    case SHADER_OPCODE_INT_REMAINDER:
       if (brw->gen >= 7) {

@@ -757,6 +757,7 @@ fs_visitor::implied_mrf_writes(fs_inst *inst)
    case SHADER_OPCODE_COS:
       return 1 * dispatch_width / 8;
    case SHADER_OPCODE_POW:
+   case SHADER_OPCODE_FDIV:
    case SHADER_OPCODE_INT_QUOTIENT:
    case SHADER_OPCODE_INT_REMAINDER:
       return 2 * dispatch_width / 8;
@@ -1330,6 +1331,7 @@ fs_visitor::emit_math(enum opcode opcode, fs_reg dst, fs_reg src0, fs_reg src1)
 	 fail("16-wide INTDIV unsupported\n");
       break;
    case SHADER_OPCODE_POW:
+   case SHADER_OPCODE_FDIV:
       break;
    default:
       assert(!"not reached: unsupported binary math opcode.");

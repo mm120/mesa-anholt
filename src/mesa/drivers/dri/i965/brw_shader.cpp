@@ -151,9 +151,10 @@ brw_link_shader(struct gl_context *ctx, struct gl_shader_program *shProg)
                                   ? BITFIELD_INSERT_TO_BFM_BFI
                                   : 0;
       const int lrp_to_arith = brw->gen < 6 ? LRP_TO_ARITH : 0;
+      const int div_to_mul_rcp = brw->gen < 6 ? DIV_TO_MUL_RCP : 0;
       lower_instructions(shader->ir,
 			 MOD_TO_FRACT |
-			 DIV_TO_MUL_RCP |
+                         div_to_mul_rcp |
 			 SUB_TO_ADD_NEG |
 			 EXP_TO_EXP2 |
 			 LOG_TO_LOG2 |
@@ -360,6 +361,8 @@ brw_math_function(enum opcode op)
       return BRW_MATH_FUNCTION_LOG;
    case SHADER_OPCODE_POW:
       return BRW_MATH_FUNCTION_POW;
+   case SHADER_OPCODE_FDIV:
+      return BRW_MATH_FUNCTION_FDIV;
    case SHADER_OPCODE_SIN:
       return BRW_MATH_FUNCTION_SIN;
    case SHADER_OPCODE_COS:
@@ -426,6 +429,8 @@ brw_instruction_name(enum opcode op)
       return "log2";
    case SHADER_OPCODE_POW:
       return "pow";
+   case SHADER_OPCODE_FDIV:
+      return "fdiv";
    case SHADER_OPCODE_INT_QUOTIENT:
       return "int_quot";
    case SHADER_OPCODE_INT_REMAINDER:
@@ -563,6 +568,7 @@ backend_instruction::is_math()
            opcode == SHADER_OPCODE_COS ||
            opcode == SHADER_OPCODE_INT_QUOTIENT ||
            opcode == SHADER_OPCODE_INT_REMAINDER ||
+           opcode == SHADER_OPCODE_FDIV ||
            opcode == SHADER_OPCODE_POW);
 }
 

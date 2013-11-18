@@ -394,6 +394,7 @@ vec4_visitor::emit_math(enum opcode opcode,
 {
    switch (opcode) {
    case SHADER_OPCODE_POW:
+   case SHADER_OPCODE_FDIV:
    case SHADER_OPCODE_INT_QUOTIENT:
    case SHADER_OPCODE_INT_REMAINDER:
       break;
@@ -1381,9 +1382,13 @@ vec4_visitor::visit(ir_expression *ir)
       break;
    }
    case ir_binop_div:
-      /* Floating point should be lowered by DIV_TO_MUL_RCP in the compiler. */
-      assert(ir->type->is_integer());
-      emit_math(SHADER_OPCODE_INT_QUOTIENT, result_dst, op[0], op[1]);
+      if (ir->type->is_integer()) {
+         emit_math(SHADER_OPCODE_INT_QUOTIENT, result_dst, op[0], op[1]);
+      } else {
+         /* This should have been lowered by DIV_TO_MUL_RCP otherwise. */
+         assert(brw->gen >= 6);
+         emit_math(SHADER_OPCODE_FDIV, result_dst, op[0], op[1]);
+      }
       break;
    case ir_binop_carry: {
       struct brw_reg acc = retype(brw_acc_reg(), BRW_REGISTER_TYPE_UD);

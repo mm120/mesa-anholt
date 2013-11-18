@@ -346,6 +346,7 @@ fs_generator::generate_math_g45(fs_inst *inst,
                                 struct brw_reg src)
 {
    if (inst->opcode == SHADER_OPCODE_POW ||
+       inst->opcode == SHADER_OPCODE_FDIV ||
        inst->opcode == SHADER_OPCODE_INT_QUOTIENT ||
        inst->opcode == SHADER_OPCODE_INT_REMAINDER) {
       generate_math_gen4(inst, dst, src);
@@ -1605,6 +1606,7 @@ fs_generator::generate_code(exec_list *instructions)
       case SHADER_OPCODE_INT_QUOTIENT:
       case SHADER_OPCODE_INT_REMAINDER:
       case SHADER_OPCODE_POW:
+      case SHADER_OPCODE_FDIV:
 	 if (brw->gen >= 7) {
 	    generate_math2_gen7(inst, dst, src[0], src[1]);
 	 } else if (brw->gen == 6) {

@@ -144,6 +144,7 @@ ir_expression *clamp(operand a, operand b, operand c);
 ir_expression *saturate(operand a);
 ir_expression *abs(operand a);
 ir_expression *neg(operand a);
+ir_expression *rcp(operand a);
 ir_expression *sin(operand a);
 ir_expression *cos(operand a);
 ir_expression *exp(operand a);

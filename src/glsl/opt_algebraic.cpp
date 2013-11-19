@@ -314,12 +314,8 @@ ir_algebraic_visitor::handle_expression(ir_expression *ir)
       break;
 
    case ir_binop_div:
-      if (is_vec_one(op_const[0]) && ir->type->base_type == GLSL_TYPE_FLOAT) {
-	 return new(mem_ctx) ir_expression(ir_unop_rcp,
-					   ir->operands[1]->type,
-					   ir->operands[1],
-					   NULL);
-      }
+      if (is_vec_one(op_const[0]) && ir->type->base_type == GLSL_TYPE_FLOAT)
+         return rcp(ir->operands[1]);
       if (is_vec_one(op_const[1]))
 	 return ir->operands[0];
       break;

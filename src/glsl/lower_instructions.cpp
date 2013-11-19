@@ -165,15 +165,9 @@ lower_instructions_visitor::div_to_mul_rcp(ir_expression *ir)
 {
    assert(ir->operands[1]->type->is_float());
 
-   /* New expression for the 1.0 / op1 */
-   ir_rvalue *expr;
-   expr = new(ir) ir_expression(ir_unop_rcp,
-				ir->operands[1]->type,
-				ir->operands[1]);
-
    /* op0 / op1 -> op0 * (1.0 / op1) */
    ir->operation = ir_binop_mul;
-   ir->operands[1] = expr;
+   ir->operands[1] = rcp(ir->operands[1]);
 
    this->progress = true;
 }

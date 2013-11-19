@@ -318,6 +318,17 @@ ir_algebraic_visitor::handle_expression(ir_expression *ir)
          return rcp(ir->operands[1]);
       if (is_vec_one(op_const[1]))
 	 return ir->operands[0];
+
+      /* If we're dividing by a constant, turn it into a multiply by the
+       * inverse instead, since multiplies are cheaper than divides at
+       * runtime.
+       */
+      if (op_const[1] && op_const[1]->type->base_type == GLSL_TYPE_FLOAT) {
+         ir_rvalue *inv_expr = rcp(op_const[1]);
+         ir_constant *inv_const = inv_expr->constant_expression_value();
+         return mul(ir->operands[0], inv_const);
+      }
+
       break;
 
    case ir_binop_dot:

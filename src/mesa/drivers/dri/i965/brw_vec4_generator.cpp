@@ -1232,7 +1232,9 @@ vec4_generator::generate_code(exec_list *instructions)
 
    if (unlikely(debug_flag)) {
       if (shader) {
-         printf("Native code for vertex shader %d:\n", shader_prog->Name);
+         printf("Native code for %s shader %d:\n",
+                shader->Type == GL_GEOMETRY_SHADER ? "geometry" : "vertex",
+                shader_prog->Name);
       } else {
          printf("Native code for vertex program %d:\n", prog->Id);
       }

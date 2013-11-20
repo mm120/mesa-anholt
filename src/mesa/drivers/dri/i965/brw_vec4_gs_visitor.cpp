@@ -558,7 +558,8 @@ brw_gs_emit(struct brw_context *brw,
 
       vec4_gs_visitor v(brw, c, prog, shader, mem_ctx, true /* no_spills */);
       if (v.run()) {
-         vec4_generator g(brw, prog, &c->gp->program.Base, &c->prog_data.base,
+         vec4_generator g(brw, prog, &c->gp->program.Base, &shader->base,
+                          &c->prog_data.base,
                           mem_ctx, INTEL_DEBUG & DEBUG_GS);
          const unsigned *generated =
             g.generate_assembly(&v.instructions, final_assembly_size);
@@ -586,8 +587,8 @@ brw_gs_emit(struct brw_context *brw,
       return NULL;
    }
 
-   vec4_generator g(brw, prog, &c->gp->program.Base, &c->prog_data.base,
-                    mem_ctx, INTEL_DEBUG & DEBUG_GS);
+   vec4_generator g(brw, prog, &c->gp->program.Base, &shader->base,
+                    &c->prog_data.base, mem_ctx, INTEL_DEBUG & DEBUG_GS);
    const unsigned *generated =
       g.generate_assembly(&v.instructions, final_assembly_size);
 

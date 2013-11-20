@@ -25,6 +25,7 @@
 extern "C" {
 #include "brw_eu.h"
 #include "main/macros.h"
+#include "main/enums.h"
 #include "program/prog_print.h"
 #include "program/prog_parameter.h"
 };
@@ -136,14 +137,14 @@ vec4_instruction::get_src(const struct brw_vec4_prog_data *prog_data, int i)
 vec4_generator::vec4_generator(struct brw_context *brw,
                                struct gl_shader_program *shader_prog,
                                struct gl_program *prog,
+                               struct gl_shader *shader,
                                struct brw_vec4_prog_data *prog_data,
                                void *mem_ctx,
                                bool debug_flag)
    : brw(brw), shader_prog(shader_prog), prog(prog), prog_data(prog_data),
      mem_ctx(mem_ctx), debug_flag(debug_flag)
 {
-   shader = shader_prog ? shader_prog->_LinkedShaders[MESA_SHADER_VERTEX] : NULL;
-
+   this->shader = shader;
    p = rzalloc(mem_ctx, struct brw_compile);
    brw_init_compile(brw, p, mem_ctx);
 }

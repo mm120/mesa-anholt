@@ -425,7 +425,9 @@ public:
    void add_inst(backend_instruction *inst);
    void compute_delay(schedule_node *node);
    virtual void calculate_deps() = 0;
-   virtual schedule_node *choose_instruction_to_schedule() = 0;
+   schedule_node *choose_instruction_to_schedule();
+   schedule_node *normal_heuristic();
+   schedule_node *register_pressure_heuristic();
 
    /**
     * Returns how many cycles it takes the instruction to issue.
@@ -450,6 +452,7 @@ public:
    int time;
    exec_list instructions;
    backend_visitor *bv;
+   bool is_fs;
 
    instruction_scheduler_mode mode;
 
@@ -477,8 +480,6 @@ public:
                             instruction_scheduler_mode mode);
    void calculate_deps();
    bool is_compressed(fs_inst *inst);
-   schedule_node *choose_instruction_to_schedule();
-   schedule_node *register_pressure_heuristic();
    int issue_time(backend_instruction *inst);
    fs_visitor *v;
 
@@ -493,6 +494,7 @@ fs_instruction_scheduler::fs_instruction_scheduler(fs_visitor *v,
    : instruction_scheduler(v, grf_count, mode),
      v(v)
 {
+   is_fs = true;
 }
 
 void
@@ -580,6 +582,7 @@ vec4_instruction_scheduler::vec4_instruction_scheduler(vec4_visitor *v,
    : instruction_scheduler(v, grf_count, SCHEDULE_POST),
      v(v)
 {
+   is_fs = false;
 }
 
 void
@@ -1137,37 +1140,11 @@ vec4_instruction_scheduler::calculate_deps()
 }
 
 schedule_node *
-fs_instruction_scheduler::choose_instruction_to_schedule()
+instruction_scheduler::register_pressure_heuristic()
 {
    schedule_node *chosen = NULL;
 
-   if (mode == SCHEDULE_PRE || mode == SCHEDULE_POST) {
-
-      int chosen_time = 0;
-
-      /* Of the instructions ready to execute or the closest to
-       * being ready, choose the oldest one.
-       */
-      foreach_list(node, &instructions) {
-         schedule_node *n = (schedule_node *)node;
-
-         if (!chosen || n->unblocked_time < chosen_time) {
-            chosen = n;
-            chosen_time = n->unblocked_time;
-         }
-      }
-
-   } else {
-      chosen = register_pressure_heuristic();
-   }
-
-   return chosen;
-}
-
-schedule_node *
-fs_instruction_scheduler::register_pressure_heuristic()
-{
-   schedule_node *chosen = NULL;
+   assert(mode == SCHEDULE_PRE_LIFO || mode == SCHEDULE_PRE_NON_LIFO);
 
    /* Before register allocation, we don't care about the latencies of
     * instructions.  All we care about is reducing live intervals of
@@ -1222,7 +1199,7 @@ fs_instruction_scheduler::register_pressure_heuristic()
           * then the MRFs for the next SEND, then the next SEND, then the
           * MRFs, etc., without ever consuming the results of a send.
           */
-         if (v->brw->gen < 7) {
+         if (is_fs && bv->brw->gen < 7) {
             fs_inst *chosen_inst = (fs_inst *)chosen->inst;
 
             /* We use regs_written > 1 as our test for the kind of send
@@ -1261,10 +1238,12 @@ fs_instruction_scheduler::register_pressure_heuristic()
 }
 
 schedule_node *
-vec4_instruction_scheduler::choose_instruction_to_schedule()
+instruction_scheduler::normal_heuristic()
 {
    schedule_node *chosen = NULL;
    int chosen_time = 0;
+
+   assert(mode == SCHEDULE_PRE || mode == SCHEDULE_POST);
 
    /* Of the instructions ready to execute or the closest to being ready,
     * choose the oldest one.
@@ -1279,6 +1258,21 @@ vec4_instruction_scheduler::choose_instruction_to_schedule()
    }
 
    return chosen;
+}
+
+schedule_node *
+instruction_scheduler::choose_instruction_to_schedule()
+{
+   switch (mode) {
+   case SCHEDULE_PRE:
+   case SCHEDULE_POST:
+      return normal_heuristic();
+   case SCHEDULE_PRE_LIFO:
+   case SCHEDULE_PRE_NON_LIFO:
+      return register_pressure_heuristic();
+   default:
+      return NULL;
+   }
 }
 
 int

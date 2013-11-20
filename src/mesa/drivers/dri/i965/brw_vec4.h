@@ -342,7 +342,7 @@ public:
    void setup_builtin_uniform_values(ir_variable *ir);
    int setup_uniforms(int payload_reg);
    bool reg_allocate_trivial();
-   bool reg_allocate();
+   bool reg_allocate(bool allow_spilling);
    void evaluate_spill_costs(float *spill_costs, bool *no_spill);
    int choose_spill_reg(struct ra_graph *g);
    void spill_reg(int spill_reg);
@@ -360,7 +360,7 @@ public:
    bool opt_algebraic();
    bool opt_register_coalesce();
    void opt_set_dependency_control();
-   void opt_schedule_instructions();
+   void opt_schedule_instructions(enum instruction_scheduler_mode mode);
 
    bool can_do_source_mods(vec4_instruction *inst);
 

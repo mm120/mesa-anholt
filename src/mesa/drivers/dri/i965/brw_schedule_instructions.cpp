@@ -566,7 +566,8 @@ fs_instruction_scheduler::get_register_pressure_benefit(backend_instruction *be)
 class vec4_instruction_scheduler : public instruction_scheduler
 {
 public:
-   vec4_instruction_scheduler(vec4_visitor *v, int grf_count);
+   vec4_instruction_scheduler(vec4_visitor *v, int grf_count,
+                              enum instruction_scheduler_mode mode);
    void calculate_deps();
    schedule_node *choose_instruction_to_schedule();
    int issue_time(backend_instruction *inst);
@@ -578,8 +579,9 @@ public:
 };
 
 vec4_instruction_scheduler::vec4_instruction_scheduler(vec4_visitor *v,
-                                                       int grf_count)
-   : instruction_scheduler(v, grf_count, SCHEDULE_POST),
+                                                       int grf_count,
+                                                       instruction_scheduler_mode mode)
+   : instruction_scheduler(v, grf_count, mode),
      v(v)
 {
    is_fs = false;
@@ -1444,9 +1446,16 @@ fs_visitor::schedule_instructions(instruction_scheduler_mode mode)
 }
 
 void
-vec4_visitor::opt_schedule_instructions()
+vec4_visitor::opt_schedule_instructions(enum instruction_scheduler_mode mode)
 {
-   vec4_instruction_scheduler sched(this, prog_data->total_grf);
+   int grf_count;
+
+   if (mode == SCHEDULE_POST)
+      grf_count = prog_data->total_grf;
+   else
+      grf_count = virtual_grf_count;
+
+   vec4_instruction_scheduler sched(this, grf_count, mode);
    sched.run(&instructions);
 
    if (unlikely(debug_flag)) {

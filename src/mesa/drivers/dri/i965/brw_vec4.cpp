@@ -1524,12 +1524,39 @@ vec4_visitor::run()
       }
    }
 
-   while (!reg_allocate()) {
-      if (failed)
-         return false;
+   static enum instruction_scheduler_mode pre_modes[] = {
+      SCHEDULE_PRE,
+      SCHEDULE_PRE_NON_LIFO,
+      SCHEDULE_PRE_LIFO,
+   };
+
+   /* Try each scheduling heuristic to see if it can successfully register
+    * allocate without spilling.  They should be ordered by decreasing
+    * performance but increasing likelihood of allocating.
+    */
+   bool allocated_without_spills = false;
+   for (unsigned i = 0; i < ARRAY_SIZE(pre_modes); i++) {
+      opt_schedule_instructions(pre_modes[i]);
+
+      if (reg_allocate(false)) {
+         allocated_without_spills = true;
+         break;
+      }
    }
 
-   opt_schedule_instructions();
+   if (!allocated_without_spills) {
+      if (!this->no_spills) {
+         while (!reg_allocate(true)) {
+            if (failed)
+               return false;
+         }
+      } else {
+         fail("Failure to register allocate.  Reduce number of live "
+              "values to avoid this.");
+         return false;
+      }
+      opt_schedule_instructions(SCHEDULE_POST);
+   }
 
    opt_set_dependency_control();
 

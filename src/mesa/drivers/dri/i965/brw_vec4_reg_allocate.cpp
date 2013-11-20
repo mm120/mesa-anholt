@@ -175,7 +175,7 @@ vec4_visitor::setup_payload_interference(struct ra_graph *g,
 }
 
 bool
-vec4_visitor::reg_allocate()
+vec4_visitor::reg_allocate(bool allow_spilling)
 {
    unsigned int hw_reg_mapping[virtual_grf_count];
    int payload_reg_count = this->first_non_payload_grf;
@@ -214,9 +214,8 @@ vec4_visitor::reg_allocate()
        * loop back into here to try again.
        */
       int reg = choose_spill_reg(g);
-      if (this->no_spills) {
-         fail("Failure to register allocate.  Reduce number of live "
-              "values to avoid this.");
+      if (!allow_spilling) {
+         return false;
       } else if (reg == -1) {
          fail("no register to spill\n");
       } else {

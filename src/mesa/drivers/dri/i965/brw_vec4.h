@@ -560,6 +560,7 @@ public:
    vec4_generator(struct brw_context *brw,
                   struct gl_shader_program *shader_prog,
                   struct gl_program *prog,
+                  struct gl_shader *shader,
                   struct brw_vec4_prog_data *prog_data,
                   void *mem_ctx,
                   bool debug_flag);

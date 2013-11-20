@@ -61,7 +61,8 @@ class instruction_scheduler;
 class schedule_node : public exec_node
 {
 public:
-   schedule_node(backend_instruction *inst, instruction_scheduler *sched);
+   schedule_node(backend_instruction *inst, instruction_scheduler *sched,
+                 unsigned ip);
    void set_latency_gen4();
    void set_latency_gen7(bool is_haswell);
 
@@ -73,6 +74,7 @@ public:
    int child_array_size;
    int unblocked_time;
    int latency;
+   unsigned ip;
 
    /**
     * Which iteration of pushing groups of children onto the candidates list
@@ -422,7 +424,7 @@ public:
    void add_dep(schedule_node *before, schedule_node *after);
 
    void run(exec_list *instructions);
-   void add_inst(backend_instruction *inst);
+   void add_inst(backend_instruction *inst, int ip);
    void compute_delay(schedule_node *node);
    virtual void calculate_deps() = 0;
    schedule_node *choose_instruction_to_schedule();
@@ -604,7 +606,8 @@ vec4_instruction_scheduler::get_register_pressure_benefit(backend_instruction *b
 }
 
 schedule_node::schedule_node(backend_instruction *inst,
-                             instruction_scheduler *sched)
+                             instruction_scheduler *sched,
+                             unsigned ip)
 {
    struct brw_context *brw = sched->bv->brw;
 
@@ -617,6 +620,7 @@ schedule_node::schedule_node(backend_instruction *inst,
    this->unblocked_time = 0;
    this->cand_generation = 0;
    this->delay = 0;
+   this->ip = ip;
 
    /* We can't measure Gen6 timings directly but expect them to be much
     * closer to Gen7 than Gen4.
@@ -630,9 +634,9 @@ schedule_node::schedule_node(backend_instruction *inst,
 }
 
 void
-instruction_scheduler::add_inst(backend_instruction *inst)
+instruction_scheduler::add_inst(backend_instruction *inst, int ip)
 {
-   schedule_node *n = new(mem_ctx) schedule_node(inst, this);
+   schedule_node *n = new(mem_ctx) schedule_node(inst, this, ip);
 
    assert(!inst->is_head_sentinel());
    assert(!inst->is_tail_sentinel());
@@ -1399,13 +1403,14 @@ instruction_scheduler::run(exec_list *all_instructions)
       }
    }
 
+   unsigned ip = 0;
    while (!next_block_header->is_tail_sentinel()) {
       /* Add things to be scheduled until we get to a new BB. */
       while (!next_block_header->is_tail_sentinel()) {
 	 backend_instruction *inst = next_block_header;
 	 next_block_header = (backend_instruction *)next_block_header->next;
 
-	 add_inst(inst);
+         add_inst(inst, ip++);
          if (inst->is_control_flow())
 	    break;
       }

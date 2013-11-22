@@ -478,6 +478,7 @@ public:
    void calculate_deps();
    bool is_compressed(fs_inst *inst);
    schedule_node *choose_instruction_to_schedule();
+   schedule_node *register_pressure_heuristic();
    int issue_time(backend_instruction *inst);
    fs_visitor *v;
 
@@ -1141,6 +1142,7 @@ fs_instruction_scheduler::choose_instruction_to_schedule()
    schedule_node *chosen = NULL;
 
    if (mode == SCHEDULE_PRE || mode == SCHEDULE_POST) {
+
       int chosen_time = 0;
 
       /* Of the instructions ready to execute or the closest to
@@ -1154,94 +1156,105 @@ fs_instruction_scheduler::choose_instruction_to_schedule()
             chosen_time = n->unblocked_time;
          }
       }
+
    } else {
-      /* Before register allocation, we don't care about the latencies of
-       * instructions.  All we care about is reducing live intervals of
-       * variables so that we can avoid register spilling, or get 16-wide
-       * shaders which naturally do a better job of hiding instruction
-       * latency.
+      chosen = register_pressure_heuristic();
+   }
+
+   return chosen;
+}
+
+schedule_node *
+fs_instruction_scheduler::register_pressure_heuristic()
+{
+   schedule_node *chosen = NULL;
+
+   /* Before register allocation, we don't care about the latencies of
+    * instructions.  All we care about is reducing live intervals of
+    * variables so that we can avoid register spilling, or get 16-wide
+    * shaders which naturally do a better job of hiding instruction
+    * latency.
+    */
+   foreach_list(node, &instructions) {
+      schedule_node *n = (schedule_node *)node;
+      fs_inst *inst = (fs_inst *)n->inst;
+
+      if (!chosen) {
+         chosen = n;
+         continue;
+      }
+
+      /* Most important: If we can definitely reduce register pressure, do
+       * so immediately.
        */
-      foreach_list(node, &instructions) {
-         schedule_node *n = (schedule_node *)node;
-         fs_inst *inst = (fs_inst *)n->inst;
+      int register_pressure_benefit = get_register_pressure_benefit(n->inst);
+      int chosen_register_pressure_benefit =
+         get_register_pressure_benefit(chosen->inst);
 
-         if (!chosen) {
-            chosen = n;
-            continue;
-         }
+      if (register_pressure_benefit > 0 &&
+          register_pressure_benefit > chosen_register_pressure_benefit) {
+         chosen = n;
+         continue;
+      } else if (chosen_register_pressure_benefit > 0 &&
+                 (register_pressure_benefit <
+                  chosen_register_pressure_benefit)) {
+         continue;
+      }
 
-         /* Most important: If we can definitely reduce register pressure, do
-          * so immediately.
+      if (mode == SCHEDULE_PRE_LIFO) {
+         /* Prefer instructions that recently became available for
+          * scheduling.  These are the things that are most likely to
+          * (eventually) make a variable dead and reduce register pressure.
+          * Typical register pressure estimates don't work for us because
+          * most of our pressure comes from texturing, where no single
+          * instruction to schedule will make a vec4 value dead.
           */
-         int register_pressure_benefit = get_register_pressure_benefit(n->inst);
-         int chosen_register_pressure_benefit =
-            get_register_pressure_benefit(chosen->inst);
-
-         if (register_pressure_benefit > 0 &&
-             register_pressure_benefit > chosen_register_pressure_benefit) {
+         if (n->cand_generation > chosen->cand_generation) {
             chosen = n;
             continue;
-         } else if (chosen_register_pressure_benefit > 0 &&
-                    (register_pressure_benefit <
-                     chosen_register_pressure_benefit)) {
+         } else if (n->cand_generation < chosen->cand_generation) {
             continue;
          }
 
-         if (mode == SCHEDULE_PRE_LIFO) {
-            /* Prefer instructions that recently became available for
-             * scheduling.  These are the things that are most likely to
-             * (eventually) make a variable dead and reduce register pressure.
-             * Typical register pressure estimates don't work for us because
-             * most of our pressure comes from texturing, where no single
-             * instruction to schedule will make a vec4 value dead.
+         /* On MRF-using chips, prefer non-SEND instructions.  If we don't
+          * do this, then because we prefer instructions that just became
+          * candidates, we'll end up in a pattern of scheduling a SEND,
+          * then the MRFs for the next SEND, then the next SEND, then the
+          * MRFs, etc., without ever consuming the results of a send.
+          */
+         if (v->brw->gen < 7) {
+            fs_inst *chosen_inst = (fs_inst *)chosen->inst;
+
+            /* We use regs_written > 1 as our test for the kind of send
+             * instruction to avoid -- only sends generate many regs, and a
+             * single-result send is probably actually reducing register
+             * pressure.
              */
-            if (n->cand_generation > chosen->cand_generation) {
+            if (inst->regs_written <= 1 && chosen_inst->regs_written > 1) {
                chosen = n;
                continue;
-            } else if (n->cand_generation < chosen->cand_generation) {
+            } else if (inst->regs_written > chosen_inst->regs_written) {
                continue;
             }
-
-            /* On MRF-using chips, prefer non-SEND instructions.  If we don't
-             * do this, then because we prefer instructions that just became
-             * candidates, we'll end up in a pattern of scheduling a SEND,
-             * then the MRFs for the next SEND, then the next SEND, then the
-             * MRFs, etc., without ever consuming the results of a send.
-             */
-            if (v->brw->gen < 7) {
-               fs_inst *chosen_inst = (fs_inst *)chosen->inst;
-
-               /* We use regs_written > 1 as our test for the kind of send
-                * instruction to avoid -- only sends generate many regs, and a
-                * single-result send is probably actually reducing register
-                * pressure.
-                */
-               if (inst->regs_written <= 1 && chosen_inst->regs_written > 1) {
-                  chosen = n;
-                  continue;
-               } else if (inst->regs_written > chosen_inst->regs_written) {
-                  continue;
-               }
-            }
          }
-
-         /* For instructions pushed on the cands list at the same time, prefer
-          * the one with the highest delay to the end of the program.  This is
-          * most likely to have its values able to be consumed first (such as
-          * for a large tree of lowered ubo loads, which appear reversed in
-          * the instruction stream with respect to when they can be consumed).
-          */
-         if (n->delay > chosen->delay) {
-            chosen = n;
-            continue;
-         } else if (n->delay < chosen->delay) {
-            continue;
-         }
-
-         /* If all other metrics are equal, we prefer the first instruction in
-          * the list (program execution).
-          */
       }
+
+      /* For instructions pushed on the cands list at the same time, prefer
+       * the one with the highest delay to the end of the program.  This is
+       * most likely to have its values able to be consumed first (such as
+       * for a large tree of lowered ubo loads, which appear reversed in
+       * the instruction stream with respect to when they can be consumed).
+       */
+      if (n->delay > chosen->delay) {
+         chosen = n;
+         continue;
+      } else if (n->delay < chosen->delay) {
+         continue;
+      }
+
+      /* If all other metrics are equal, we prefer the first instruction in
+       * the list (program execution).
+       */
    }
 
    return chosen;

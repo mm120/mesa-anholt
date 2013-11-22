@@ -1806,14 +1806,16 @@ intel_miptree_map_blit(struct brw_context *brw,
    }
    map->stride = map->mt->region->pitch;
 
-   if (!intel_miptree_blit(brw,
-                           mt, level, slice,
-                           map->x, map->y, false,
-                           map->mt, 0, 0,
-                           0, 0, false,
-                           map->w, map->h, GL_COPY)) {
-      fprintf(stderr, "Failed to blit\n");
-      goto fail;
+   if (!(map->mode & GL_MAP_INVALIDATE_RANGE_BIT)) {
+      if (!intel_miptree_blit(brw,
+                              mt, level, slice,
+                              map->x, map->y, false,
+                              map->mt, 0, 0,
+                              0, 0, false,
+                              map->w, map->h, GL_COPY)) {
+         fprintf(stderr, "Failed to blit\n");
+         goto fail;
+      }
    }
 
    map->ptr = intel_miptree_map_raw(brw, map->mt);
@@ -2281,7 +2283,6 @@ intel_miptree_map_singlesample(struct brw_context *brw,
    }
    /* See intel_miptree_blit() for details on the 32k pitch limit. */
    else if (brw->has_llc &&
-            !(mode & GL_MAP_WRITE_BIT) &&
             !mt->compressed &&
             (mt->region->tiling == I915_TILING_X ||
              (brw->gen >= 6 && mt->region->tiling == I915_TILING_Y)) &&

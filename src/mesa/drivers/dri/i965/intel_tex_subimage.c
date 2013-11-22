@@ -453,6 +453,8 @@ intel_texsubimage_tiled_memcpy(struct gl_context * ctx,
    uint32_t cpp;
    mem_copy_fn mem_copy = NULL;
 
+   return false;
+
    /* This fastpath is restricted to specific texture types: level 0 of
     * a 2D BGRA, RGBA, L8 or A8 texture. It could be generalized to support
     * more types.

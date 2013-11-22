@@ -38,8 +38,6 @@ void intelInitTextureFuncs(struct dd_function_table *functions);
 
 void intelInitTextureImageFuncs(struct dd_function_table *functions);
 
-void intelInitTextureSubImageFuncs(struct dd_function_table *functions);
-
 void intelInitTextureCopyImageFuncs(struct dd_function_table *functions);
 
 void intelSetTexBuffer(__DRIcontext *pDRICtx,
@@ -54,16 +52,5 @@ intel_miptree_create_for_teximage(struct brw_context *brw,
 				  bool expect_accelerated_upload);
 
 GLuint intel_finalize_mipmap_tree(struct brw_context *brw, GLuint unit);
-
-bool
-intel_texsubimage_tiled_memcpy(struct gl_context *ctx,
-                               GLuint dims,
-                               struct gl_texture_image *texImage,
-                               GLint xoffset, GLint yoffset, GLint zoffset,
-                               GLsizei width, GLsizei height, GLsizei depth,
-                               GLenum format, GLenum type,
-                               const GLvoid *pixels,
-                               const struct gl_pixelstore_attrib *packing,
-                               bool for_glTexImage);
 
 #endif

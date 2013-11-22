@@ -1242,41 +1242,36 @@ instruction_scheduler::register_pressure_heuristic()
    return chosen;
 }
 
+/**
+ * This is an implementation of the scheduling algorithm from Muchnick (p541).
+ */
 schedule_node *
 instruction_scheduler::normal_heuristic(int current_time)
 {
    assert(mode == SCHEDULE_PRE || mode == SCHEDULE_POST);
 
-   /* First, we figure out what the conditions would be for the ecands and
-    * mcands lists from Muchnick.  ecands is the set of instructions that are
-    * ready to execute without any stalls.  mcands is the set of instructions
-    * with the highest maximum delay to program termination of any
-    * instruction.
+   /* First, we figure out the conditions for the MCands and ECands subsets.
+    * MCands is the set of instructions with the maximum delay to the end of
+    * the program of any available instruction.  ECands is the subset of
+    * MCands that is actually ready to execute right away.
     */
    int maxdelay = 0, ecand_maxdelay = 0;
-   unsigned min_unblocked_time = ~0;
    schedule_node *single_mcand = NULL;
-   bool found_an_ecand = false;
+   bool found_any_ecand = false;
    foreach_list(node, &instructions) {
       schedule_node *n = (schedule_node *)node;
       if (n->delay > maxdelay) {
          single_mcand = n;
          maxdelay = n->delay;
+         found_any_ecand = n->unblocked_time <= current_time;
       } else if (n->delay == maxdelay) {
          single_mcand = NULL;
+         found_any_ecand = found_any_ecand || n->unblocked_time <= current_time;
       }
-
-      if (n->unblocked_time <= current_time) {
-         found_an_ecand = true;
-         ecand_maxdelay = MAX2(ecand_maxdelay, n->delay);
-      }
-      min_unblocked_time = MIN2(min_unblocked_time,
-                                (unsigned)n->unblocked_time);
    }
 
    /* If there's a single instruction with the highest delay of any
-    * instruction out there, then always choose it.  This helps ensure that we
-    * don't prioritize instructions
+    * instruction out there, then we always choose it.
     */
    if (single_mcand) {
       if (debug) {
@@ -1287,27 +1282,25 @@ instruction_scheduler::normal_heuristic(int current_time)
       return single_mcand;
    }
 
-   /* Get the list of either mcands or ecands.  We'll prune this list by
-    * moving things back to &instructions, according to our heuristics.
+   /* Get the subset of nodes that we should apply heuristics on.  This is
+    * either ECands or MCands.
+    *
+    * We'll prune this list by moving things back to &instructions, according
+    * to our heuristics.
     */
    exec_list cands_subset;
    foreach_list_safe(node, &instructions) {
       schedule_node *n = (schedule_node *)node;
-      if (found_an_ecand) {
-         if (n->unblocked_time <= current_time) {
-            n->remove();
-            cands_subset.push_tail(n);
-         }
-      } else {
-         if (n->delay == maxdelay) {
-            n->remove();
-            cands_subset.push_tail(n);
-         }
+      if (n->delay == maxdelay && (!found_any_ecand ||
+                                   n->unblocked_time <= current_time)) {
+         n->remove();
+         cands_subset.push_tail(n);
       }
    }
+
    if (debug) {
       /* Print the list of instructions we're considering. */
-      printf("%s\n", found_an_ecand ? "ecand" : "mcand");
+      printf("%s\n", found_any_ecand ? "ecand" : "mcand");
       foreach_list_safe(node, &cands_subset) {
          schedule_node *n = (schedule_node *)node;
          printf("%4d: %8d ", n->ip, n->delay);
@@ -1316,23 +1309,19 @@ instruction_scheduler::normal_heuristic(int current_time)
       printf("\n");
    }
 
-   if (found_an_ecand) {
-      /* Cull instructions that don't have the maximum delay of any
-       * ready-to-execute instruction.
-       */
-      foreach_list_safe(node, &cands_subset) {
-         schedule_node *n = (schedule_node *)node;
-         if (n->delay != ecand_maxdelay) {
-            n->remove();
-            instructions.push_tail(n);
-         }
-      }
-   } else {
+   if (!found_any_ecand) {
       /* Cull instructions that aren't the closest to being ready to execute
        * without stalls.  Instruction issue is cheap, and generally there
        * aren't that many children of any one instruction, so this standard
        * heuristic is probably a very good one for us.
        */
+      unsigned min_unblocked_time = ~0;
+      foreach_list(node, &cands_subset) {
+         schedule_node *n = (schedule_node *)node;
+         min_unblocked_time = MIN2(min_unblocked_time,
+                                   (unsigned)n->unblocked_time);
+      }
+
       foreach_list_safe(node, &cands_subset) {
          schedule_node *n = (schedule_node *)node;
          if (n->unblocked_time != (unsigned)min_unblocked_time) {
@@ -1342,7 +1331,28 @@ instruction_scheduler::normal_heuristic(int current_time)
       }
    }
 
-   /* Of the instructions that passed the previous heuristic, choose the
+   /* If we haven't register allocated yet, then prefer instructions that will
+    * reduce register pressure so we're more likely to be able to succeed
+    * without falling back to register_pressure_heuristic().
+    */
+   if (mode == SCHEDULE_PRE) {
+      foreach_list(node, &cands_subset) {
+         schedule_node *n = (schedule_node *)node;
+
+         if (get_register_pressure_benefit(n->inst) > 0) {
+            foreach_list_safe(node, &cands_subset) {
+               schedule_node *n = (schedule_node *)node;
+               if (get_register_pressure_benefit(n->inst) <= 0) {
+                  n->remove();
+                  instructions.push_tail(n);
+               }
+            }
+            break;
+         }
+      }
+   }
+
+   /* Of the instructions that passed all the other heuristics, choose the
     * oldest one.
     *
     * We track the ip in the scheduler node to keep track of it as we move the

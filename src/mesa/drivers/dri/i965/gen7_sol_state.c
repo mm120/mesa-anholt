@@ -228,6 +228,13 @@ upload_3dstate_streamout(struct brw_context *brw, bool active,
 	 SO_STREAM_0_VERTEX_READ_LENGTH_SHIFT;
    }
 
+   /* From the IVB PRM, Vol2 Part 1, page 196:
+    *
+    *     "Because of corruption, software must flush the whole fixed function
+    *      pipeline when 3DSTATE_STREAMOUT changes state."
+    */
+   intel_batchbuffer_emit_mi_flush(brw);
+
    BEGIN_BATCH(3);
    OUT_BATCH(_3DSTATE_STREAMOUT << 16 | (3 - 2));
    OUT_BATCH(dw1);

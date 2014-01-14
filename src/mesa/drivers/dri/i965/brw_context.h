@@ -815,12 +815,6 @@ enum shader_time_shader_type {
 #define CACHE_NEW_CLIP_UNIT              (1<<BRW_CLIP_UNIT)
 #define CACHE_NEW_CLIP_PROG              (1<<BRW_CLIP_PROG)
 
-struct brw_cached_batch_item {
-   struct header *header;
-   GLuint sz;
-   struct brw_cached_batch_item *next;
-};
-
 struct brw_vertex_buffer {
    /** Buffer object containing the uploaded vertex data */
    drm_intel_bo *bo;
@@ -1131,7 +1125,6 @@ struct brw_context
    } state;
 
    struct brw_cache cache;
-   struct brw_cached_batch_item *cached_batch_items;
 
    /* Whether a meta-operation is in progress. */
    bool meta_in_progress;

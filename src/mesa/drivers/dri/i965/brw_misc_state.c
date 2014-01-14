@@ -58,7 +58,7 @@ static void upload_drawing_rect(struct brw_context *brw)
    OUT_BATCH(((ctx->DrawBuffer->Width - 1) & 0xffff) |
 	    ((ctx->DrawBuffer->Height - 1) << 16));
    OUT_BATCH(0);
-   ADVANCE_BATCH();
+   CACHED_BATCH();
 }
 
 const struct brw_tracked_state brw_drawing_rect = {

@@ -78,13 +78,13 @@ upload_vs_state(struct brw_context *brw)
    BEGIN_BATCH(2);
    OUT_BATCH(_3DSTATE_BINDING_TABLE_POINTERS_VS << 16 | (2 - 2));
    OUT_BATCH(stage_state->bind_bo_offset);
-   ADVANCE_BATCH();
+   CACHED_BATCH();
 
    /* CACHE_NEW_SAMPLER */
    BEGIN_BATCH(2);
    OUT_BATCH(_3DSTATE_SAMPLER_STATE_POINTERS_VS << 16 | (2 - 2));
    OUT_BATCH(stage_state->sampler_offset);
-   ADVANCE_BATCH();
+   CACHED_BATCH();
 
    gen7_upload_constant_state(brw, stage_state, true /* active */,
                               _3DSTATE_CONSTANT_VS);

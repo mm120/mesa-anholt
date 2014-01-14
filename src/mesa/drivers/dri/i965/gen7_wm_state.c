@@ -120,7 +120,7 @@ upload_wm_state(struct brw_context *brw)
    OUT_BATCH(_3DSTATE_WM << 16 | (3 - 2));
    OUT_BATCH(dw1);
    OUT_BATCH(dw2);
-   ADVANCE_BATCH();
+   CACHED_BATCH();
 }
 
 const struct brw_tracked_state gen7_wm_state = {
@@ -147,13 +147,13 @@ upload_ps_state(struct brw_context *brw)
    BEGIN_BATCH(2);
    OUT_BATCH(_3DSTATE_BINDING_TABLE_POINTERS_PS << 16 | (2 - 2));
    OUT_BATCH(brw->wm.base.bind_bo_offset);
-   ADVANCE_BATCH();
+   CACHED_BATCH();
 
    /* CACHE_NEW_SAMPLER */
    BEGIN_BATCH(2);
    OUT_BATCH(_3DSTATE_SAMPLER_STATE_POINTERS_PS << 16 | (2 - 2));
    OUT_BATCH(brw->wm.base.sampler_offset);
-   ADVANCE_BATCH();
+   CACHED_BATCH();
 
    /* CACHE_NEW_WM_PROG */
    gen7_upload_constant_state(brw, &brw->wm.base, true, _3DSTATE_CONSTANT_PS);

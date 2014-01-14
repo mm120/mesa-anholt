@@ -867,6 +867,7 @@ struct intel_batchbuffer {
    bool need_workaround_flush;
 
    struct cached_batch_item *cached_items;
+   uint32_t cached_items_size;
 
    uint16_t emit, total;
    uint16_t used, reserved_space;

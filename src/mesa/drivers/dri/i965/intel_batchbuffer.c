@@ -31,28 +31,21 @@
 #include "intel_bufmgr.h"
 #include "intel_buffers.h"
 #include "brw_context.h"
+#include "glsl/ralloc.h"
 
 static void
 intel_batchbuffer_reset(struct brw_context *brw);
 
 struct cached_batch_item {
-   struct cached_batch_item *next;
-   uint16_t header;
+   uint16_t offset;
    uint16_t size;
 };
 
 void
 intel_batchbuffer_clear_cache(struct brw_context *brw)
 {
-   struct cached_batch_item *item = brw->batch.cached_items;
-
-   while (item) {
-      struct cached_batch_item *next = item->next;
-      free(item);
-      item = next;
-   }
-
-   brw->batch.cached_items = NULL;
+   memset(brw->batch.cached_items, 0,
+          brw->batch.cached_items_size * sizeof(*brw->batch.cached_items));
 }
 
 void
@@ -433,45 +426,46 @@ intel_batchbuffer_data(struct brw_context *brw,
 }
 
 void
-intel_batchbuffer_cached_advance(struct brw_context *brw)
+intel_batchbuffer_cached_advance(struct brw_context *brw, int *index)
 {
-   struct cached_batch_item **prev = &brw->batch.cached_items, *item;
-   uint32_t sz = (brw->batch.used - brw->batch.emit) * sizeof(uint32_t);
-   uint32_t *start = brw->batch.map + brw->batch.emit;
-   uint16_t op = *start >> 16;
+   static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+   int i = *index;
+   static int next_offset = 0;
+   struct intel_batchbuffer *batch = &brw->batch;
 
-   while (*prev) {
-      uint32_t *old;
-
-      item = *prev;
-      old = brw->batch.map + item->header;
-      if (op == *old >> 16) {
-	 if (item->size == sz && memcmp(old, start, sz) == 0) {
-	    if (prev != &brw->batch.cached_items) {
-	       *prev = item->next;
-	       item->next = brw->batch.cached_items;
-	       brw->batch.cached_items = item;
-	    }
-	    brw->batch.used = brw->batch.emit;
-            assert(brw->batch.used > 0);
-	    return;
-	 }
-
-	 goto emit;
+   /* Since the offsets are common across contexts, we need to avoid racing
+    * initializing them.
+    */
+   if (unlikely(i == -1)) {
+      pthread_mutex_lock(&m);
+      if (*index == -1) {
+         i = *index = next_offset++;
       }
-      prev = &item->next;
+      pthread_mutex_unlock(&m);
    }
 
-   item = malloc(sizeof(struct cached_batch_item));
-   if (item == NULL)
-      return;
+   if (unlikely(batch->cached_items_size <= i)) {
+      batch->cached_items_size = MAX2(8, batch->cached_items_size);
+      batch->cached_items = reralloc(brw, batch->cached_items,
+                                     struct cached_batch_item,
+                                     batch->cached_items_size);
+      if (!batch->cached_items) {
+         batch->cached_items_size = 0;
+         return;
+      }
+   }
 
-   item->next = brw->batch.cached_items;
-   brw->batch.cached_items = item;
+   uint32_t size = (brw->batch.used - brw->batch.emit) * sizeof(uint32_t);
+   uint32_t *start = brw->batch.map + brw->batch.emit;
+   uint32_t *old = brw->batch.map + batch->cached_items[i].offset;
 
-emit:
-   item->size = sz;
-   item->header = brw->batch.emit;
+   if (batch->cached_items[i].size == size &&
+       memcmp(old, start, size) == 0) {
+      brw->batch.used = brw->batch.emit;
+   } else {
+      batch->cached_items[i].offset = brw->batch.emit;
+      batch->cached_items[i].size = size;
+   }
 }
 
 /**

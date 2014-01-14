@@ -163,7 +163,7 @@ intel_batchbuffer_advance(struct brw_context *brw)
 #endif
 }
 
-void intel_batchbuffer_cached_advance(struct brw_context *brw);
+void intel_batchbuffer_cached_advance(struct brw_context *brw, int *offset);
 
 #define BEGIN_BATCH(n) intel_batchbuffer_begin(brw, n, RENDER_RING)
 #define BEGIN_BATCH_BLT(n) intel_batchbuffer_begin(brw, n, BLT_RING)
@@ -175,7 +175,11 @@ void intel_batchbuffer_cached_advance(struct brw_context *brw);
 } while (0)
 
 #define ADVANCE_BATCH() intel_batchbuffer_advance(brw);
-#define CACHED_BATCH() intel_batchbuffer_cached_advance(brw);
+#define CACHED_BATCH() \
+   do {                                                                 \
+      static int cached_batch_loc = -1;                                 \
+      intel_batchbuffer_cached_advance(brw, &cached_batch_loc);         \
+   } while (0)
 
 #ifdef __cplusplus
 }

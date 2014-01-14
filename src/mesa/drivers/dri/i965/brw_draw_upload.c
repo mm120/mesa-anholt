@@ -643,7 +643,7 @@ static void brw_emit_vertices(struct brw_context *brw)
 		(BRW_VE1_COMPONENT_STORE_0 << BRW_VE1_COMPONENT_1_SHIFT) |
 		(BRW_VE1_COMPONENT_STORE_0 << BRW_VE1_COMPONENT_2_SHIFT) |
 		(BRW_VE1_COMPONENT_STORE_1_FLT << BRW_VE1_COMPONENT_3_SHIFT));
-      CACHED_BATCH();
+      intel_batchbuffer_clear_cache(brw);
       return;
    }
 

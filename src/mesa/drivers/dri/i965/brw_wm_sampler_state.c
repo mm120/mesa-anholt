@@ -204,13 +204,16 @@ upload_default_color(struct brw_context *brw,
  * Sets the sampler state for a single unit based off of the sampler key
  * entry.
  */
-static void brw_update_sampler_state(struct brw_context *brw,
-				     int unit,
-                                     int ss_index,
-                                     struct brw_sampler_state *sampler,
-                                     uint32_t sampler_state_table_offset,
-                                     uint32_t *sdc_offset)
+static void
+brw_upload_sampler_state(struct brw_context *brw,
+                         struct brw_stage_state *stage_state,
+                         void *samplers,
+                         int unit,
+                         int ss_index)
 {
+   struct brw_sampler_state *sampler =
+      ((struct brw_sampler_state *)samplers) + ss_index;
+   uint32_t *sdc_offset = &stage_state->sdc_offset[ss_index];
    struct gl_context *ctx = &brw->ctx;
    struct gl_texture_unit *texUnit = &ctx->Texture.Unit[unit];
    struct gl_texture_object *texObj = texUnit->_Current;
@@ -354,7 +357,7 @@ static void brw_update_sampler_state(struct brw_context *brw,
 					    *sdc_offset) >> 5;
 
       drm_intel_bo_emit_reloc(brw->batch.bo,
-			      sampler_state_table_offset +
+			      stage_state->sampler_offset +
 			      ss_index * sizeof(struct brw_sampler_state) +
 			      offsetof(struct brw_sampler_state, ss2),
 			      brw->batch.bo, *sdc_offset,
@@ -378,26 +381,31 @@ brw_upload_sampler_state_table(struct brw_context *brw,
                                struct brw_stage_state *stage_state)
 {
    struct gl_context *ctx = &brw->ctx;
-   struct brw_sampler_state *samplers;
+   void *samplers;
    uint32_t sampler_count = stage_state->sampler_count;
-
    GLbitfield SamplersUsed = prog->SamplersUsed;
+   static const uint32_t sampler_state_size_per_gen[] = {
+      [4] = sizeof(struct brw_sampler_state),
+      [5] = sizeof(struct brw_sampler_state),
+      [6] = sizeof(struct brw_sampler_state),
+      [7] = sizeof(struct gen7_sampler_state),
+   };
+   uint32_t sampler_state_size =
+      sampler_count * sampler_state_size_per_gen[brw->gen];
 
    if (sampler_count == 0)
       return;
 
    samplers = brw_state_batch(brw, AUB_TRACE_SAMPLER_STATE,
-			      sampler_count * sizeof(*samplers),
+			      sampler_state_size,
 			      32, &stage_state->sampler_offset);
-   memset(samplers, 0, sampler_count * sizeof(*samplers));
+   memset(samplers, 0, sampler_state_size);
 
    for (unsigned s = 0; s < sampler_count; s++) {
       if (SamplersUsed & (1 << s)) {
          const unsigned unit = prog->SamplerUnits[s];
          if (ctx->Texture.Unit[unit]._ReallyEnabled)
-            brw_update_sampler_state(brw, unit, s, &samplers[s],
-                                     stage_state->sampler_offset,
-                                     &stage_state->sdc_offset[s]);
+            brw->vtbl.upload_sampler_state(brw, stage_state, samplers, unit, s);
       }
    }
 
@@ -409,7 +417,7 @@ brw_upload_fs_samplers(struct brw_context *brw)
 {
    /* BRW_NEW_FRAGMENT_PROGRAM */
    struct gl_program *fs = (struct gl_program *) brw->fragment_program;
-   brw->vtbl.upload_sampler_state_table(brw, fs, &brw->wm.base);
+   brw_upload_sampler_state_table(brw, fs, &brw->wm.base);
 }
 
 const struct brw_tracked_state brw_fs_samplers = {
@@ -427,7 +435,7 @@ brw_upload_vs_samplers(struct brw_context *brw)
 {
    /* BRW_NEW_VERTEX_PROGRAM */
    struct gl_program *vs = (struct gl_program *) brw->vertex_program;
-   brw->vtbl.upload_sampler_state_table(brw, vs, &brw->vs.base);
+   brw_upload_sampler_state_table(brw, vs, &brw->vs.base);
 }
 
 
@@ -450,7 +458,7 @@ brw_upload_gs_samplers(struct brw_context *brw)
    if (!gs)
       return;
 
-   brw->vtbl.upload_sampler_state_table(brw, gs, &brw->gs.base);
+   brw_upload_sampler_state_table(brw, gs, &brw->gs.base);
 }
 
 
@@ -468,5 +476,5 @@ const struct brw_tracked_state brw_gs_samplers = {
 void
 gen4_init_vtable_sampler_functions(struct brw_context *brw)
 {
-   brw->vtbl.upload_sampler_state_table = brw_upload_sampler_state_table;
+   brw->vtbl.upload_sampler_state = brw_upload_sampler_state;
 }

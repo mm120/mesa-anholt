@@ -1004,10 +1004,12 @@ struct brw_context
                                         unsigned mocs,
                                         bool rw);
 
-      /** Upload a SAMPLER_STATE table. */
-      void (*upload_sampler_state_table)(struct brw_context *brw,
-                                         struct gl_program *prog,
-                                         struct brw_stage_state *stage_state);
+      /** Upload a SAMPLER_STATE entry. */
+      void (*upload_sampler_state)(struct brw_context *brw,
+                                   struct brw_stage_state *stage_state,
+                                   void *samplers,
+                                   int unit,
+                                   int ss_index);
 
       /**
        * Send the appropriate state packets to configure depth, stencil, and

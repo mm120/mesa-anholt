@@ -34,14 +34,19 @@
  * Sets the sampler state for a single unit.
  */
 static void
-gen7_update_sampler_state(struct brw_context *brw, int unit, int ss_index,
-			  struct gen7_sampler_state *sampler,
-                          uint32_t *sdc_offset)
+gen7_upload_sampler_state(struct brw_context *brw,
+                          struct brw_stage_state *stage_state,
+                          void *samplers,
+                          int unit,
+                          int ss_index)
 {
    struct gl_context *ctx = &brw->ctx;
    struct gl_texture_unit *texUnit = &ctx->Texture.Unit[unit];
    struct gl_texture_object *texObj = texUnit->_Current;
    struct gl_sampler_object *gl_sampler = _mesa_get_samplerobj(ctx, unit);
+   struct gen7_sampler_state *sampler =
+      ((struct gen7_sampler_state *)samplers) + ss_index;
+   uint32_t *sdc_offset = &stage_state->sdc_offset[ss_index];
    bool using_nearest = false;
 
    /* These don't use samplers at all. */
@@ -177,40 +182,8 @@ gen7_update_sampler_state(struct brw_context *brw, int unit, int ss_index,
                                     BRW_ADDRESS_ROUNDING_ENABLE_R_MAG;
 }
 
-
-static void
-gen7_upload_sampler_state_table(struct brw_context *brw,
-                                struct gl_program *prog,
-                                struct brw_stage_state *stage_state)
-{
-   struct gl_context *ctx = &brw->ctx;
-   struct gen7_sampler_state *samplers;
-   uint32_t sampler_count = stage_state->sampler_count;
-
-   GLbitfield SamplersUsed = prog->SamplersUsed;
-
-   if (sampler_count == 0)
-      return;
-
-   samplers = brw_state_batch(brw, AUB_TRACE_SAMPLER_STATE,
-			      sampler_count * sizeof(*samplers),
-			      32, &stage_state->sampler_offset);
-   memset(samplers, 0, sampler_count * sizeof(*samplers));
-
-   for (unsigned s = 0; s < sampler_count; s++) {
-      if (SamplersUsed & (1 << s)) {
-         const unsigned unit = prog->SamplerUnits[s];
-         if (ctx->Texture.Unit[unit]._ReallyEnabled)
-            gen7_update_sampler_state(brw, unit, s, &samplers[s],
-                                      &stage_state->sdc_offset[s]);
-      }
-   }
-
-   brw->state.dirty.cache |= CACHE_NEW_SAMPLER;
-}
-
 void
 gen7_init_vtable_sampler_functions(struct brw_context *brw)
 {
-   brw->vtbl.upload_sampler_state_table = gen7_upload_sampler_state_table;
+   brw->vtbl.upload_sampler_state = gen7_upload_sampler_state;
 }

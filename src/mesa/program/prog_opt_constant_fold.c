@@ -131,10 +131,10 @@ GLboolean
 _mesa_constant_fold(struct gl_program *prog)
 {
    bool progress = false;
-   unsigned i;
+   struct simple_node *node;
 
-   for (i = 0; i < prog->NumInstructions; i++) {
-      struct prog_instruction *const inst = &prog->Instructions[i];
+   foreach(node, &prog->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
 
       switch (inst->Opcode) {
       case OPCODE_ADD:

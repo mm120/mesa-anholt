@@ -38,6 +38,14 @@ static GLboolean dbg = GL_FALSE;
 
 #define NO_MASK 0xf
 
+static void
+remove_instruction(struct gl_program *prog, struct prog_instruction *inst)
+{
+   remove_from_list(&inst->link);
+   _mesa_free_instruction(inst);
+   prog->NumInstructions--;
+}
+
 /**
  * Returns the mask of channels (bitmask of WRITEMASK_X,Y,Z,W) which
  * are read from the given src in this instruction, We also provide
@@ -157,51 +165,6 @@ is_swizzle_regular(GLuint swz)
           GET_SWZ(swz,3) <= SWIZZLE_W;
 }
 
-
-/**
- * In 'prog' remove instruction[i] if removeFlags[i] == TRUE.
- * \return number of instructions removed
- */
-static GLuint
-remove_instructions(struct gl_program *prog, const GLboolean *removeFlags)
-{
-   GLint i, removeEnd = 0, removeCount = 0;
-   GLuint totalRemoved = 0;
-
-   /* go backward */
-   for (i = prog->NumInstructions - 1; i >= 0; i--) {
-      if (removeFlags[i]) {
-         totalRemoved++;
-         if (removeCount == 0) {
-            /* begin a run of instructions to remove */
-            removeEnd = i;
-            removeCount = 1;
-         }
-         else {
-            /* extend the run of instructions to remove */
-            removeCount++;
-         }
-      }
-      else {
-         /* don't remove this instruction, but check if the preceeding
-          * instructions are to be removed.
-          */
-         if (removeCount > 0) {
-            GLint removeStart = removeEnd - removeCount + 1;
-            _mesa_delete_instructions(prog, removeStart, removeCount);
-            removeStart = removeCount = 0; /* reset removal info */
-         }
-      }
-   }
-   /* Finish removing if the first instruction was to be removed. */
-   if (removeCount > 0) {
-      GLint removeStart = removeEnd - removeCount + 1;
-      _mesa_delete_instructions(prog, removeStart, removeCount);
-   }
-   return totalRemoved;
-}
-
-
 /**
  * Remap register indexes according to map.
  * \param prog  the program to search/replace
@@ -209,12 +172,12 @@ remove_instructions(struct gl_program *prog, const GLboolean *removeFlags)
  * \param map  maps old register indexes to new indexes
  */
 static void
-replace_regs(struct gl_program *prog, gl_register_file file, const GLint map[])
+replace_regs(struct simple_node *list, gl_register_file file, const GLint map[])
 {
-   GLuint i;
+   struct simple_node *node;
 
-   for (i = 0; i < prog->NumInstructions; i++) {
-      struct prog_instruction *inst = prog->Instructions + i;
+   foreach(node, list) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
       const GLuint numSrc = _mesa_num_inst_src_regs(inst->Opcode);
       GLuint j;
       for (j = 0; j < numSrc; j++) {
@@ -243,8 +206,9 @@ static GLboolean
 _mesa_remove_dead_code_global(struct gl_program *prog)
 {
    bool *tempRead;
-   GLboolean *removeInst; /* per-instruction removal flag */
-   GLuint i, rem = 0, comp;
+   bool rem = false;
+   GLuint i, comp;
+   struct simple_node *node, *node_temp;
 
    tempRead = calloc(prog->NumTemporaries, 4 * sizeof(bool));
    if (!tempRead)
@@ -255,12 +219,9 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
       /*_mesa_print_program(prog);*/
    }
 
-   removeInst =
-      calloc(1, prog->NumInstructions * sizeof(GLboolean));
-
    /* Determine which temps are read and written */
-   for (i = 0; i < prog->NumInstructions; i++) {
-      const struct prog_instruction *inst = prog->Instructions + i;
+   foreach(node, &prog->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
       const GLuint numSrc = _mesa_num_inst_src_regs(inst->Opcode);
       GLuint j;
 
@@ -313,9 +274,10 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
       }
    }
 
-   /* find instructions that write to dead registers, flag for removal */
-   for (i = 0; i < prog->NumInstructions; i++) {
-      struct prog_instruction *inst = prog->Instructions + i;
+   /* find instructions that write to dead registers and remove them */
+   i = 0;
+   foreach_s(node, node_temp, &prog->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
       const GLuint numDst = _mesa_num_inst_dst_regs(inst->Opcode);
 
       if (numDst != 0 && inst->DstReg.File == PROGRAM_TEMPORARY) {
@@ -337,13 +299,12 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
 	    /* If we cleared all writes, the instruction can be removed. */
 	    if (dbg)
                fprintf(stderr, "Remove instruction %u: \n", i);
-	    removeInst[i] = GL_TRUE;
+            remove_instruction(prog, inst);
+            rem = true;
 	 }
       }
+      i++;
    }
-
-   /* now remove the instructions which aren't needed */
-   rem = remove_instructions(prog, removeInst);
 
    if (dbg) {
       fprintf(stderr, "Optimize: End dead code removal.\n");
@@ -354,8 +315,7 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
 
 done:
    free(tempRead);
-   free(removeInst);
-   return rem != 0;
+   return rem;
 }
 
 
@@ -377,14 +337,17 @@ enum inst_use
  */
 static enum inst_use
 find_next_use(const struct gl_program *prog,
-              GLuint start,
+              struct prog_instruction *inst,
               GLuint index,
               GLuint mask)
 {
-   GLuint i;
+   struct simple_node *node;
 
-   for (i = start; i < prog->NumInstructions; i++) {
-      const struct prog_instruction *inst = prog->Instructions + i;
+   for (node = next_elem(&inst->link);
+        !at_end(&prog->Instructions, node);
+        node = next_elem(node)) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
+
       switch (inst->Opcode) {
       case OPCODE_BGNLOOP:
       case OPCODE_BGNSUB:
@@ -488,7 +451,7 @@ can_upward_mov_be_modifed(const struct prog_instruction *mov)
 static void
 _mesa_remove_extra_move_use(struct gl_program *prog)
 {
-   GLuint i, j;
+   struct simple_node *node;
 
    if (dbg) {
       fprintf(stderr, "Optimize: Begin remove extra move use\n");
@@ -506,8 +469,10 @@ _mesa_remove_extra_move_use(struct gl_program *prog)
     *    FOO tmpY, arg0, arg1;
     */
 
-   for (i = 0; i < prog->NumInstructions; i++) {
-      const struct prog_instruction *mov = prog->Instructions + i;
+   foreach(node, &prog->Instructions) {
+      struct prog_instruction *mov = (struct prog_instruction *)node;
+      struct simple_node *node2;
+
       GLuint dst_mask, src_mask;
       if (can_upward_mov_be_modifed(mov) == GL_FALSE)
          continue;
@@ -522,8 +487,10 @@ _mesa_remove_extra_move_use(struct gl_program *prog)
        * rewritten or we get into some flow-control, eliminating the use of
        * this MOV.
        */
-      for (j = i + 1; j < prog->NumInstructions; j++) {
-	 struct prog_instruction *inst2 = prog->Instructions + j;
+      for (node2 = mov->link.next;
+           node2 != &prog->Instructions;
+           node2 = node2->next) {
+	 struct prog_instruction *inst2 = (struct prog_instruction *)node2;
          GLuint arg;
 
 	 if (_mesa_is_flow_control_opcode(inst2->Opcode))
@@ -596,14 +563,12 @@ _mesa_remove_extra_move_use(struct gl_program *prog)
 static GLboolean
 _mesa_remove_dead_code_local(struct gl_program *prog)
 {
-   GLboolean *removeInst;
-   GLuint i, arg, rem = 0;
+   bool rem = false;
+   GLuint arg;
+   struct simple_node *node, *t;
 
-   removeInst =
-      calloc(1, prog->NumInstructions * sizeof(GLboolean));
-
-   for (i = 0; i < prog->NumInstructions; i++) {
-      const struct prog_instruction *inst = prog->Instructions + i;
+   foreach_s(node, t, &prog->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
       const GLuint index = inst->DstReg.Index;
       const GLuint mask = inst->DstReg.WriteMask;
       enum inst_use use;
@@ -621,16 +586,15 @@ _mesa_remove_dead_code_local(struct gl_program *prog)
           inst->DstReg.RelAddr)
          continue;
 
-      use = find_next_use(prog, i+1, index, mask);
-      if (use == WRITE || use == END)
-         removeInst[i] = GL_TRUE;
+      use = find_next_use(prog, inst, index, mask);
+      if (use == WRITE || use == END) {
+         remove_instruction(prog, inst);
+         rem = true;
+      }
    }
 
-   rem = remove_instructions(prog, removeInst);
-
 done:
-   free(removeInst);
-   return rem != 0;
+   return rem;
 }
 
 
@@ -732,16 +696,13 @@ _mesa_merge_mov_into_inst(struct prog_instruction *inst,
 static GLboolean
 _mesa_remove_extra_moves(struct gl_program *prog)
 {
-   GLboolean *removeInst; /* per-instruction removal flag */
-   GLuint i, rem = 0, nesting = 0;
+   struct simple_node *node, *t;
+   GLuint rem = 0, nesting = 0;
 
    if (dbg) {
       fprintf(stderr, "Optimize: Begin remove extra moves\n");
       _mesa_print_program(prog);
    }
-
-   removeInst =
-      calloc(1, prog->NumInstructions * sizeof(GLboolean));
 
    /*
     * Look for sequences such as this:
@@ -751,8 +712,8 @@ _mesa_remove_extra_moves(struct gl_program *prog)
     *    FOO tmpY, arg0, arg1;
     */
 
-   for (i = 0; i < prog->NumInstructions; i++) {
-      const struct prog_instruction *mov = prog->Instructions + i;
+   foreach_s(node, t, &prog->Instructions) {
+      struct prog_instruction *mov = (struct prog_instruction *)node;
 
       switch (mov->Opcode) {
       case OPCODE_BGNLOOP:
@@ -766,7 +727,7 @@ _mesa_remove_extra_moves(struct gl_program *prog)
          nesting--;
          break;
       case OPCODE_MOV:
-         if (i > 0 &&
+         if (mov->link.prev != &prog->Instructions &&
              can_downward_mov_be_modifed(mov) &&
              mov->SrcReg[0].File == PROGRAM_TEMPORARY &&
              nesting == 0)
@@ -774,14 +735,8 @@ _mesa_remove_extra_moves(struct gl_program *prog)
 
             /* see if this MOV can be removed */
             const GLuint id = mov->SrcReg[0].Index;
-            struct prog_instruction *prevInst;
-            GLuint prevI;
-
-            /* get pointer to previous instruction */
-            prevI = i - 1;
-            while (prevI > 0 && removeInst[prevI])
-               prevI--;
-            prevInst = prog->Instructions + prevI;
+            struct prog_instruction *prevInst =
+               (struct prog_instruction *)mov->link.prev;
 
             if (prevInst->DstReg.File == PROGRAM_TEMPORARY &&
                 prevInst->DstReg.Index == id &&
@@ -789,7 +744,7 @@ _mesa_remove_extra_moves(struct gl_program *prog)
                 prevInst->DstReg.CondMask == COND_TR) {
 
                const GLuint dst_mask = prevInst->DstReg.WriteMask;
-               enum inst_use next_use = find_next_use(prog, i+1, id, dst_mask);
+               enum inst_use next_use = find_next_use(prog, mov, id, dst_mask);
 
                if (next_use == WRITE || next_use == END) {
                   /* OK, we can safely remove this MOV instruction.
@@ -800,12 +755,13 @@ _mesa_remove_extra_moves(struct gl_program *prog)
                    *   prevI: FOO z, x, y;
                    */
                   if (_mesa_merge_mov_into_inst(prevInst, mov)) {
-                     removeInst[i] = GL_TRUE;
                      if (dbg) {
-                        fprintf(stderr, "Remove MOV at %u\n", i);
-                        fprintf(stderr, "new prev inst %u: ", prevI);
+                        fprintf(stderr, "Remove MOV: ");
+                        _mesa_print_instruction(mov);
+                        fprintf(stderr, "new prev: ");
                         _mesa_print_instruction(prevInst);
                      }
+                     remove_instruction(prog, mov);
                   }
                }
             }
@@ -815,11 +771,6 @@ _mesa_remove_extra_moves(struct gl_program *prog)
          ; /* nothing */
       }
    }
-
-   /* now remove the instructions which aren't needed */
-   rem = remove_instructions(prog, removeInst);
-
-   free(removeInst);
 
    if (dbg) {
       fprintf(stderr, "Optimize: End remove extra moves.  %u instructions removed\n", rem);
@@ -975,6 +926,7 @@ static GLboolean
 _mesa_find_temp_intervals(struct gl_program *prog,
                           struct interval_list *intervals)
 {
+   struct simple_node *node;
    struct loop_info loopStack[MAX_LOOP_NESTING];
    GLuint loopStackDepth = 0;
    GLuint i;
@@ -995,11 +947,13 @@ _mesa_find_temp_intervals(struct gl_program *prog,
    intervals->Num = prog->NumTemporaries;
 
    /* Scan instructions looking for temporary registers */
-   for (i = 0; i < prog->NumInstructions; i++) {
-      const struct prog_instruction *inst = prog->Instructions + i;
+   i = 0;
+   foreach(node, &prog->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
       if (inst->Opcode == OPCODE_BGNLOOP) {
          loopStack[loopStackDepth].Start = i;
-         loopStack[loopStackDepth].End = inst->BranchTarget;
+         loopStack[loopStackDepth].End =
+            i + _mesa_count_between_instructions(inst, inst->BranchTarget);
          loopStackDepth++;
       }
       else if (inst->Opcode == OPCODE_ENDLOOP) {
@@ -1028,6 +982,7 @@ _mesa_find_temp_intervals(struct gl_program *prog,
                             loopStack, loopStackDepth, i);
          }
       }
+      i++;
    }
 
    return GL_TRUE;
@@ -1227,7 +1182,7 @@ _mesa_reallocate_registers(struct gl_program *prog)
        * Scan the program and replace all the old temporary register
        * indexes with the new indexes.
        */
-      replace_regs(prog, PROGRAM_TEMPORARY, registerMap);
+      replace_regs(&prog->Instructions, PROGRAM_TEMPORARY, registerMap);
 
       prog->NumTemporaries = maxTemp + 1;
    }
@@ -1280,6 +1235,7 @@ print_it(struct gl_context *ctx, struct gl_program *program, const char *txt) {
 static void
 _mesa_simplify_cmp(struct gl_program * program)
 {
+   struct simple_node *node;
    GLuint *tempWrites;
    GLuint outputWrites[MAX_PROGRAM_OUTPUTS];
    GLuint i;
@@ -1297,8 +1253,8 @@ _mesa_simplify_cmp(struct gl_program * program)
       outputWrites[i] = 0;
    }
 
-   for (i = 0; i < program->NumInstructions; i++) {
-      struct prog_instruction *inst = program->Instructions + i;
+   foreach(node, &program->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
       GLuint prevWriteMask;
 
       /* Give up if we encounter relative addressing or flow control. */

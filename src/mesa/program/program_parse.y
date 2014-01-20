@@ -2282,13 +2282,11 @@ asm_instruction_ctor(gl_inst_opcode op,
    struct asm_instruction *inst = CALLOC_STRUCT(asm_instruction);
 
    if (inst) {
-      inst->Base = _mesa_alloc_instructions(1);
+      inst->Base = _mesa_alloc_instruction(op);
       if (!inst->Base) {
          free(inst);
          return NULL;
       }
-      _mesa_init_instructions(inst->Base, 1);
-      inst->Base->Opcode = op;
 
       asm_instruction_set_operands(inst, dst, src0, src1, src2);
    }
@@ -2307,13 +2305,11 @@ asm_instruction_copy_ctor(const struct prog_instruction *base,
    struct asm_instruction *inst = CALLOC_STRUCT(asm_instruction);
 
    if (inst) {
-      inst->Base = _mesa_alloc_instructions(1);
+      inst->Base = _mesa_alloc_instruction(base->Opcode);
       if (!inst->Base) {
          free(inst);
          return NULL;
       }
-      _mesa_init_instructions(inst->Base, 1);
-      inst->Base->Opcode = base->Opcode;
       inst->Base->CondUpdate = base->CondUpdate;
       inst->Base->CondDst = base->CondDst;
       inst->Base->SaturateMode = base->SaturateMode;
@@ -2691,8 +2687,8 @@ GLboolean
 _mesa_parse_arb_program(struct gl_context *ctx, GLenum target, const GLubyte *str,
 			GLsizei len, struct asm_parser_state *state)
 {
-   struct asm_instruction *inst;
-   unsigned i;
+   struct prog_instruction *inst;
+   struct asm_instruction *asm_inst;
    GLubyte *strz;
    GLboolean result = GL_FALSE;
    void *temp;
@@ -2753,32 +2749,18 @@ _mesa_parse_arb_program(struct gl_context *ctx, GLenum target, const GLubyte *st
       goto error;
    }
 
-
-   
-   /* Add one instruction to store the "END" instruction.
-    */
-   state->prog->Instructions =
-      _mesa_alloc_instructions(state->prog->NumInstructions + 1);
-
-   if (state->prog->Instructions == NULL) {
-      goto error;
-   }
-
-   inst = state->inst_head;
-   for (i = 0; i < state->prog->NumInstructions; i++) {
-      struct asm_instruction *const temp = inst->next;
-
-      state->prog->Instructions[i] = *inst->Base;
-      inst = temp;
+   /* Copy the assembled instructions to the program. */
+   state->prog->NumInstructions = 0;
+   make_empty_list(&state->prog->Instructions);
+   for (asm_inst = state->inst_head; asm_inst; asm_inst = asm_inst->next) {
+      _mesa_append_instruction(state->prog, asm_inst->Base);
    }
 
    /* Finally, tag on an OPCODE_END instruction */
-   {
-      const GLuint numInst = state->prog->NumInstructions;
-      _mesa_init_instructions(state->prog->Instructions + numInst, 1);
-      state->prog->Instructions[numInst].Opcode = OPCODE_END;
-   }
-   state->prog->NumInstructions++;
+   inst = _mesa_alloc_instruction(OPCODE_END);
+   if (!inst)
+      goto error;
+   _mesa_append_instruction(state->prog, inst);
 
    state->prog->NumParameters = state->prog->Parameters->NumParameters;
    state->prog->NumAttributes = _mesa_bitcount_64(state->prog->InputsRead);
@@ -2796,10 +2778,9 @@ _mesa_parse_arb_program(struct gl_context *ctx, GLenum target, const GLubyte *st
    result = GL_TRUE;
 
 error:
-   for (inst = state->inst_head; inst != NULL; inst = temp) {
-      temp = inst->next;
-      _mesa_free_instructions(inst->Base, 1);
-      free(inst);
+   for (asm_inst = state->inst_head; asm_inst != NULL; asm_inst = temp) {
+      temp = asm_inst->next;
+      free(asm_inst);
    }
 
    state->inst_head = NULL;

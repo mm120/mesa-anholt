@@ -139,10 +139,9 @@ static struct gl_fragment_program *
 get_pixel_transfer_program(struct gl_context *ctx, const struct state_key *key)
 {
    struct st_context *st = st_context(ctx);
-   struct prog_instruction inst[MAX_INST];
+   struct prog_instruction *inst;
    struct gl_program_parameter_list *params;
    struct gl_fragment_program *fp;
-   GLuint ic = 0;
    const GLuint colorTemp = 0;
 
    fp = (struct gl_fragment_program *)
@@ -156,15 +155,17 @@ get_pixel_transfer_program(struct gl_context *ctx, const struct state_key *key)
     * Get initial pixel color from the texture.
     * TEX colorTemp, fragment.texcoord[0], texture[0], 2D;
     */
-   _mesa_init_instructions(inst + ic, 1);
-   inst[ic].Opcode = OPCODE_TEX;
-   inst[ic].DstReg.File = PROGRAM_TEMPORARY;
-   inst[ic].DstReg.Index = colorTemp;
-   inst[ic].SrcReg[0].File = PROGRAM_INPUT;
-   inst[ic].SrcReg[0].Index = VARYING_SLOT_TEX0;
-   inst[ic].TexSrcUnit = 0;
-   inst[ic].TexSrcTarget = TEXTURE_2D_INDEX;
-   ic++;
+   inst = _mesa_alloc_instruction(OPCODE_TEX);
+   if (!inst)
+      goto fail_exit;
+   inst->DstReg.File = PROGRAM_TEMPORARY;
+   inst->DstReg.Index = colorTemp;
+   inst->SrcReg[0].File = PROGRAM_INPUT;
+   inst->SrcReg[0].Index = VARYING_SLOT_TEX0;
+   inst->TexSrcUnit = 0;
+   inst->TexSrcTarget = TEXTURE_2D_INDEX;
+   _mesa_append_instruction(&fp->Base, inst);
+
    fp->Base.InputsRead = BITFIELD64_BIT(VARYING_SLOT_TEX0);
    fp->Base.OutputsWritten = BITFIELD64_BIT(FRAG_RESULT_COLOR);
    fp->Base.SamplersUsed = 0x1;  /* sampler 0 (bit 0) is used */
@@ -180,17 +181,18 @@ get_pixel_transfer_program(struct gl_context *ctx, const struct state_key *key)
       bias_p = _mesa_add_state_reference(params, bias_state);
 
       /* MAD colorTemp, colorTemp, scale, bias; */
-      _mesa_init_instructions(inst + ic, 1);
-      inst[ic].Opcode = OPCODE_MAD;
-      inst[ic].DstReg.File = PROGRAM_TEMPORARY;
-      inst[ic].DstReg.Index = colorTemp;
-      inst[ic].SrcReg[0].File = PROGRAM_TEMPORARY;
-      inst[ic].SrcReg[0].Index = colorTemp;
-      inst[ic].SrcReg[1].File = PROGRAM_STATE_VAR;
-      inst[ic].SrcReg[1].Index = scale_p;
-      inst[ic].SrcReg[2].File = PROGRAM_STATE_VAR;
-      inst[ic].SrcReg[2].Index = bias_p;
-      ic++;
+      inst = _mesa_alloc_instruction(OPCODE_MAD);
+      if (!inst)
+         goto fail_exit;
+      inst->DstReg.File = PROGRAM_TEMPORARY;
+      inst->DstReg.Index = colorTemp;
+      inst->SrcReg[0].File = PROGRAM_TEMPORARY;
+      inst->SrcReg[0].Index = colorTemp;
+      inst->SrcReg[1].File = PROGRAM_STATE_VAR;
+      inst->SrcReg[1].Index = scale_p;
+      inst->SrcReg[2].File = PROGRAM_STATE_VAR;
+      inst->SrcReg[2].Index = bias_p;
+      _mesa_append_instruction(&fp->Base, inst);
    }
 
    if (key->pixelMaps) {
@@ -209,68 +211,56 @@ get_pixel_transfer_program(struct gl_context *ctx, const struct state_key *key)
        */
 
       /* TEX temp.rg, colorTemp.rgba, texture[1], 2D; */
-      _mesa_init_instructions(inst + ic, 1);
-      inst[ic].Opcode = OPCODE_TEX;
-      inst[ic].DstReg.File = PROGRAM_TEMPORARY;
-      inst[ic].DstReg.Index = temp;
-      inst[ic].DstReg.WriteMask = WRITEMASK_XY; /* write R,G */
-      inst[ic].SrcReg[0].File = PROGRAM_TEMPORARY;
-      inst[ic].SrcReg[0].Index = colorTemp;
-      inst[ic].TexSrcUnit = 1;
-      inst[ic].TexSrcTarget = TEXTURE_2D_INDEX;
-      ic++;
+      inst = _mesa_alloc_instruction(OPCODE_TEX);
+      if (!inst)
+         goto fail_exit;
+      inst->DstReg.File = PROGRAM_TEMPORARY;
+      inst->DstReg.Index = temp;
+      inst->DstReg.WriteMask = WRITEMASK_XY; /* write R,G */
+      inst->SrcReg[0].File = PROGRAM_TEMPORARY;
+      inst->SrcReg[0].Index = colorTemp;
+      inst->TexSrcUnit = 1;
+      inst->TexSrcTarget = TEXTURE_2D_INDEX;
+      _mesa_append_instruction(&fp->Base, inst);
 
       /* TEX temp.ba, colorTemp.baba, texture[1], 2D; */
-      _mesa_init_instructions(inst + ic, 1);
-      inst[ic].Opcode = OPCODE_TEX;
-      inst[ic].DstReg.File = PROGRAM_TEMPORARY;
-      inst[ic].DstReg.Index = temp;
-      inst[ic].DstReg.WriteMask = WRITEMASK_ZW; /* write B,A */
-      inst[ic].SrcReg[0].File = PROGRAM_TEMPORARY;
-      inst[ic].SrcReg[0].Index = colorTemp;
-      inst[ic].SrcReg[0].Swizzle = MAKE_SWIZZLE4(SWIZZLE_Z, SWIZZLE_W,
-                                                 SWIZZLE_Z, SWIZZLE_W);
-      inst[ic].TexSrcUnit = 1;
-      inst[ic].TexSrcTarget = TEXTURE_2D_INDEX;
-      ic++;
+      inst = _mesa_alloc_instruction(OPCODE_TEX);
+      if (!inst)
+         goto fail_exit;
+      inst->DstReg.File = PROGRAM_TEMPORARY;
+      inst->DstReg.Index = temp;
+      inst->DstReg.WriteMask = WRITEMASK_ZW; /* write B,A */
+      inst->SrcReg[0].File = PROGRAM_TEMPORARY;
+      inst->SrcReg[0].Index = colorTemp;
+      inst->SrcReg[0].Swizzle = MAKE_SWIZZLE4(SWIZZLE_Z, SWIZZLE_W,
+                                              SWIZZLE_Z, SWIZZLE_W);
+      inst->TexSrcUnit = 1;
+      inst->TexSrcTarget = TEXTURE_2D_INDEX;
+      _mesa_append_instruction(&fp->Base, inst);
 
       /* MOV colorTemp, temp; */
-      _mesa_init_instructions(inst + ic, 1);
-      inst[ic].Opcode = OPCODE_MOV;
-      inst[ic].DstReg.File = PROGRAM_TEMPORARY;
-      inst[ic].DstReg.Index = colorTemp;
-      inst[ic].SrcReg[0].File = PROGRAM_TEMPORARY;
-      inst[ic].SrcReg[0].Index = temp;
-      ic++;
+      inst = _mesa_alloc_instruction(OPCODE_MOV);
+      if (!inst)
+         goto fail_exit;
+      inst->DstReg.File = PROGRAM_TEMPORARY;
+      inst->DstReg.Index = colorTemp;
+      inst->SrcReg[0].File = PROGRAM_TEMPORARY;
+      inst->SrcReg[0].Index = temp;
+      _mesa_append_instruction(&fp->Base, inst);
 
       fp->Base.SamplersUsed |= (1 << 1);  /* sampler 1 is used */
    }
 
    /* Modify last instruction's dst reg to write to result.color */
-   {
-      struct prog_instruction *last = &inst[ic - 1];
-      last->DstReg.File = PROGRAM_OUTPUT;
-      last->DstReg.Index = FRAG_RESULT_COLOR;
-   }
+   inst->DstReg.File = PROGRAM_OUTPUT;
+   inst->DstReg.Index = FRAG_RESULT_COLOR;
 
    /* END; */
-   _mesa_init_instructions(inst + ic, 1);
-   inst[ic].Opcode = OPCODE_END;
-   ic++;
+   inst = _mesa_alloc_instruction(OPCODE_END);
+   if (!inst)
+      goto fail_exit;
+   _mesa_append_instruction(&fp->Base, inst);
 
-   assert(ic <= MAX_INST);
-
-
-   fp->Base.Instructions = _mesa_alloc_instructions(ic);
-   if (!fp->Base.Instructions) {
-      _mesa_error(ctx, GL_OUT_OF_MEMORY,
-                  "generating pixel transfer program");
-      _mesa_free_parameter_list(params);
-      return NULL;
-   }
-
-   _mesa_copy_instructions(fp->Base.Instructions, inst, ic);
-   fp->Base.NumInstructions = ic;
    fp->Base.Parameters = params;
 
 #if 0
@@ -280,6 +270,12 @@ get_pixel_transfer_program(struct gl_context *ctx, const struct state_key *key)
 #endif
 
    return fp;
+
+fail_exit:
+   _mesa_error(ctx, GL_OUT_OF_MEMORY,
+               "generating pixel transfer program");
+   _mesa_free_parameter_list(params);
+   return NULL;
 }
 
 

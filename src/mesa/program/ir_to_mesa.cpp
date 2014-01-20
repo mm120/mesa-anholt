@@ -204,12 +204,11 @@ public:
    ir_to_mesa_instruction *bgn_inst;
 
    /**
-    * Index of the first instruction of the function body in actual
-    * Mesa IR.
+    * First instruction of the function body in actual Mesa IR.
     *
     * Set after convertion from ir_to_mesa_instruction to prog_instruction.
     */
-   int inst;
+   struct prog_instruction *inst;
 
    /** Storage for the return value. */
    src_reg return_reg;
@@ -2273,16 +2272,16 @@ mesa_src_reg_from_ir_src_reg(src_reg reg)
 
 static void
 set_branchtargets(ir_to_mesa_visitor *v,
-		  struct prog_instruction *mesa_instructions,
-		  int num_instructions)
+		  struct simple_node *mesa_instructions)
 {
+   struct simple_node *node;
    int if_count = 0, loop_count = 0;
-   int *if_stack, *loop_stack;
+   struct prog_instruction **if_stack, **loop_stack;
    int if_stack_pos = 0, loop_stack_pos = 0;
-   int i, j;
 
-   for (i = 0; i < num_instructions; i++) {
-      switch (mesa_instructions[i].Opcode) {
+   foreach(node, mesa_instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
+      switch (inst->Opcode) {
       case OPCODE_IF:
 	 if_count++;
 	 break;
@@ -2291,32 +2290,36 @@ set_branchtargets(ir_to_mesa_visitor *v,
 	 break;
       case OPCODE_BRK:
       case OPCODE_CONT:
-	 mesa_instructions[i].BranchTarget = -1;
+	 inst->BranchTarget = NULL;
 	 break;
       default:
 	 break;
       }
    }
 
-   if_stack = rzalloc_array(v->mem_ctx, int, if_count);
-   loop_stack = rzalloc_array(v->mem_ctx, int, loop_count);
+   if_stack = rzalloc_array(v->mem_ctx, struct prog_instruction *, if_count);
+   loop_stack = rzalloc_array(v->mem_ctx, struct prog_instruction *,
+                              loop_count);
 
-   for (i = 0; i < num_instructions; i++) {
-      switch (mesa_instructions[i].Opcode) {
+   foreach(node, mesa_instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
+      struct simple_node *node2;
+
+      switch (inst->Opcode) {
       case OPCODE_IF:
-	 if_stack[if_stack_pos] = i;
+	 if_stack[if_stack_pos] = inst;
 	 if_stack_pos++;
 	 break;
       case OPCODE_ELSE:
-	 mesa_instructions[if_stack[if_stack_pos - 1]].BranchTarget = i;
-	 if_stack[if_stack_pos - 1] = i;
+	 if_stack[if_stack_pos - 1]->BranchTarget = inst;
+	 if_stack[if_stack_pos - 1] = inst;
 	 break;
       case OPCODE_ENDIF:
-	 mesa_instructions[if_stack[if_stack_pos - 1]].BranchTarget = i;
+	 if_stack[if_stack_pos - 1]->BranchTarget = inst;
 	 if_stack_pos--;
 	 break;
       case OPCODE_BGNLOOP:
-	 loop_stack[loop_stack_pos] = i;
+	 loop_stack[loop_stack_pos] = inst;
 	 loop_stack_pos++;
 	 break;
       case OPCODE_ENDLOOP:
@@ -2325,24 +2328,27 @@ set_branchtargets(ir_to_mesa_visitor *v,
 	  * already had a BranchTarget assigned) to point to the end
 	  * of the loop.
 	  */
-	 for (j = loop_stack[loop_stack_pos]; j < i; j++) {
-	    if (mesa_instructions[j].Opcode == OPCODE_BRK ||
-		mesa_instructions[j].Opcode == OPCODE_CONT) {
-	       if (mesa_instructions[j].BranchTarget == -1) {
-		  mesa_instructions[j].BranchTarget = i;
+	 for (node2 = loop_stack[loop_stack_pos]->link.next;
+              node2 != node;
+              node2 = node2->next) {
+            struct prog_instruction *brkcont = (struct prog_instruction *)node2;
+	    if (brkcont->Opcode == OPCODE_BRK ||
+		brkcont->Opcode == OPCODE_CONT) {
+	       if (!brkcont->BranchTarget) {
+		  brkcont->BranchTarget = inst;
 	       }
 	    }
 	 }
 	 /* The loop ends point at each other. */
-	 mesa_instructions[i].BranchTarget = loop_stack[loop_stack_pos];
-	 mesa_instructions[loop_stack[loop_stack_pos]].BranchTarget = i;
+	 inst->BranchTarget = loop_stack[loop_stack_pos];
+	 loop_stack[loop_stack_pos]->BranchTarget = inst;
 	 break;
       case OPCODE_CAL:
 	 foreach_list(n, &v->function_signatures) {
 	    function_entry *entry = (function_entry *) n;
 
-	    if (entry->sig_id == mesa_instructions[i].BranchTarget) {
-	       mesa_instructions[i].BranchTarget = entry->inst;
+	    if (entry->sig_id == (intptr_t)inst->BranchTarget) {
+	       inst->BranchTarget = entry->inst;
 	       break;
 	    }
 	 }
@@ -2354,16 +2360,16 @@ set_branchtargets(ir_to_mesa_visitor *v,
 }
 
 static void
-print_program(struct prog_instruction *mesa_instructions,
-	      ir_instruction **mesa_instruction_annotation,
-	      int num_instructions)
+print_program(struct gl_program *prog,
+	      ir_instruction **mesa_instruction_annotation)
 {
+   struct simple_node *node;
    ir_instruction *last_ir = NULL;
-   int i;
+   int i = 0;
    int indent = 0;
 
-   for (i = 0; i < num_instructions; i++) {
-      struct prog_instruction *mesa_inst = mesa_instructions + i;
+   foreach(node, &prog->Instructions) {
+      struct prog_instruction *mesa_inst = (struct prog_instruction *)node;
       ir_instruction *ir = mesa_instruction_annotation[i];
 
       fprintf(stderr, "%3d: ", i);
@@ -2382,7 +2388,8 @@ print_program(struct prog_instruction *mesa_instructions,
       }
 
       indent = _mesa_fprint_instruction_opt(stderr, mesa_inst, indent,
-					    PROG_PRINT_DEBUG, NULL);
+					    PROG_PRINT_DEBUG, prog);
+      i++;
    }
 }
 
@@ -2796,7 +2803,8 @@ get_mesa_program(struct gl_context *ctx,
 		 struct gl_shader *shader)
 {
    ir_to_mesa_visitor v;
-   struct prog_instruction *mesa_instructions, *mesa_inst;
+   struct simple_node mesa_instructions;
+   struct prog_instruction *mesa_inst;
    ir_instruction **mesa_instruction_annotation;
    int i;
    struct gl_program *prog;
@@ -2830,9 +2838,6 @@ get_mesa_program(struct gl_context *ctx,
       num_instructions++;
    }
 
-   mesa_instructions =
-      (struct prog_instruction *)calloc(num_instructions,
-					sizeof(*mesa_instructions));
    mesa_instruction_annotation = ralloc_array(v.mem_ctx, ir_instruction *,
 					      num_instructions);
 
@@ -2840,11 +2845,13 @@ get_mesa_program(struct gl_context *ctx,
 
    /* Convert ir_mesa_instructions into prog_instructions.
     */
-   mesa_inst = mesa_instructions;
    i = 0;
    foreach_list(node, &v.instructions) {
       const ir_to_mesa_instruction *inst = (ir_to_mesa_instruction *) node;
 
+      mesa_inst = (struct prog_instruction *)calloc(1, sizeof(*mesa_inst));
+      if (!mesa_inst)
+         goto fail_exit;
       mesa_inst->Opcode = inst->op;
       mesa_inst->CondUpdate = inst->cond_update;
       if (inst->saturate)
@@ -2861,6 +2868,7 @@ get_mesa_program(struct gl_context *ctx,
       mesa_inst->TexSrcTarget = inst->tex_target;
       mesa_inst->TexShadow = inst->tex_shadow;
       mesa_instruction_annotation[i] = inst->ir;
+      _mesa_append_instruction(prog, mesa_inst);
 
       /* Set IndirectRegisterFiles. */
       if (mesa_inst->DstReg.RelAddr)
@@ -2903,7 +2911,6 @@ get_mesa_program(struct gl_context *ctx,
 	 break;
       }
 
-      mesa_inst++;
       i++;
 
       if (!shader_program->LinkStatus)
@@ -2914,7 +2921,7 @@ get_mesa_program(struct gl_context *ctx,
       goto fail_exit;
    }
 
-   set_branchtargets(&v, mesa_instructions, num_instructions);
+   set_branchtargets(&v, &prog->Instructions);
 
    if (ctx->_Shader->Flags & GLSL_DUMP) {
       fprintf(stderr, "\n");
@@ -2925,18 +2932,9 @@ get_mesa_program(struct gl_context *ctx,
       fprintf(stderr, "\n");
       fprintf(stderr, "Mesa IR for linked %s program %d:\n", target_string,
 	      shader_program->Name);
-      print_program(mesa_instructions, mesa_instruction_annotation,
-		    num_instructions);
+      print_program(prog, mesa_instruction_annotation);
       fflush(stderr);
    }
-
-   prog->Instructions = mesa_instructions;
-   prog->NumInstructions = num_instructions;
-
-   /* Setting this to NULL prevents a possible double free in the fail_exit
-    * path (far below).
-    */
-   mesa_instructions = NULL;
 
    do_set_program_inouts(shader->ir, prog, shader->Stage);
 
@@ -2976,7 +2974,6 @@ get_mesa_program(struct gl_context *ctx,
    return prog;
 
 fail_exit:
-   free(mesa_instructions);
    _mesa_reference_program(ctx, &shader->Program, NULL);
    return NULL;
 }

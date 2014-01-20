@@ -69,7 +69,12 @@ struct gl_program_machine
 
    const GLubyte *Samplers;  /** Array mapping sampler var to tex unit */
 
-   GLuint CallStack[MAX_PROGRAM_CALL_DEPTH]; /**< For CAL/RET instructions */
+
+   /**
+    * For a series of CAL/RET instructions, this stack holds a pointers to the
+    * CAL instructions.
+    */
+   struct simple_node *CallStack[MAX_PROGRAM_CALL_DEPTH];
    GLuint StackDepth; /**< Index/ptr to top of CallStack[] */
 
    /** Texture fetch functions */

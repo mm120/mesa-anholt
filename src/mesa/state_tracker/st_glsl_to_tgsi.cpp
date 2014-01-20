@@ -5307,7 +5307,6 @@ get_mesa_program(struct gl_context *ctx,
       fflush(stdout);
    }
 
-   prog->Instructions = NULL;
    prog->NumInstructions = 0;
 
    do_set_program_inouts(shader->ir, prog, shader->Stage);

@@ -130,8 +130,9 @@ fs_visitor::emit_fragment_program_code()
    fs_reg one = fs_reg(this, glsl_type::float_type);
    emit(MOV(one, fs_reg(1.0f)));
 
-   for (unsigned int insn = 0; insn < prog->NumInstructions; insn++) {
-      const struct prog_instruction *fpi = &prog->Instructions[insn];
+   struct simple_node *node;
+   foreach(node, &prog->Instructions) {
+      struct prog_instruction *fpi = (struct prog_instruction *)node;
       base_ir = fpi;
 
       //_mesa_print_instruction(fpi);

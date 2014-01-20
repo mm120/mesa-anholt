@@ -63,6 +63,9 @@ _mesa_update_default_objects_program(struct gl_context *ctx);
 extern void
 _mesa_set_program_error(struct gl_context *ctx, GLint pos, const char *string);
 
+extern void
+_mesa_append_instruction(struct gl_program *prog, struct prog_instruction *inst);
+
 extern const GLubyte *
 _mesa_find_line_column(const GLubyte *string, const GLubyte *pos,
                        GLint *line, GLint *col);
@@ -161,13 +164,6 @@ _mesa_clone_fragment_program(struct gl_context *ctx,
 {
    return (struct gl_fragment_program *) _mesa_clone_program(ctx, &prog->Base);
 }
-
-
-extern  GLboolean
-_mesa_insert_instructions(struct gl_program *prog, GLuint start, GLuint count);
-
-extern  GLboolean
-_mesa_delete_instructions(struct gl_program *prog, GLuint start, GLuint count);
 
 extern struct gl_program *
 _mesa_combine_programs(struct gl_context *ctx,

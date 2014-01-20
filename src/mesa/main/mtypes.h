@@ -2088,7 +2088,7 @@ struct gl_program
    GLenum Target;    /**< GL_VERTEX/FRAGMENT_PROGRAM_ARB, GL_GEOMETRY_PROGRAM_NV */
    GLenum Format;    /**< String encoding format */
 
-   struct prog_instruction *Instructions;
+   struct simple_node Instructions;
 
    GLbitfield64 InputsRead;     /**< Bitmask of which input regs are read */
    GLbitfield64 OutputsWritten; /**< Bitmask of which output regs are written */

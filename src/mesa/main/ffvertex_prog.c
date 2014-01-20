@@ -302,7 +302,6 @@ struct ureg {
 struct tnl_program {
    const struct state_key *state;
    struct gl_vertex_program *program;
-   GLint max_inst;  /** number of instructions allocated for program */
    GLboolean mvp_with_dp4;
 
    GLuint temp_in_use;
@@ -575,44 +574,21 @@ static void emit_op3fn(struct tnl_program *p,
 		       const char *fn,
 		       GLuint line)
 {
-   GLuint nr;
    struct prog_instruction *inst;
 
-   assert((GLint) p->program->Base.NumInstructions <= p->max_inst);
+   inst = _mesa_alloc_instruction(op);
+   if (!inst)
+      return;
 
-   if (p->program->Base.NumInstructions == p->max_inst) {
-      /* need to extend the program's instruction array */
-      struct prog_instruction *newInst;
-
-      /* double the size */
-      p->max_inst *= 2;
-
-      newInst = _mesa_alloc_instructions(p->max_inst);
-      if (!newInst) {
-         _mesa_error(NULL, GL_OUT_OF_MEMORY, "vertex program build");
-         return;
-      }
-
-      _mesa_copy_instructions(newInst,
-                              p->program->Base.Instructions,
-                              p->program->Base.NumInstructions);
-
-      _mesa_free_instructions(p->program->Base.Instructions,
-                              p->program->Base.NumInstructions);
-
-      p->program->Base.Instructions = newInst;
-   }
-
-   nr = p->program->Base.NumInstructions++;
-
-   inst = &p->program->Base.Instructions[nr];
-   inst->Opcode = (enum prog_opcode) op;
+   p->program->Base.NumInstructions++;
 
    emit_arg( &inst->SrcReg[0], src0 );
    emit_arg( &inst->SrcReg[1], src1 );
    emit_arg( &inst->SrcReg[2], src2 );
 
    emit_dst( &inst->DstReg, dest, mask );
+
+   insert_at_tail(&p->program->Base.Instructions, &inst->link);
 
    debug_insn(inst, fn, line);
 }
@@ -1629,11 +1605,7 @@ create_new_program( const struct state_key *key,
    else
       p.temp_reserved = ~((1<<max_temps)-1);
 
-   /* Start by allocating 32 instructions.
-    * If we need more, we'll grow the instruction array as needed.
-    */
-   p.max_inst = 32;
-   p.program->Base.Instructions = _mesa_alloc_instructions(p.max_inst);
+   make_empty_list(&p.program->Base.Instructions);
    p.program->Base.String = NULL;
    p.program->Base.NumInstructions =
    p.program->Base.NumTemporaries =

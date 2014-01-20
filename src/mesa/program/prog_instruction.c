@@ -29,107 +29,92 @@
 #include "main/mtypes.h"
 #include "prog_instruction.h"
 
+struct prog_instruction *
+_mesa_alloc_instruction(gl_inst_opcode opcode)
+{
+   struct prog_instruction *inst = calloc(1, sizeof(struct prog_instruction));
+
+   if (!inst)
+      return NULL;
+
+   inst->Opcode = opcode;
+   inst->SrcReg[0].File = PROGRAM_UNDEFINED;
+   inst->SrcReg[0].Swizzle = SWIZZLE_NOOP;
+   inst->SrcReg[1].File = PROGRAM_UNDEFINED;
+   inst->SrcReg[1].Swizzle = SWIZZLE_NOOP;
+   inst->SrcReg[2].File = PROGRAM_UNDEFINED;
+   inst->SrcReg[2].Swizzle = SWIZZLE_NOOP;
+
+   inst->DstReg.File = PROGRAM_UNDEFINED;
+   inst->DstReg.WriteMask = WRITEMASK_XYZW;
+   inst->DstReg.CondMask = COND_TR;
+   inst->DstReg.CondSwizzle = SWIZZLE_NOOP;
+
+   inst->SaturateMode = SATURATE_OFF;
+   inst->Precision = FLOAT32;
+
+   return inst;
+}
+
 
 /**
- * Initialize program instruction fields to defaults.
- * \param inst  first instruction to initialize
- * \param count  number of instructions to initialize
+ * Duplicate a list of program instructions to the end of an existing list.
+ */
+bool
+_mesa_copy_instructions(struct simple_node *dst, const struct simple_node *src)
+{
+   struct simple_node *node;
+
+   foreach(node, src) {
+      struct prog_instruction *src_inst = (struct prog_instruction *)node;
+      struct prog_instruction *dst_inst;
+
+      /* We don't have fixup code for this, but no callers currently ask us to
+       * copy code that branches.
+       */
+      assert(!src_inst->BranchTarget);
+
+      dst_inst = _mesa_alloc_instruction(src_inst->Opcode);
+      if (!dst_inst)
+         return false;
+
+      *dst_inst = *src_inst;
+      if (dst_inst->Comment)
+         dst_inst->Comment = _mesa_strdup(dst_inst->Comment);
+
+      insert_at_tail(dst, &dst_inst->link);
+   }
+
+   return true;
+}
+
+/**
+ * Free a single instruction.
+ *
+ * Our prog_instructions aren't contained in any pool or anything, so memory
+ * management is totally manual.
  */
 void
-_mesa_init_instructions(struct prog_instruction *inst, GLuint count)
+_mesa_free_instruction(struct prog_instruction *inst)
 {
-   GLuint i;
-
-   memset(inst, 0, count * sizeof(struct prog_instruction));
-
-   for (i = 0; i < count; i++) {
-      inst[i].SrcReg[0].File = PROGRAM_UNDEFINED;
-      inst[i].SrcReg[0].Swizzle = SWIZZLE_NOOP;
-      inst[i].SrcReg[1].File = PROGRAM_UNDEFINED;
-      inst[i].SrcReg[1].Swizzle = SWIZZLE_NOOP;
-      inst[i].SrcReg[2].File = PROGRAM_UNDEFINED;
-      inst[i].SrcReg[2].Swizzle = SWIZZLE_NOOP;
-
-      inst[i].DstReg.File = PROGRAM_UNDEFINED;
-      inst[i].DstReg.WriteMask = WRITEMASK_XYZW;
-      inst[i].DstReg.CondMask = COND_TR;
-      inst[i].DstReg.CondSwizzle = SWIZZLE_NOOP;
-
-      inst[i].SaturateMode = SATURATE_OFF;
-      inst[i].Precision = FLOAT32;
-   }
+   free((char *)inst->Comment);
+   free(inst);
 }
-
-
-/**
- * Allocate an array of program instructions.
- * \param numInst  number of instructions
- * \return pointer to instruction memory
- */
-struct prog_instruction *
-_mesa_alloc_instructions(GLuint numInst)
-{
-   return
-      calloc(1, numInst * sizeof(struct prog_instruction));
-}
-
-
-/**
- * Reallocate memory storing an array of program instructions.
- * This is used when we need to append additional instructions onto an
- * program.
- * \param oldInst  pointer to first of old/src instructions
- * \param numOldInst  number of instructions at <oldInst>
- * \param numNewInst  desired size of new instruction array.
- * \return  pointer to start of new instruction array.
- */
-struct prog_instruction *
-_mesa_realloc_instructions(struct prog_instruction *oldInst,
-                           GLuint numOldInst, GLuint numNewInst)
-{
-   struct prog_instruction *newInst;
-
-   newInst = (struct prog_instruction *)
-      _mesa_realloc(oldInst,
-                    numOldInst * sizeof(struct prog_instruction),
-                    numNewInst * sizeof(struct prog_instruction));
-
-   return newInst;
-}
-
-
-/**
- * Copy an array of program instructions.
- * \param dest  pointer to destination.
- * \param src  pointer to source.
- * \param n  number of instructions to copy.
- * \return pointer to destination.
- */
-struct prog_instruction *
-_mesa_copy_instructions(struct prog_instruction *dest,
-                        const struct prog_instruction *src, GLuint n)
-{
-   GLuint i;
-   memcpy(dest, src, n * sizeof(struct prog_instruction));
-   for (i = 0; i < n; i++) {
-      if (src[i].Comment)
-         dest[i].Comment = _mesa_strdup(src[i].Comment);
-   }
-   return dest;
-}
-
 
 /**
  * Free an array of instructions
  */
 void
-_mesa_free_instructions(struct prog_instruction *inst, GLuint count)
+_mesa_free_instructions(struct simple_node *list)
 {
-   GLuint i;
-   for (i = 0; i < count; i++) {
-      free((char *)inst[i].Comment);
+   struct simple_node *node, *temp_node;
+
+   foreach_s(node, temp_node, list) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
+      remove_from_list(&inst->link);
+      _mesa_free_instruction(inst);
    }
-   free(inst);
+   make_empty_list(list);
 }
 
 
@@ -332,3 +317,25 @@ _mesa_opcode_string(gl_inst_opcode opcode)
    }
 }
 
+unsigned
+_mesa_count_between_instructions(const struct prog_instruction *a,
+                                 const struct prog_instruction *b)
+{
+   const struct simple_node *node;
+   int count = 0;
+
+   for (node = &a->link; node != &b->link; node = node->next)
+      count++;
+
+   return count;
+}
+
+unsigned
+_mesa_count_from_program_start(const struct gl_program *prog,
+                               const struct prog_instruction *inst)
+{
+   struct prog_instruction *first =
+      (struct prog_instruction *)first_elem(&prog->Instructions);
+
+   return _mesa_count_between_instructions(first, inst);
+}

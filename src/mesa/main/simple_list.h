@@ -120,6 +120,15 @@ do {						\
    (sentinal)->prev = sentinal;			\
 } while (0)
 
+#define move_list(to, from)                     \
+   do {                                         \
+      assert((from)->next->prev == from);       \
+      assert((from)->prev->next == from);       \
+      *(to) = *(from);                          \
+      (to)->next->prev = to;                    \
+      (to)->prev->next = to;                    \
+} while (0)                                     \
+
 /**
  * Get list first element.
  *
@@ -186,6 +195,9 @@ do {						\
  */
 #define foreach(ptr, list)     \
         for( ptr=(list)->next ;  ptr!=list ;  ptr=(ptr)->next )
+
+#define foreach_rev(ptr, list)     \
+        for( ptr=(list)->prev ;  ptr!=list ;  ptr=(ptr)->prev )
 
 /**
  * Walk through the elements of a list.

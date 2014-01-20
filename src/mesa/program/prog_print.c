@@ -632,6 +632,11 @@ _mesa_print_alu_instruction(const struct prog_instruction *inst,
 				numRegs, PROG_PRINT_DEBUG, NULL);
 }
 
+static unsigned
+branch_index(const struct gl_program *prog, const struct prog_instruction *inst)
+{
+   return _mesa_count_from_program_start(prog, inst->BranchTarget);
+}
 
 /**
  * Print a single vertex/fragment program instruction.
@@ -741,20 +746,20 @@ _mesa_fprint_instruction_opt(FILE *f,
 		 _mesa_swizzle_string(inst->DstReg.CondSwizzle,
 				      0, GL_FALSE));
       }
-      fprintf(f, " # (if false, goto %d)", inst->BranchTarget);
+      fprintf(f, " # (if false, goto %d)", branch_index(prog, inst));
       fprint_comment(f, inst);
       return indent + 3;
    case OPCODE_ELSE:
-      fprintf(f, "ELSE; # (goto %d)\n", inst->BranchTarget);
+      fprintf(f, "ELSE; # (goto %d)\n", branch_index(prog, inst));
       return indent + 3;
    case OPCODE_ENDIF:
       fprintf(f, "ENDIF;\n");
       break;
    case OPCODE_BGNLOOP:
-      fprintf(f, "BGNLOOP; # (end at %d)\n", inst->BranchTarget);
+      fprintf(f, "BGNLOOP; # (end at %d)\n", branch_index(prog, inst));
       return indent + 3;
    case OPCODE_ENDLOOP:
-      fprintf(f, "ENDLOOP; # (goto %d)\n", inst->BranchTarget);
+      fprintf(f, "ENDLOOP; # (goto %d)\n", branch_index(prog, inst));
       break;
    case OPCODE_BRK:
    case OPCODE_CONT:
@@ -762,7 +767,7 @@ _mesa_fprint_instruction_opt(FILE *f,
 	      _mesa_opcode_string(inst->Opcode),
 	      _mesa_condcode_string(inst->DstReg.CondMask),
 	      _mesa_swizzle_string(inst->DstReg.CondSwizzle, 0, GL_FALSE),
-	      inst->BranchTarget);
+	      branch_index(prog, inst));
       fprint_comment(f, inst);
       break;
 
@@ -777,7 +782,7 @@ _mesa_fprint_instruction_opt(FILE *f,
       }
       break;
    case OPCODE_CAL:
-      fprintf(f, "CAL %u", inst->BranchTarget);
+      fprintf(f, "CAL %u", branch_index(prog, inst));
       fprint_comment(f, inst);
       break;
    case OPCODE_RET:
@@ -850,6 +855,7 @@ _mesa_fprint_program_opt(FILE *f,
                          GLboolean lineNumbers)
 {
    GLuint i, indent = 0;
+   struct simple_node *node;
 
    switch (prog->Target) {
    case GL_VERTEX_PROGRAM_ARB:
@@ -868,11 +874,14 @@ _mesa_fprint_program_opt(FILE *f,
       fprintf(f, "# Geometry Shader\n");
    }
 
-   for (i = 0; i < prog->NumInstructions; i++) {
+   i = 0;
+   foreach(node, &prog->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
       if (lineNumbers)
          fprintf(f, "%3d: ", i);
-      indent = _mesa_fprint_instruction_opt(f, prog->Instructions + i,
+      indent = _mesa_fprint_instruction_opt(f, inst,
                                            indent, mode, prog);
+      i++;
    }
 }
 

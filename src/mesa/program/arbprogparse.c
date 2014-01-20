@@ -121,8 +121,8 @@ _mesa_parse_arb_fragment_program(struct gl_context* ctx, GLenum target,
    program->UsesKill            = state.fragment.UsesKill;
    program->UsesDFdy            = state.fragment.UsesDFdy;
 
-   free(program->Base.Instructions);
-   program->Base.Instructions = prog.Instructions;
+   _mesa_free_instructions(&program->Base.Instructions);
+   move_list(&program->Base.Instructions, &prog.Instructions);
 
    if (program->Base.Parameters)
       _mesa_free_parameter_list(program->Base.Parameters);
@@ -199,8 +199,8 @@ _mesa_parse_arb_vertex_program(struct gl_context *ctx, GLenum target,
    program->IsPositionInvariant = (state.option.PositionInvariant)
       ? GL_TRUE : GL_FALSE;
 
-   free(program->Base.Instructions);
-   program->Base.Instructions = prog.Instructions;
+   _mesa_free_instructions(&program->Base.Instructions);
+   move_list(&program->Base.Instructions, &prog.Instructions);
 
    if (program->Base.Parameters)
       _mesa_free_parameter_list(program->Base.Parameters);

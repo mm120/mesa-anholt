@@ -52,13 +52,13 @@ dump_assembly(void *assembly, int num_annotations, struct annotation *annotation
          last_annotation_ir = annotation[i].ir;
          if (last_annotation_ir) {
             fprintf(stderr, "   ");
-            if (!prog->Instructions)
+            if (is_empty_list(&prog->Instructions))
                fprint_ir(stderr, annotation[i].ir);
             else {
                const struct prog_instruction *pi =
                   (const struct prog_instruction *)annotation[i].ir;
                fprintf(stderr, "%d: ",
-                       (int)(pi - prog->Instructions));
+                       _mesa_count_from_program_start(prog, pi));
                _mesa_fprint_instruction_opt(stderr,
                                             pi,
                                             0, PROG_PRINT_DEBUG, NULL);

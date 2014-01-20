@@ -240,6 +240,7 @@ _mesa_init_program_struct( struct gl_context *ctx, struct gl_program *prog,
       prog->Target = target;
       prog->RefCount = 1;
       prog->Format = GL_PROGRAM_FORMAT_ASCII_ARB;
+      make_empty_list(&prog->Instructions);
 
       /* default mapping from samplers to texture units */
       for (i = 0; i < MAX_SAMPLERS; i++)
@@ -371,9 +372,7 @@ _mesa_delete_program(struct gl_context *ctx, struct gl_program *prog)
    free(prog->String);
    free(prog->LocalParams);
 
-   if (prog->Instructions) {
-      _mesa_free_instructions(prog->Instructions, prog->NumInstructions);
-   }
+   _mesa_free_instructions(&prog->Instructions);
    if (prog->Parameters) {
       _mesa_free_parameter_list(prog->Parameters);
    }
@@ -483,13 +482,11 @@ _mesa_clone_program(struct gl_context *ctx, const struct gl_program *prog)
 
    clone->String = (GLubyte *) _mesa_strdup((char *) prog->String);
    clone->Format = prog->Format;
-   clone->Instructions = _mesa_alloc_instructions(prog->NumInstructions);
-   if (!clone->Instructions) {
+   if (!_mesa_copy_instructions(&clone->Instructions, &prog->Instructions)) {
       _mesa_reference_program(ctx, &clone, NULL);
       return NULL;
    }
-   _mesa_copy_instructions(clone->Instructions, prog->Instructions,
-                           prog->NumInstructions);
+
    clone->InputsRead = prog->InputsRead;
    clone->OutputsWritten = prog->OutputsWritten;
    clone->SamplersUsed = prog->SamplersUsed;
@@ -563,124 +560,32 @@ _mesa_clone_program(struct gl_context *ctx, const struct gl_program *prog)
 
 
 /**
- * Insert 'count' NOP instructions at 'start' in the given program.
- * Adjust branch targets accordingly.
- */
-GLboolean
-_mesa_insert_instructions(struct gl_program *prog, GLuint start, GLuint count)
-{
-   const GLuint origLen = prog->NumInstructions;
-   const GLuint newLen = origLen + count;
-   struct prog_instruction *newInst;
-   GLuint i;
-
-   /* adjust branches */
-   for (i = 0; i < prog->NumInstructions; i++) {
-      struct prog_instruction *inst = prog->Instructions + i;
-      if (inst->BranchTarget > 0) {
-         if ((GLuint)inst->BranchTarget >= start) {
-            inst->BranchTarget += count;
-         }
-      }
-   }
-
-   /* Alloc storage for new instructions */
-   newInst = _mesa_alloc_instructions(newLen);
-   if (!newInst) {
-      return GL_FALSE;
-   }
-
-   /* Copy 'start' instructions into new instruction buffer */
-   _mesa_copy_instructions(newInst, prog->Instructions, start);
-
-   /* init the new instructions */
-   _mesa_init_instructions(newInst + start, count);
-
-   /* Copy the remaining/tail instructions to new inst buffer */
-   _mesa_copy_instructions(newInst + start + count,
-                           prog->Instructions + start,
-                           origLen - start);
-
-   /* free old instructions */
-   _mesa_free_instructions(prog->Instructions, origLen);
-
-   /* install new instructions */
-   prog->Instructions = newInst;
-   prog->NumInstructions = newLen;
-
-   return GL_TRUE;
-}
-
-/**
- * Delete 'count' instructions at 'start' in the given program.
- * Adjust branch targets accordingly.
- */
-GLboolean
-_mesa_delete_instructions(struct gl_program *prog, GLuint start, GLuint count)
-{
-   const GLuint origLen = prog->NumInstructions;
-   const GLuint newLen = origLen - count;
-   struct prog_instruction *newInst;
-   GLuint i;
-
-   /* adjust branches */
-   for (i = 0; i < prog->NumInstructions; i++) {
-      struct prog_instruction *inst = prog->Instructions + i;
-      if (inst->BranchTarget > 0) {
-         if (inst->BranchTarget > (GLint) start) {
-            inst->BranchTarget -= count;
-         }
-      }
-   }
-
-   /* Alloc storage for new instructions */
-   newInst = _mesa_alloc_instructions(newLen);
-   if (!newInst) {
-      return GL_FALSE;
-   }
-
-   /* Copy 'start' instructions into new instruction buffer */
-   _mesa_copy_instructions(newInst, prog->Instructions, start);
-
-   /* Copy the remaining/tail instructions to new inst buffer */
-   _mesa_copy_instructions(newInst + start,
-                           prog->Instructions + start + count,
-                           newLen - start);
-
-   /* free old instructions */
-   _mesa_free_instructions(prog->Instructions, origLen);
-
-   /* install new instructions */
-   prog->Instructions = newInst;
-   prog->NumInstructions = newLen;
-
-   return GL_TRUE;
-}
-
-
-/**
  * Search instructions for registers that match (oldFile, oldIndex),
  * replacing them with (newFile, newIndex).
  */
 static void
-replace_registers(struct prog_instruction *inst, GLuint numInst,
+replace_registers(struct simple_node *list,
                   GLuint oldFile, GLuint oldIndex,
                   GLuint newFile, GLuint newIndex)
 {
-   GLuint i, j;
-   for (i = 0; i < numInst; i++) {
+   GLuint i;
+   struct simple_node *node;
+
+   foreach(node, list) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
+
       /* src regs */
-      for (j = 0; j < _mesa_num_inst_src_regs(inst[i].Opcode); j++) {
-         if (inst[i].SrcReg[j].File == oldFile &&
-             inst[i].SrcReg[j].Index == oldIndex) {
-            inst[i].SrcReg[j].File = newFile;
-            inst[i].SrcReg[j].Index = newIndex;
+      for (i = 0; i < _mesa_num_inst_src_regs(inst->Opcode); i++) {
+         if (inst->SrcReg[i].File == oldFile &&
+             inst->SrcReg[i].Index == oldIndex) {
+            inst->SrcReg[i].File = newFile;
+            inst->SrcReg[i].Index = newIndex;
          }
       }
       /* dst reg */
-      if (inst[i].DstReg.File == oldFile && inst[i].DstReg.Index == oldIndex) {
-         inst[i].DstReg.File = newFile;
-         inst[i].DstReg.Index = newIndex;
+      if (inst->DstReg.File == oldFile && inst->DstReg.Index == oldIndex) {
+         inst->DstReg.File = newFile;
+         inst->DstReg.Index = newIndex;
       }
    }
 }
@@ -692,17 +597,20 @@ replace_registers(struct prog_instruction *inst, GLuint numInst,
  * Used when combining programs.
  */
 static void
-adjust_param_indexes(struct prog_instruction *inst, GLuint numInst,
-                     GLuint offset)
+adjust_param_indexes(struct simple_node *list, GLuint offset)
 {
-   GLuint i, j;
-   for (i = 0; i < numInst; i++) {
-      for (j = 0; j < _mesa_num_inst_src_regs(inst[i].Opcode); j++) {
-         GLuint f = inst[i].SrcReg[j].File;
+   GLuint i;
+   struct simple_node *node;
+
+   foreach(node, list) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
+
+      for (i = 0; i < _mesa_num_inst_src_regs(inst->Opcode); i++) {
+         GLuint f = inst->SrcReg->File;
          if (f == PROGRAM_CONSTANT ||
              f == PROGRAM_UNIFORM ||
              f == PROGRAM_STATE_VAR) {
-            inst[i].SrcReg[j].Index += offset;
+            inst->SrcReg->Index += offset;
          }
       }
    }
@@ -718,7 +626,6 @@ _mesa_combine_programs(struct gl_context *ctx,
                        const struct gl_program *progA,
                        const struct gl_program *progB)
 {
-   struct prog_instruction *newInst;
    struct gl_program *newProg;
    const GLuint lenA = progA->NumInstructions - 1; /* omit END instr */
    const GLuint lenB = progB->NumInstructions;
@@ -728,24 +635,18 @@ _mesa_combine_programs(struct gl_context *ctx,
    GLuint firstTemp = 0;
    GLbitfield64 inputsB;
    GLuint i;
+   struct simple_node progA_copy, progB_copy, *node, *node_temp;
 
    ASSERT(progA->Target == progB->Target);
 
-   newInst = _mesa_alloc_instructions(newLength);
-   if (!newInst)
-      return GL_FALSE;
-
-   _mesa_copy_instructions(newInst, progA->Instructions, lenA);
-   _mesa_copy_instructions(newInst + lenA, progB->Instructions, lenB);
-
-   /* adjust branch / instruction addresses for B's instructions */
-   for (i = 0; i < lenB; i++) {
-      newInst[lenA + i].BranchTarget += lenA;
-   }
-
    newProg = ctx->Driver.NewProgram(ctx, progA->Target, 0);
-   newProg->Instructions = newInst;
+   make_empty_list(&newProg->Instructions);
    newProg->NumInstructions = newLength;
+
+   make_empty_list(&progA_copy);
+   make_empty_list(&progB_copy);
+   _mesa_copy_instructions(&progA_copy, &progA->Instructions);
+   _mesa_copy_instructions(&progB_copy, &progB->Instructions);
 
    /* find used temp regs (we may need new temps below) */
    _mesa_find_used_registers(newProg, PROGRAM_TEMPORARY,
@@ -806,11 +707,11 @@ _mesa_combine_programs(struct gl_context *ctx,
          firstTemp = tempReg + 1;
 
          /* replace writes to result.color[0] with tempReg */
-         replace_registers(newInst, lenA,
+         replace_registers(&progA_copy,
                            PROGRAM_OUTPUT, FRAG_RESULT_COLOR,
                            PROGRAM_TEMPORARY, tempReg);
          /* replace reads from the input color with tempReg */
-         replace_registers(newInst + lenA, lenB,
+         replace_registers(&progB_copy,
                            progB_colorFile, progB_colorIndex, /* search for */
                            PROGRAM_TEMPORARY, tempReg  /* replace with */ );
       }
@@ -835,8 +736,16 @@ _mesa_combine_programs(struct gl_context *ctx,
    newProg->Parameters = _mesa_combine_parameter_lists(progA->Parameters,
                                                        progB->Parameters);
 
-   adjust_param_indexes(newInst + lenA, lenB, numParamsA);
+   adjust_param_indexes(&progB_copy, numParamsA);
 
+   move_list(&newProg->Instructions, &progA_copy);
+
+   foreach_s(node, node_temp, &progB_copy) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
+
+      remove_from_list(&inst->link);
+      insert_at_tail(&newProg->Instructions, &inst->link);
+   }
 
    return newProg;
 }
@@ -854,12 +763,13 @@ _mesa_find_used_registers(const struct gl_program *prog,
                           gl_register_file file,
                           GLboolean used[], GLuint usedSize)
 {
-   GLuint i, j;
+   struct simple_node *node;
+   GLuint j;
 
    memset(used, 0, usedSize);
 
-   for (i = 0; i < prog->NumInstructions; i++) {
-      const struct prog_instruction *inst = prog->Instructions + i;
+   foreach(node, &prog->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
       const GLuint n = _mesa_num_inst_src_regs(inst->Opcode);
 
       if (inst->DstReg.File == file) {
@@ -988,16 +898,16 @@ void
 _mesa_postprocess_program(struct gl_context *ctx, struct gl_program *prog)
 {
    static const GLfloat white[4] = { 0.5, 0.5, 0.5, 0.5 };
-   GLuint i;
    GLuint whiteSwizzle;
    GLint whiteIndex = _mesa_add_unnamed_constant(prog->Parameters,
                                                  (gl_constant_value *) white,
                                                  4, &whiteSwizzle);
+   struct simple_node *node;
 
    (void) whiteIndex;
 
-   for (i = 0; i < prog->NumInstructions; i++) {
-      struct prog_instruction *inst = prog->Instructions + i;
+   foreach(node, &prog->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
       const GLuint n = _mesa_num_inst_src_regs(inst->Opcode);
 
       (void) n;
@@ -1076,4 +986,30 @@ _mesa_get_min_invocations_per_fragment(struct gl_context *ctx,
          return 1;
    }
    return 1;
+}
+
+/**
+ * Inserts an instruction at the end of a struct gl_program.
+ *
+ * If there is an OPCODE_END already present, then it inserts the new thing
+ * before OPCODE_END.  If there is no OPCODE_END, then it's just inserted at
+ * the end of the program.
+ */
+void
+_mesa_append_instruction(struct gl_program *prog, struct prog_instruction *inst)
+{
+   struct simple_node *list = &prog->Instructions;
+   struct simple_node *end_node = last_elem(list);
+   struct prog_instruction *end = (struct prog_instruction *)end_node;
+
+   if (!inst)
+      return;
+
+   if (!is_empty_list(list) && end->Opcode == OPCODE_END) {
+      insert_at_tail(&end->link, &inst->link);
+   } else {
+      insert_at_tail(list, &inst->link);
+   }
+
+   prog->NumInstructions++;
 }

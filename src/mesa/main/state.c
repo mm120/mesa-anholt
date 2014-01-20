@@ -69,9 +69,9 @@ update_program_enables(struct gl_context *ctx)
     * GLSL shaders not relevant here.
     */
    ctx->VertexProgram._Enabled = ctx->VertexProgram.Enabled
-      && ctx->VertexProgram.Current->Base.Instructions;
+      && !is_empty_list(&ctx->VertexProgram.Current->Base.Instructions);
    ctx->FragmentProgram._Enabled = ctx->FragmentProgram.Enabled
-      && ctx->FragmentProgram.Current->Base.Instructions;
+      && !is_empty_list(&ctx->FragmentProgram.Current->Base.Instructions);
    ctx->ATIFragmentShader._Enabled = ctx->ATIFragmentShader.Enabled
       && ctx->ATIFragmentShader.Current->Instructions[0];
 }

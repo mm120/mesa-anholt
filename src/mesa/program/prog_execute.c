@@ -572,7 +572,8 @@ _mesa_execute_program(struct gl_context * ctx,
 {
    const GLuint numInst = program->NumInstructions;
    const GLuint maxExec = 65536;
-   GLuint pc, numExec = 0;
+   GLuint numExec = 0;
+   struct simple_node *node;
 
    machine->CurProgram = program;
 
@@ -587,8 +588,8 @@ _mesa_execute_program(struct gl_context * ctx,
       machine->EnvParams = ctx->FragmentProgram.Parameters;
    }
 
-   for (pc = 0; pc < numInst; pc++) {
-      const struct prog_instruction *inst = program->Instructions + pc;
+   foreach(node, &program->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
 
       if (DEBUG_PROG) {
          _mesa_print_instruction(inst);
@@ -635,35 +636,35 @@ _mesa_execute_program(struct gl_context * ctx,
          break;
       case OPCODE_BGNLOOP:
          /* no-op */
-         ASSERT(program->Instructions[inst->BranchTarget].Opcode
-                == OPCODE_ENDLOOP);
+         ASSERT(inst->BranchTarget->Opcode == OPCODE_ENDLOOP);
          break;
       case OPCODE_ENDLOOP:
-         /* subtract 1 here since pc is incremented by for(pc) loop */
-         ASSERT(program->Instructions[inst->BranchTarget].Opcode
-                == OPCODE_BGNLOOP);
-         pc = inst->BranchTarget - 1;   /* go to matching BNGLOOP */
+         /* Jump to instruction preceding the branch target, since the loop
+          * will increment the instruction.
+          */
+         ASSERT(inst->BranchTarget->Opcode == OPCODE_BGNLOOP);
+         node = inst->BranchTarget->link.prev;
          break;
       case OPCODE_BGNSUB:      /* begin subroutine */
          break;
       case OPCODE_ENDSUB:      /* end subroutine */
          break;
       case OPCODE_BRK:         /* break out of loop (conditional) */
-         ASSERT(program->Instructions[inst->BranchTarget].Opcode
-                == OPCODE_ENDLOOP);
+         ASSERT(inst->BranchTarget->Opcode == OPCODE_ENDLOOP);
          if (eval_condition(machine, inst)) {
-            /* break out of loop */
-            /* pc++ at end of for-loop will put us after the ENDLOOP inst */
-            pc = inst->BranchTarget;
+            /* Jump to the ENDLOOP, since the main loop will increment the
+             * instruction.
+             */
+            node = &inst->BranchTarget->link;
          }
          break;
       case OPCODE_CONT:        /* continue loop (conditional) */
-         ASSERT(program->Instructions[inst->BranchTarget].Opcode
-                == OPCODE_ENDLOOP);
+         ASSERT(inst->BranchTarget->Opcode == OPCODE_ENDLOOP);
          if (eval_condition(machine, inst)) {
-            /* continue at ENDLOOP */
-            /* Subtract 1 here since we'll do pc++ at end of for-loop */
-            pc = inst->BranchTarget - 1;
+            /* Jump to instruction preceding the ENDLOOP, since the main loop
+             * will increment the instruction.
+             */
+            node = inst->BranchTarget->link.prev;
          }
          break;
       case OPCODE_CAL:         /* Call subroutine (conditional) */
@@ -672,9 +673,11 @@ _mesa_execute_program(struct gl_context * ctx,
             if (machine->StackDepth >= MAX_PROGRAM_CALL_DEPTH) {
                return GL_TRUE;  /* Per GL_NV_vertex_program2 spec */
             }
-            machine->CallStack[machine->StackDepth++] = pc + 1; /* next inst */
-            /* Subtract 1 here since we'll do pc++ at end of for-loop */
-            pc = inst->BranchTarget - 1;
+            machine->CallStack[machine->StackDepth++] = inst->link.next; /* next inst */
+            /* Jump to instruction preceding the branch target, since the main
+             * loop will increment the instruction.
+             */
+            node = inst->BranchTarget->link.prev;
          }
          break;
       case OPCODE_CMP:
@@ -847,10 +850,8 @@ _mesa_execute_program(struct gl_context * ctx,
       case OPCODE_IF:
          {
             GLboolean cond;
-            ASSERT(program->Instructions[inst->BranchTarget].Opcode
-                   == OPCODE_ELSE ||
-                   program->Instructions[inst->BranchTarget].Opcode
-                   == OPCODE_ENDIF);
+            ASSERT(inst->BranchTarget->Opcode == OPCODE_ELSE ||
+                   inst->BranchTarget->Opcode == OPCODE_ENDIF);
             /* eval condition */
             if (inst->SrcReg[0].File != PROGRAM_UNDEFINED) {
                GLfloat a[4];
@@ -868,18 +869,17 @@ _mesa_execute_program(struct gl_context * ctx,
                /* do if-clause (just continue execution) */
             }
             else {
-               /* go to the instruction after ELSE or ENDIF */
-               assert(inst->BranchTarget >= 0);
-               pc = inst->BranchTarget;
+               /* Jump to the instruction after the ELSE or ENDIF (the main loop
+                * will increment the instruction).
+                */
+               node = &inst->BranchTarget->link;
             }
          }
          break;
       case OPCODE_ELSE:
          /* goto ENDIF */
-         ASSERT(program->Instructions[inst->BranchTarget].Opcode
-                == OPCODE_ENDIF);
-         assert(inst->BranchTarget >= 0);
-         pc = inst->BranchTarget;
+         ASSERT(inst->BranchTarget->Opcode == OPCODE_ENDIF);
+         node = inst->BranchTarget;
          break;
       case OPCODE_ENDIF:
          /* nothing */
@@ -1225,8 +1225,10 @@ _mesa_execute_program(struct gl_context * ctx,
             if (machine->StackDepth == 0) {
                return GL_TRUE;  /* Per GL_NV_vertex_program2 spec */
             }
-            /* subtract one because of pc++ in the for loop */
-            pc = machine->CallStack[--machine->StackDepth] - 1;
+            /* The CallStack holds the address of the CAL, so the foreach will
+             * go to the instruction after the CAL.
+             */
+            node = machine->CallStack[--machine->StackDepth];
          }
          break;
       case OPCODE_RFL:         /* reflection vector */
@@ -1672,7 +1674,6 @@ _mesa_execute_program(struct gl_context * ctx,
 	 }
          return GL_TRUE;
       }
-
    } /* for pc */
 
    return GL_TRUE;

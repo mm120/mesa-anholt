@@ -44,6 +44,8 @@
 #include "util/u_debug.h"
 #include "util/u_math.h"
 #include "util/u_memory.h"
+#include "main/hash_table.h"
+#include "ralloc.h"
 
 
 #define PROGRAM_ANY_CONST ((1 << PROGRAM_STATE_VAR) |    \
@@ -52,7 +54,7 @@
 
 
 struct label {
-   unsigned branch_target;
+   struct prog_instruction *branch_target;
    unsigned token;
 };
 
@@ -82,13 +84,10 @@ struct st_translate {
    unsigned labels_size;
    unsigned labels_count;
 
-   /* Keep a record of the tgsi instruction number that each mesa
-    * instruction starts at, will be used to fix up labels after
-    * translation.
+   /* Maps from a struct prog_instruction * to the index of the generated TGSI
+    * instruction, used to fix up branch targets.
     */
-   unsigned *insn;
-   unsigned insn_size;
-   unsigned insn_count;
+   struct hash_table *insn_map;
 
    unsigned procType;  /**< TGSI_PROCESSOR_VERTEX/FRAGMENT */
 
@@ -111,7 +110,7 @@ static unsigned mesa_sysval_to_semantic[SYSTEM_VALUE_MAX] = {
  * location of each label.
  */
 static unsigned *get_label( struct st_translate *t,
-                            unsigned branch_target )
+                            struct prog_instruction *branch_target )
 {
    unsigned i;
 
@@ -129,29 +128,6 @@ static unsigned *get_label( struct st_translate *t,
    t->labels[i].branch_target = branch_target;
    return &t->labels[i].token;
 }
-
-
-/**
- * Called prior to emitting the TGSI code for each Mesa instruction.
- * Allocate additional space for instructions if needed.
- * Update the insn[] array so the next Mesa instruction points to
- * the next TGSI instruction.
- */
-static void set_insn_start( struct st_translate *t,
-                            unsigned start )
-{
-   if (t->insn_count + 1 >= t->insn_size) {
-      t->insn_size = 1 << (util_logbase2(t->insn_size) + 1);
-      t->insn = realloc(t->insn, t->insn_size * sizeof t->insn[0]);
-      if (t->insn == NULL) {
-         t->error = TRUE;
-         return;
-      }
-   }
-
-   t->insn[t->insn_count++] = start;
-}
-
 
 /**
  * Map a Mesa dst register to a TGSI ureg_dst register.
@@ -1029,6 +1005,7 @@ st_translate_mesa_program(
    struct st_translate translate, *t;
    unsigned i;
    enum pipe_error ret = PIPE_OK;
+   struct simple_node *node;
 
    assert(numInputs <= Elements(t->inputs));
    assert(numOutputs <= Elements(t->outputs));
@@ -1040,6 +1017,7 @@ st_translate_mesa_program(
    t->inputMapping = inputMapping;
    t->outputMapping = outputMapping;
    t->ureg = ureg;
+   t->insn_map = _mesa_hash_table_create(NULL, _mesa_key_pointer_equal);
 
    /*_mesa_print_program(program);*/
 
@@ -1233,23 +1211,36 @@ st_translate_mesa_program(
 
    /* Emit each instruction in turn:
     */
-   for (i = 0; i < program->NumInstructions; i++) {
-      set_insn_start( t, ureg_get_instruction_number( ureg ));
-      compile_instruction( ctx, t, &program->Instructions[i], clamp_color );
+   foreach(node, &program->Instructions) {
+      struct prog_instruction *inst = (struct prog_instruction *)node;
+      unsigned tgsi_index = ureg_get_instruction_number( ureg );
+      _mesa_hash_table_insert(t->insn_map,
+                              _mesa_hash_pointer(inst),
+                              inst,
+                              (void *)(uintptr_t)tgsi_index);
+
+      compile_instruction( ctx, t, inst, clamp_color );
    }
 
    /* Fix up all emitted labels:
     */
    for (i = 0; i < t->labels_count; i++) {
+      struct prog_instruction *branch_target = t->labels[i].branch_target;
+      struct hash_entry *he =
+         _mesa_hash_table_search(t->insn_map,
+                                 _mesa_hash_pointer(branch_target),
+                                 branch_target);
+      unsigned tgsi_target = (uintptr_t)he->data;
+
       ureg_fixup_label( ureg,
                         t->labels[i].token,
-                        t->insn[t->labels[i].branch_target] );
+                        tgsi_target );
    }
 
 out:
-   free(t->insn);
    free(t->labels);
    free(t->constants);
+   ralloc_free(t->insn_map);
 
    if (t->error) {
       debug_printf("%s: translate error flag set\n", __FUNCTION__);

@@ -70,8 +70,9 @@ vec4_vs_visitor::emit_program_code()
    src_reg one = src_reg(this, glsl_type::float_type);
    emit(MOV(dst_reg(one), src_reg(1.0f)));
 
-   for (unsigned int insn = 0; insn < prog->NumInstructions; insn++) {
-      const struct prog_instruction *vpi = &prog->Instructions[insn];
+   struct simple_node *node;
+   foreach(node, &prog->Instructions) {
+      const struct prog_instruction *vpi = (struct prog_instruction *)node;
       base_ir = vpi;
 
       dst_reg dst;

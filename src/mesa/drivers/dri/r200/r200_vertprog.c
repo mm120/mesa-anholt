@@ -393,7 +393,6 @@ static unsigned long op_operands(enum prog_opcode opcode)
 static GLboolean r200_translate_vertex_program(struct gl_context *ctx, struct r200_vertex_program *vp)
 {
    struct gl_vertex_program *mesa_vp = &vp->mesa_program;
-   struct prog_instruction *vpi;
    int i;
    VERTEX_SHADER_INSTRUCTION *o_inst;
    unsigned long operands;
@@ -589,7 +588,13 @@ static GLboolean r200_translate_vertex_program(struct gl_context *ctx, struct r2
    }
 
    o_inst = vp->instr;
-   for (vpi = mesa_vp->Base.Instructions; vpi->Opcode != OPCODE_END; vpi++, o_inst++){
+   struct simple_node *node;
+   foreach(node, &mesa_vp->Base.Instructions) {
+      const struct prog_instruction *vpi = (struct prog_instruction *)node;
+
+      if (vpi->Opcode == OPCODE_END)
+         break;
+
       operands = op_operands(vpi->Opcode);
       are_srcs_scalar = operands & SCALAR_FLAG;
       operands &= OP_MASK;
@@ -1091,6 +1096,7 @@ else {
       if ((o_inst->op & R200_VSF_OUT_CLASS_MASK) == R200_VSF_OUT_CLASS_RESULT_POS) {
 	 vp->pos_end = (o_inst - vp->instr);
       }
+      o_inst++;
    }
 
    vp->native = GL_TRUE;

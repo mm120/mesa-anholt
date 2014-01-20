@@ -293,12 +293,13 @@ do {									\
 static bool calc_live_regs( struct i915_fragment_program *p )
 {
     const struct gl_fragment_program *program = &p->FragProg;
+    struct simple_node *node;
     GLuint regsUsed = ~((1 << I915_MAX_TEMPORARY) - 1);
     uint8_t live_components[I915_MAX_TEMPORARY] = { 0, };
-    GLint i;
-   
-    for (i = program->Base.NumInstructions - 1; i >= 0; i--) {
-        struct prog_instruction *inst = &program->Base.Instructions[i];
+    GLint i = program->Base.NumInstructions - 1;
+
+    foreach_rev(node, &program->Base.Instructions) {
+        struct prog_instruction *inst = (struct prog_instruction *)node;
         int opArgs = _mesa_num_inst_src_regs(inst->Opcode);
         int a;
 
@@ -332,6 +333,7 @@ static bool calc_live_regs( struct i915_fragment_program *p )
         }
 
         p->usedRegs[i] = regsUsed;
+        i--;
     }
 
     return true;
@@ -341,7 +343,7 @@ static GLuint get_live_regs( struct i915_fragment_program *p,
                              const struct prog_instruction *inst )
 {
     const struct gl_fragment_program *program = &p->FragProg;
-    GLuint nr = inst - program->Base.Instructions;
+    GLuint nr = _mesa_count_from_program_start(&program->Base, inst);
 
     return p->usedRegs[nr];
 }
@@ -362,7 +364,8 @@ static void
 upload_program(struct i915_fragment_program *p)
 {
    const struct gl_fragment_program *program = &p->FragProg;
-   const struct prog_instruction *inst = program->Base.Instructions;
+   const struct prog_instruction *inst =
+      (struct prog_instruction *)first_elem(&program->Base.Instructions);
 
    if (INTEL_DEBUG & DEBUG_WM)
       _mesa_print_program(&program->Base);
@@ -371,7 +374,7 @@ upload_program(struct i915_fragment_program *p)
     * loaded, as the flagging of an error isn't sufficient to stop
     * this being uploaded to hardware.
     */
-   if (inst[0].Opcode == OPCODE_END) {
+   if (inst->Opcode == OPCODE_END) {
       GLuint tmp = i915_get_utemp(p);
       i915_emit_arith(p,
                       A0_MOV,
@@ -394,9 +397,12 @@ upload_program(struct i915_fragment_program *p)
       return;
    }
 
-   while (1) {
+   struct simple_node *node;
+   foreach(node, &program->Base.Instructions) {
       GLuint src0, src1, src2, flags;
       GLuint tmp = 0, dst, consts0 = 0, consts1 = 0;
+
+      inst = (struct prog_instruction *)node;
 
       switch (inst->Opcode) {
       case OPCODE_ABS:
@@ -1168,7 +1174,6 @@ upload_program(struct i915_fragment_program *p)
          return;
       }
 
-      inst++;
       i915_release_utemps(p);
    }
 }

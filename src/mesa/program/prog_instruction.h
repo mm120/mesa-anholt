@@ -39,7 +39,7 @@
 
 
 #include "main/glheader.h"
-
+#include "main/simple_list.h"
 
 /**
  * Swizzle indexes.
@@ -310,6 +310,9 @@ struct prog_dst_register
  */
 struct prog_instruction
 {
+   /* Must be the first field in prog_instruction */
+   struct simple_node link;
+
    gl_inst_opcode Opcode;
    struct prog_src_register SrcReg[3];
    struct prog_dst_register DstReg;
@@ -376,7 +379,7 @@ struct prog_instruction
     * For IF, points to ELSE or ENDIF.
     * For ELSE, points to ENDIF.
     */
-   GLint BranchTarget;
+   struct prog_instruction *BranchTarget;
 
    /** for debugging purposes */
    const char *Comment;
@@ -390,22 +393,25 @@ struct prog_instruction
 extern "C" {
 #endif
 
-extern void
-_mesa_init_instructions(struct prog_instruction *inst, GLuint count);
-
 extern struct prog_instruction *
-_mesa_alloc_instructions(GLuint numInst);
+_mesa_alloc_instruction(gl_inst_opcode opcode);
 
-extern struct prog_instruction *
-_mesa_realloc_instructions(struct prog_instruction *oldInst,
-                           GLuint numOldInst, GLuint numNewInst);
-
-extern struct prog_instruction *
-_mesa_copy_instructions(struct prog_instruction *dest,
-                        const struct prog_instruction *src, GLuint n);
+extern bool
+_mesa_copy_instructions(struct simple_node *dst, const struct simple_node *src);
 
 extern void
-_mesa_free_instructions(struct prog_instruction *inst, GLuint count);
+_mesa_free_instruction(struct prog_instruction *inst);
+
+extern void
+_mesa_free_instructions(struct simple_node *list);
+
+extern unsigned
+_mesa_count_between_instructions(const struct prog_instruction *a,
+                                 const struct prog_instruction *b);
+
+extern unsigned
+_mesa_count_from_program_start(const struct gl_program *prog,
+                               const struct prog_instruction *b);
 
 extern GLuint
 _mesa_num_inst_src_regs(gl_inst_opcode opcode);

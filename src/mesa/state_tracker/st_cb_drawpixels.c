@@ -79,15 +79,19 @@ static GLboolean
 is_passthrough_program(const struct gl_fragment_program *prog)
 {
    if (prog->Base.NumInstructions == 2) {
-      const struct prog_instruction *inst = prog->Base.Instructions;
-      if (inst[0].Opcode == OPCODE_MOV &&
-          inst[1].Opcode == OPCODE_END &&
-          inst[0].DstReg.File == PROGRAM_OUTPUT &&
-          inst[0].DstReg.Index == FRAG_RESULT_COLOR &&
-          inst[0].DstReg.WriteMask == WRITEMASK_XYZW &&
-          inst[0].SrcReg[0].File == PROGRAM_INPUT &&
-          inst[0].SrcReg[0].Index == VARYING_SLOT_COL0 &&
-          inst[0].SrcReg[0].Swizzle == SWIZZLE_XYZW) {
+      const struct prog_instruction *inst[2] = {
+         (struct prog_instruction *)first_elem(&prog->Base.Instructions),
+         (struct prog_instruction *)first_elem(&prog->Base.Instructions)->next
+      };
+
+      if (inst[0]->Opcode == OPCODE_MOV &&
+          inst[1]->Opcode == OPCODE_END &&
+          inst[0]->DstReg.File == PROGRAM_OUTPUT &&
+          inst[0]->DstReg.Index == FRAG_RESULT_COLOR &&
+          inst[0]->DstReg.WriteMask == WRITEMASK_XYZW &&
+          inst[0]->SrcReg[0].File == PROGRAM_INPUT &&
+          inst[0]->SrcReg[0].Index == VARYING_SLOT_COL0 &&
+          inst[0]->SrcReg[0].Swizzle == SWIZZLE_XYZW) {
          return GL_TRUE;
       }
    }
@@ -198,7 +202,7 @@ st_make_drawpix_z_stencil_program(struct st_context *st,
    struct gl_context *ctx = st->ctx;
    struct gl_program *p;
    struct gl_fragment_program *fp;
-   GLuint ic = 0;
+   struct prog_instruction *inst;
    const GLuint shaderIndex = write_depth * 2 + write_stencil;
 
    assert(shaderIndex < Elements(st->drawpix.shaders));
@@ -215,53 +219,51 @@ st_make_drawpix_z_stencil_program(struct st_context *st,
    if (!p)
       return NULL;
 
-   p->NumInstructions = write_depth ? 3 : 1;
-   p->NumInstructions += write_stencil ? 1 : 0;
-
-   p->Instructions = _mesa_alloc_instructions(p->NumInstructions);
-   if (!p->Instructions) {
-      ctx->Driver.DeleteProgram(ctx, p);
-      return NULL;
-   }
-   _mesa_init_instructions(p->Instructions, p->NumInstructions);
-
    if (write_depth) {
       /* TEX result.depth, fragment.texcoord[0], texture[0], 2D; */
-      p->Instructions[ic].Opcode = OPCODE_TEX;
-      p->Instructions[ic].DstReg.File = PROGRAM_OUTPUT;
-      p->Instructions[ic].DstReg.Index = FRAG_RESULT_DEPTH;
-      p->Instructions[ic].DstReg.WriteMask = WRITEMASK_Z;
-      p->Instructions[ic].SrcReg[0].File = PROGRAM_INPUT;
-      p->Instructions[ic].SrcReg[0].Index = VARYING_SLOT_TEX0;
-      p->Instructions[ic].TexSrcUnit = 0;
-      p->Instructions[ic].TexSrcTarget = TEXTURE_2D_INDEX;
-      ic++;
+      inst = _mesa_alloc_instruction(OPCODE_TEX);
+      if (!inst)
+         goto fail_exit;
+      inst->DstReg.File = PROGRAM_OUTPUT;
+      inst->DstReg.Index = FRAG_RESULT_DEPTH;
+      inst->DstReg.WriteMask = WRITEMASK_Z;
+      inst->SrcReg[0].File = PROGRAM_INPUT;
+      inst->SrcReg[0].Index = VARYING_SLOT_TEX0;
+      inst->TexSrcUnit = 0;
+      inst->TexSrcTarget = TEXTURE_2D_INDEX;
+      _mesa_append_instruction(p, inst);
+
       /* MOV result.color, fragment.color; */
-      p->Instructions[ic].Opcode = OPCODE_MOV;
-      p->Instructions[ic].DstReg.File = PROGRAM_OUTPUT;
-      p->Instructions[ic].DstReg.Index = FRAG_RESULT_COLOR;
-      p->Instructions[ic].SrcReg[0].File = PROGRAM_INPUT;
-      p->Instructions[ic].SrcReg[0].Index = VARYING_SLOT_COL0;
-      ic++;
+      inst = _mesa_alloc_instruction(OPCODE_MOV);
+      if (!inst)
+         goto fail_exit;
+      inst->DstReg.File = PROGRAM_OUTPUT;
+      inst->DstReg.Index = FRAG_RESULT_COLOR;
+      inst->SrcReg[0].File = PROGRAM_INPUT;
+      inst->SrcReg[0].Index = VARYING_SLOT_COL0;
+      _mesa_append_instruction(p, inst);
    }
 
    if (write_stencil) {
       /* TEX result.stencil, fragment.texcoord[0], texture[0], 2D; */
-      p->Instructions[ic].Opcode = OPCODE_TEX;
-      p->Instructions[ic].DstReg.File = PROGRAM_OUTPUT;
-      p->Instructions[ic].DstReg.Index = FRAG_RESULT_STENCIL;
-      p->Instructions[ic].DstReg.WriteMask = WRITEMASK_Y;
-      p->Instructions[ic].SrcReg[0].File = PROGRAM_INPUT;
-      p->Instructions[ic].SrcReg[0].Index = VARYING_SLOT_TEX0;
-      p->Instructions[ic].TexSrcUnit = 1;
-      p->Instructions[ic].TexSrcTarget = TEXTURE_2D_INDEX;
-      ic++;
+      inst = _mesa_alloc_instruction(OPCODE_TEX);
+      if (!inst)
+         goto fail_exit;
+      inst->DstReg.File = PROGRAM_OUTPUT;
+      inst->DstReg.Index = FRAG_RESULT_STENCIL;
+      inst->DstReg.WriteMask = WRITEMASK_Y;
+      inst->SrcReg[0].File = PROGRAM_INPUT;
+      inst->SrcReg[0].Index = VARYING_SLOT_TEX0;
+      inst->TexSrcUnit = 1;
+      inst->TexSrcTarget = TEXTURE_2D_INDEX;
+      _mesa_append_instruction(p, inst);
    }
 
    /* END; */
-   p->Instructions[ic++].Opcode = OPCODE_END;
-
-   assert(ic == p->NumInstructions);
+   inst = _mesa_alloc_instruction(OPCODE_END);
+   if (!inst)
+      goto fail_exit;
+   _mesa_append_instruction(p, inst);
 
    p->InputsRead = VARYING_BIT_TEX0 | VARYING_BIT_COL0;
    p->OutputsWritten = 0;
@@ -282,6 +284,10 @@ st_make_drawpix_z_stencil_program(struct st_context *st,
    st->drawpix.shaders[shaderIndex] = fp;
 
    return fp;
+
+fail_exit:
+   ctx->Driver.DeleteProgram(ctx, p);
+   return NULL;
 }
 
 

@@ -118,46 +118,42 @@ make_bitmap_fragment_program(struct gl_context *ctx, GLuint samplerIndex)
    struct st_context *st = st_context(ctx);
    struct st_fragment_program *stfp;
    struct gl_program *p;
-   GLuint ic = 0;
+   struct prog_instruction *inst;
 
    p = ctx->Driver.NewProgram(ctx, GL_FRAGMENT_PROGRAM_ARB, 0);
    if (!p)
       return NULL;
 
-   p->NumInstructions = 3;
-
-   p->Instructions = _mesa_alloc_instructions(p->NumInstructions);
-   if (!p->Instructions) {
-      ctx->Driver.DeleteProgram(ctx, p);
-      return NULL;
-   }
-   _mesa_init_instructions(p->Instructions, p->NumInstructions);
-
    /* TEX tmp0, fragment.texcoord[0], texture[0], 2D; */
-   p->Instructions[ic].Opcode = OPCODE_TEX;
-   p->Instructions[ic].DstReg.File = PROGRAM_TEMPORARY;
-   p->Instructions[ic].DstReg.Index = 0;
-   p->Instructions[ic].SrcReg[0].File = PROGRAM_INPUT;
-   p->Instructions[ic].SrcReg[0].Index = VARYING_SLOT_TEX0;
-   p->Instructions[ic].TexSrcUnit = samplerIndex;
-   p->Instructions[ic].TexSrcTarget = TEXTURE_2D_INDEX;
-   ic++;
+   inst = _mesa_alloc_instruction(OPCODE_TEX);
+   if (!inst)
+      goto fail_exit;
+   inst->DstReg.File = PROGRAM_TEMPORARY;
+   inst->DstReg.Index = 0;
+   inst->SrcReg[0].File = PROGRAM_INPUT;
+   inst->SrcReg[0].Index = VARYING_SLOT_TEX0;
+   inst->TexSrcUnit = samplerIndex;
+   inst->TexSrcTarget = TEXTURE_2D_INDEX;
+   _mesa_append_instruction(p, inst);
 
    /* KIL if -tmp0 < 0 # texel=0 -> keep / texel=0 -> discard */
-   p->Instructions[ic].Opcode = OPCODE_KIL;
-   p->Instructions[ic].SrcReg[0].File = PROGRAM_TEMPORARY;
+   inst = _mesa_alloc_instruction(OPCODE_KIL);
+   if (!inst)
+      goto fail_exit;
+   inst->SrcReg[0].File = PROGRAM_TEMPORARY;
 
    if (st->bitmap.tex_format == PIPE_FORMAT_L8_UNORM)
-      p->Instructions[ic].SrcReg[0].Swizzle = SWIZZLE_XXXX;
+      inst->SrcReg[0].Swizzle = SWIZZLE_XXXX;
 
-   p->Instructions[ic].SrcReg[0].Index = 0;
-   p->Instructions[ic].SrcReg[0].Negate = NEGATE_XYZW;
-   ic++;
+   inst->SrcReg[0].Index = 0;
+   inst->SrcReg[0].Negate = NEGATE_XYZW;
+   _mesa_append_instruction(p, inst);
 
    /* END; */
-   p->Instructions[ic++].Opcode = OPCODE_END;
-
-   assert(ic == p->NumInstructions);
+   inst = _mesa_alloc_instruction(OPCODE_END);
+   if (!inst)
+      goto fail_exit;
+   _mesa_append_instruction(p, inst);
 
    p->InputsRead = VARYING_BIT_TEX0;
    p->OutputsWritten = 0x0;
@@ -167,6 +163,10 @@ make_bitmap_fragment_program(struct gl_context *ctx, GLuint samplerIndex)
    stfp->Base.UsesKill = GL_TRUE;
 
    return stfp;
+
+fail_exit:
+   ctx->Driver.DeleteProgram(ctx, p);
+   return NULL;
 }
 
 

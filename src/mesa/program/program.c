@@ -52,25 +52,8 @@ struct gl_program _mesa_DummyProgram;
 void
 _mesa_init_program(struct gl_context *ctx)
 {
-   /*
-    * If this assertion fails, we need to increase the field
-    * size for register indexes (see INST_INDEX_BITS).
-    */
-   ASSERT(ctx->Const.Program[MESA_SHADER_VERTEX].MaxUniformComponents / 4
-          <= (1 << INST_INDEX_BITS));
-   ASSERT(ctx->Const.Program[MESA_SHADER_FRAGMENT].MaxUniformComponents / 4
-          <= (1 << INST_INDEX_BITS));
-
-   ASSERT(ctx->Const.Program[MESA_SHADER_VERTEX].MaxTemps <= (1 << INST_INDEX_BITS));
-   ASSERT(ctx->Const.Program[MESA_SHADER_VERTEX].MaxLocalParams <= (1 << INST_INDEX_BITS));
-   ASSERT(ctx->Const.Program[MESA_SHADER_FRAGMENT].MaxTemps <= (1 << INST_INDEX_BITS));
-   ASSERT(ctx->Const.Program[MESA_SHADER_FRAGMENT].MaxLocalParams <= (1 << INST_INDEX_BITS));
-
    ASSERT(ctx->Const.Program[MESA_SHADER_VERTEX].MaxUniformComponents <= 4 * MAX_UNIFORMS);
    ASSERT(ctx->Const.Program[MESA_SHADER_FRAGMENT].MaxUniformComponents <= 4 * MAX_UNIFORMS);
-
-   ASSERT(ctx->Const.Program[MESA_SHADER_VERTEX].MaxAddressOffset <= (1 << INST_INDEX_BITS));
-   ASSERT(ctx->Const.Program[MESA_SHADER_FRAGMENT].MaxAddressOffset <= (1 << INST_INDEX_BITS));
 
    /* If this fails, increase prog_instruction::TexSrcUnit size */
    STATIC_ASSERT(MAX_TEXTURE_UNITS <= (1 << 5));

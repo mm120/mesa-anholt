@@ -225,23 +225,20 @@ typedef enum prog_opcode {
    MAX_OPCODE
 } gl_inst_opcode;
 
-
-/**
- * Number of bits for the src/dst register Index field.
- * This limits the size of temp/uniform register files.
- */
-#define INST_INDEX_BITS 12
-
-
 /**
  * Instruction source register.
  */
 struct prog_src_register
 {
    GLuint File:4;	/**< One of the PROGRAM_* register file values. */
-   GLint Index:(INST_INDEX_BITS+1); /**< Extra bit here for sign bit.
-                                     * May be negative for relative addressing.
-                                     */
+   /**
+    * Offset within the register file, or the offset from the address register
+    * within the register file, in the case of RelAddr being set.
+    *
+    * Note that the index can be negative for relative addressing.
+    */
+   int Index;
+
    GLuint Swizzle:12;
    GLuint RelAddr:1;
 
@@ -267,9 +264,7 @@ struct prog_src_register
     */
    GLuint HasIndex2:1;
    GLuint RelAddr2:1;
-   GLint Index2:(INST_INDEX_BITS+1); /**< Extra bit here for sign bit.
-                                       * May be negative for relative
-                                       * addressing. */
+   int Index2;
 };
 
 
@@ -279,7 +274,7 @@ struct prog_src_register
 struct prog_dst_register
 {
    GLuint File:4;      /**< One of the PROGRAM_* register file values */
-   GLuint Index:INST_INDEX_BITS;  /**< Unsigned, never negative */
+   uint32_t Index;
    GLuint WriteMask:4;
    GLuint RelAddr:1;
 

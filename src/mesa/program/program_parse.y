@@ -2337,12 +2337,9 @@ init_dst_reg(struct prog_dst_register *r)
 void
 set_dst_reg(struct prog_dst_register *r, gl_register_file file, GLint index)
 {
-   const GLint maxIndex = 1 << INST_INDEX_BITS;
    const GLint minIndex = 0;
    ASSERT(index >= minIndex);
    (void) minIndex;
-   ASSERT(index <= maxIndex);
-   (void) maxIndex;
    ASSERT(file == PROGRAM_TEMPORARY ||
 	  file == PROGRAM_ADDRESS ||
 	  file == PROGRAM_OUTPUT);
@@ -2379,13 +2376,7 @@ void
 set_src_reg_swz(struct asm_src_register *r, gl_register_file file, GLint index,
                 GLuint swizzle)
 {
-   const GLint maxIndex = (1 << INST_INDEX_BITS) - 1;
-   const GLint minIndex = -(1 << INST_INDEX_BITS);
    ASSERT(file < PROGRAM_FILE_MAX);
-   ASSERT(index >= minIndex);
-   (void) minIndex;
-   ASSERT(index <= maxIndex);
-   (void) maxIndex;
    memset(r, 0, sizeof(*r));
    r->Base.File = file;
    r->Base.Index = index;

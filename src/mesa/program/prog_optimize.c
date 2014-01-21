@@ -848,7 +848,7 @@ struct interval
 struct interval_list
 {
    GLuint Num;
-   struct interval Intervals[REG_ALLOCATE_MAX_PROGRAM_TEMPS];
+   struct interval *Intervals;
 };
 
 /** Insert interval inv into list, sorted by interval end */
@@ -988,12 +988,17 @@ _mesa_find_temp_intervals(struct gl_program *prog,
    /* We will output a struct interval_list with an interval per declared
     * temporary, even if the temp is never used.
     */
-   for (i = 0; i < REG_ALLOCATE_MAX_PROGRAM_TEMPS; i++){
+   intervals->Intervals = calloc(prog->NumTemporaries,
+                                 sizeof(*intervals->Intervals));
+   if (!intervals->Intervals)
+      return GL_FALSE;
+
+   for (i = 0; i < prog->NumTemporaries; i++){
       intervals->Intervals[i].Reg = i;
       intervals->Intervals[i].Start = -1;
       intervals->Intervals[i].End = -1;
    }
-   intervals->Num = REG_ALLOCATE_MAX_PROGRAM_TEMPS;
+   intervals->Num = prog->NumTemporaries;
 
    /* Scan instructions looking for temporary registers */
    for (i = 0; i < prog->NumInstructions; i++) {
@@ -1099,10 +1104,10 @@ find_live_intervals(struct gl_program *prog,
 
 /** Scan the array of used register flags to find free entry */
 static GLint
-alloc_register(GLboolean usedRegs[REG_ALLOCATE_MAX_PROGRAM_TEMPS])
+alloc_register(GLboolean *usedRegs, unsigned int count)
 {
    GLuint k;
-   for (k = 0; k < REG_ALLOCATE_MAX_PROGRAM_TEMPS; k++) {
+   for (k = 0; k < count; k++) {
       if (!usedRegs[k]) {
          usedRegs[k] = GL_TRUE;
          return k;
@@ -1124,8 +1129,8 @@ static void
 _mesa_reallocate_registers(struct gl_program *prog)
 {
    struct interval_list liveIntervals;
-   GLint registerMap[REG_ALLOCATE_MAX_PROGRAM_TEMPS];
-   GLboolean usedRegs[REG_ALLOCATE_MAX_PROGRAM_TEMPS];
+   GLint *registerMap = NULL;
+   GLboolean *usedRegs = NULL;
    GLuint i;
    GLint maxTemp = -1;
 
@@ -1134,19 +1139,28 @@ _mesa_reallocate_registers(struct gl_program *prog)
       _mesa_print_program(prog);
    }
 
-   for (i = 0; i < REG_ALLOCATE_MAX_PROGRAM_TEMPS; i++){
-      registerMap[i] = -1;
-      usedRegs[i] = GL_FALSE;
-   }
-
    if (!find_live_intervals(prog, &liveIntervals)) {
       if (dbg)
          fprintf(stderr, "Aborting register reallocation\n");
-      return;
+      goto done;
+   }
+
+   registerMap = calloc(prog->NumTemporaries, sizeof(*registerMap));
+   usedRegs = calloc(prog->NumTemporaries, sizeof(*usedRegs));
+   if (!registerMap || !usedRegs)
+      goto done;
+
+   for (i = 0; i < prog->NumTemporaries; i++){
+      registerMap[i] = -1;
    }
 
    {
       struct interval_list activeIntervals;
+      activeIntervals.Intervals = calloc(liveIntervals.Num,
+                                         sizeof(*activeIntervals.Intervals));
+      if (!activeIntervals.Intervals)
+         goto done;
+
       activeIntervals.Num = 0;
 
       /* loop over live intervals, allocating a new register for each */
@@ -1194,10 +1208,10 @@ _mesa_reallocate_registers(struct gl_program *prog)
 
          /* find a free register for this live interval */
          {
-            const GLint k = alloc_register(usedRegs);
+            const GLint k = alloc_register(usedRegs, prog->NumTemporaries);
             if (k < 0) {
                /* out of registers, give up */
-               return;
+               goto done;
             }
             registerMap[live->Reg] = k;
             maxTemp = MAX2(maxTemp, k);
@@ -1210,6 +1224,8 @@ _mesa_reallocate_registers(struct gl_program *prog)
           */
          insert_interval_by_end(&activeIntervals, live);
       }
+
+      free(activeIntervals.Intervals);
    }
 
    if (maxTemp + 1 < (GLint) liveIntervals.Num) {
@@ -1228,6 +1244,11 @@ _mesa_reallocate_registers(struct gl_program *prog)
                    liveIntervals.Num, maxTemp + 1);
       _mesa_print_program(prog);
    }
+
+ done:
+   free(liveIntervals.Intervals);
+   free(registerMap);
+   free(usedRegs);
 }
 
 

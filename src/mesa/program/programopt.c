@@ -93,10 +93,8 @@ _mesa_insert_mvp_dp4_code(struct gl_context *ctx, struct gl_vertex_program *vpro
       newInst[i].DstReg.WriteMask = (WRITEMASK_X << i);
       newInst[i].SrcReg[0].File = PROGRAM_STATE_VAR;
       newInst[i].SrcReg[0].Index = mvpRef[i];
-      newInst[i].SrcReg[0].Swizzle = SWIZZLE_NOOP;
       newInst[i].SrcReg[1].File = PROGRAM_INPUT;
       newInst[i].SrcReg[1].Index = VERT_ATTRIB_POS;
-      newInst[i].SrcReg[1].Swizzle = SWIZZLE_NOOP;
    }
 
    /* Append original instructions after new instructions */
@@ -162,43 +160,35 @@ _mesa_insert_mvp_mad_code(struct gl_context *ctx, struct gl_vertex_program *vpro
    newInst[0].Opcode = OPCODE_MUL;
    newInst[0].DstReg.File = PROGRAM_TEMPORARY;
    newInst[0].DstReg.Index = hposTemp;
-   newInst[0].DstReg.WriteMask = WRITEMASK_XYZW;
    newInst[0].SrcReg[0].File = PROGRAM_INPUT;
    newInst[0].SrcReg[0].Index = VERT_ATTRIB_POS;
    newInst[0].SrcReg[0].Swizzle = SWIZZLE_XXXX;
    newInst[0].SrcReg[1].File = PROGRAM_STATE_VAR;
    newInst[0].SrcReg[1].Index = mvpRef[0];
-   newInst[0].SrcReg[1].Swizzle = SWIZZLE_NOOP;
 
    for (i = 1; i <= 2; i++) {
       newInst[i].Opcode = OPCODE_MAD;
       newInst[i].DstReg.File = PROGRAM_TEMPORARY;
       newInst[i].DstReg.Index = hposTemp;
-      newInst[i].DstReg.WriteMask = WRITEMASK_XYZW;
       newInst[i].SrcReg[0].File = PROGRAM_INPUT;
       newInst[i].SrcReg[0].Index = VERT_ATTRIB_POS;
       newInst[i].SrcReg[0].Swizzle = MAKE_SWIZZLE4(i,i,i,i);
       newInst[i].SrcReg[1].File = PROGRAM_STATE_VAR;
       newInst[i].SrcReg[1].Index = mvpRef[i];
-      newInst[i].SrcReg[1].Swizzle = SWIZZLE_NOOP;
       newInst[i].SrcReg[2].File = PROGRAM_TEMPORARY;
       newInst[i].SrcReg[2].Index = hposTemp;
-      newInst[i].SrcReg[2].Swizzle = SWIZZLE_NOOP;
    }
 
    newInst[3].Opcode = OPCODE_MAD;
    newInst[3].DstReg.File = PROGRAM_OUTPUT;
    newInst[3].DstReg.Index = VARYING_SLOT_POS;
-   newInst[3].DstReg.WriteMask = WRITEMASK_XYZW;
    newInst[3].SrcReg[0].File = PROGRAM_INPUT;
    newInst[3].SrcReg[0].Index = VERT_ATTRIB_POS;
    newInst[3].SrcReg[0].Swizzle = SWIZZLE_WWWW;
    newInst[3].SrcReg[1].File = PROGRAM_STATE_VAR;
    newInst[3].SrcReg[1].Index = mvpRef[3];
-   newInst[3].SrcReg[1].Swizzle = SWIZZLE_NOOP;
    newInst[3].SrcReg[2].File = PROGRAM_TEMPORARY;
    newInst[3].SrcReg[2].Index = hposTemp;
-   newInst[3].SrcReg[2].Swizzle = SWIZZLE_NOOP;
 
 
    /* Append original instructions after new instructions */

@@ -53,10 +53,7 @@ _mesa_insert_mvp_dp4_code(struct gl_context *ctx, struct gl_vertex_program *vpro
    const GLuint newLen = origLen + 4;
    GLuint i;
 
-   /*
-    * Setup state references for the modelview/projection matrix.
-    * XXX we should check if these state vars are already declared.
-    */
+   /* Set up state references for the modelview/projection matrix. */
    static const gl_state_index mvpState[4][STATE_LENGTH] = {
       { STATE_MVP_MATRIX, 0, 0, 0, 0 },  /* state.matrix.mvp.row[0] */
       { STATE_MVP_MATRIX, 0, 1, 1, 0 },  /* state.matrix.mvp.row[1] */
@@ -120,10 +117,7 @@ _mesa_insert_mvp_mad_code(struct gl_context *ctx, struct gl_vertex_program *vpro
    GLuint hposTemp;
    GLuint i;
 
-   /*
-    * Setup state references for the modelview/projection matrix.
-    * XXX we should check if these state vars are already declared.
-    */
+   /* Set up state references for the modelview/projection matrix. */
    static const gl_state_index mvpState[4][STATE_LENGTH] = {
       { STATE_MVP_MATRIX, 0, 0, 0, STATE_MATRIX_TRANSPOSE },
       { STATE_MVP_MATRIX, 0, 1, 1, STATE_MATRIX_TRANSPOSE },

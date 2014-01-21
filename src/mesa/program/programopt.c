@@ -183,7 +183,7 @@ _mesa_insert_mvp_mad_code(struct gl_context *ctx, struct gl_vertex_program *vpro
       newInst[i].SrcReg[1].Swizzle = SWIZZLE_NOOP;
       newInst[i].SrcReg[2].File = PROGRAM_TEMPORARY;
       newInst[i].SrcReg[2].Index = hposTemp;
-      newInst[1].SrcReg[2].Swizzle = SWIZZLE_NOOP;
+      newInst[i].SrcReg[2].Swizzle = SWIZZLE_NOOP;
    }
 
    newInst[3].Opcode = OPCODE_MAD;

@@ -33,12 +33,6 @@
 
 
 #define MAX_LOOP_NESTING 50
-/* MAX_PROGRAM_TEMPS is a low number (256), and we want to be able to
- * register allocate many temporary values into that small number of
- * temps.  So allow large temporary indices coming into the register
- * allocator.
- */
-#define REG_ALLOCATE_MAX_PROGRAM_TEMPS	((1 << INST_INDEX_BITS) - 1)
 
 static GLboolean dbg = GL_FALSE;
 
@@ -1286,7 +1280,7 @@ print_it(struct gl_context *ctx, struct gl_program *program, const char *txt) {
 static void
 _mesa_simplify_cmp(struct gl_program * program)
 {
-   GLuint tempWrites[REG_ALLOCATE_MAX_PROGRAM_TEMPS];
+   GLuint *tempWrites;
    GLuint outputWrites[MAX_PROGRAM_OUTPUTS];
    GLuint i;
 
@@ -1295,9 +1289,9 @@ _mesa_simplify_cmp(struct gl_program * program)
       _mesa_print_program(program);
    }
 
-   for (i = 0; i < REG_ALLOCATE_MAX_PROGRAM_TEMPS; i++) {
-      tempWrites[i] = 0;
-   }
+   tempWrites = calloc(program->NumTemporaries, sizeof(*tempWrites));
+   if (!tempWrites)
+      return;
 
    for (i = 0; i < MAX_PROGRAM_OUTPUTS; i++) {
       outputWrites[i] = 0;
@@ -1309,6 +1303,7 @@ _mesa_simplify_cmp(struct gl_program * program)
 
       /* Give up if we encounter relative addressing or flow control. */
       if (_mesa_is_flow_control_opcode(inst->Opcode) || inst->DstReg.RelAddr) {
+         free(tempWrites);
          return;
       }
 
@@ -1317,7 +1312,7 @@ _mesa_simplify_cmp(struct gl_program * program)
          prevWriteMask = outputWrites[inst->DstReg.Index];
          outputWrites[inst->DstReg.Index] |= inst->DstReg.WriteMask;
       } else if (inst->DstReg.File == PROGRAM_TEMPORARY) {
-         assert(inst->DstReg.Index < REG_ALLOCATE_MAX_PROGRAM_TEMPS);
+         assert(inst->DstReg.Index < program->NumTemporaries);
          prevWriteMask = tempWrites[inst->DstReg.Index];
          tempWrites[inst->DstReg.Index] |= inst->DstReg.WriteMask;
       } else {
@@ -1350,6 +1345,7 @@ _mesa_simplify_cmp(struct gl_program * program)
       fprintf(stderr, "Optimize: End reads without writes\n");
       _mesa_print_program(program);
    }
+   free(tempWrites);
 }
 
 /**

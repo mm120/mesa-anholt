@@ -851,14 +851,6 @@ struct interval_list
    struct interval Intervals[REG_ALLOCATE_MAX_PROGRAM_TEMPS];
 };
 
-
-static void
-append_interval(struct interval_list *list, const struct interval *inv)
-{
-   list->Intervals[list->Num++] = *inv;
-}
-
-
 /** Insert interval inv into list, sorted by interval end */
 static void
 insert_interval_by_end(struct interval_list *list, const struct interval *inv)
@@ -945,9 +937,9 @@ struct loop_info
  * instruction 'ic'.
  */
 static void
-update_interval(GLint intBegin[], GLint intEnd[],
+update_interval(struct interval *interval,
 		struct loop_info *loopStack, GLuint loopStackDepth,
-		GLuint index, GLuint ic)
+		GLuint ic)
 {
    int i;
    GLuint begin = ic;
@@ -957,7 +949,7 @@ update_interval(GLint intBegin[], GLint intEnd[],
     * of the outermost loop that doesn't contain its definition.
     */
    for (i = 0; i < loopStackDepth; i++) {
-      if (intBegin[index] < loopStack[i].Start) {
+      if (interval->Start < loopStack[i].Start) {
 	 end = loopStack[i].End;
 	 break;
       }
@@ -971,14 +963,13 @@ update_interval(GLint intBegin[], GLint intEnd[],
       begin = loopStack[0].Start;
    }
 
-   ASSERT(index < REG_ALLOCATE_MAX_PROGRAM_TEMPS);
-   if (intBegin[index] == -1) {
-      ASSERT(intEnd[index] == -1);
-      intBegin[index] = begin;
-      intEnd[index] = end;
+   if (interval->Start == -1) {
+      ASSERT(interval->End == -1);
+      interval->Start = begin;
+      interval->End = end;
    }
    else {
-      intEnd[index] = end;
+      interval->End = end;
    }
 }
 
@@ -986,23 +977,27 @@ update_interval(GLint intBegin[], GLint intEnd[],
 /**
  * Find first/last instruction that references each temporary register.
  */
-GLboolean
-_mesa_find_temp_intervals(const struct prog_instruction *instructions,
-                          GLuint numInstructions,
-                          GLint intBegin[REG_ALLOCATE_MAX_PROGRAM_TEMPS],
-                          GLint intEnd[REG_ALLOCATE_MAX_PROGRAM_TEMPS])
+static GLboolean
+_mesa_find_temp_intervals(struct gl_program *prog,
+                          struct interval_list *intervals)
 {
    struct loop_info loopStack[MAX_LOOP_NESTING];
    GLuint loopStackDepth = 0;
    GLuint i;
 
+   /* We will output a struct interval_list with an interval per declared
+    * temporary, even if the temp is never used.
+    */
    for (i = 0; i < REG_ALLOCATE_MAX_PROGRAM_TEMPS; i++){
-      intBegin[i] = intEnd[i] = -1;
+      intervals->Intervals[i].Reg = i;
+      intervals->Intervals[i].Start = -1;
+      intervals->Intervals[i].End = -1;
    }
+   intervals->Num = REG_ALLOCATE_MAX_PROGRAM_TEMPS;
 
    /* Scan instructions looking for temporary registers */
-   for (i = 0; i < numInstructions; i++) {
-      const struct prog_instruction *inst = instructions + i;
+   for (i = 0; i < prog->NumInstructions; i++) {
+      const struct prog_instruction *inst = prog->Instructions + i;
       if (inst->Opcode == OPCODE_BGNLOOP) {
          loopStack[loopStackDepth].Start = i;
          loopStack[loopStackDepth].End = inst->BranchTarget;
@@ -1022,16 +1017,16 @@ _mesa_find_temp_intervals(const struct prog_instruction *instructions,
                const GLuint index = inst->SrcReg[j].Index;
                if (inst->SrcReg[j].RelAddr)
                   return GL_FALSE;
-               update_interval(intBegin, intEnd, loopStack, loopStackDepth,
-			       index, i);
+               update_interval(&intervals->Intervals[index],
+                               loopStack, loopStackDepth, i);
             }
          }
          if (inst->DstReg.File == PROGRAM_TEMPORARY) {
             const GLuint index = inst->DstReg.Index;
             if (inst->DstReg.RelAddr)
                return GL_FALSE;
-            update_interval(intBegin, intEnd, loopStack, loopStackDepth,
-			    index, i);
+            update_interval(&intervals->Intervals[index],
+                            loopStack, loopStackDepth, i);
          }
       }
    }
@@ -1051,9 +1046,7 @@ static GLboolean
 find_live_intervals(struct gl_program *prog,
                     struct interval_list *liveIntervals)
 {
-   GLint intBegin[REG_ALLOCATE_MAX_PROGRAM_TEMPS];
-   GLint intEnd[REG_ALLOCATE_MAX_PROGRAM_TEMPS];
-   GLuint i;
+   GLuint i, skipped;
 
    /*
     * Note: we'll return GL_FALSE below if we find relative indexing
@@ -1066,19 +1059,17 @@ find_live_intervals(struct gl_program *prog,
    }
 
    /* build intermediate arrays */
-   if (!_mesa_find_temp_intervals(prog->Instructions, prog->NumInstructions,
-                                  intBegin, intEnd))
+   if (!_mesa_find_temp_intervals(prog, liveIntervals))
       return GL_FALSE;
 
-   /* Build live intervals list from intermediate arrays */
-   liveIntervals->Num = 0;
-   for (i = 0; i < REG_ALLOCATE_MAX_PROGRAM_TEMPS; i++) {
-      if (intBegin[i] >= 0) {
-         struct interval inv;
-         inv.Reg = i;
-         inv.Start = intBegin[i];
-         inv.End = intEnd[i];
-         append_interval(liveIntervals, &inv);
+   /* Compress the intervals list down to just what's used. */
+   skipped = 0;
+   for (i = 0; i < liveIntervals->Num; i++) {
+      if (liveIntervals->Intervals[i].Start >= 0) {
+         if (skipped)
+            liveIntervals->Intervals[i - skipped] = liveIntervals->Intervals[i];
+      } else {
+         skipped++;
       }
    }
 

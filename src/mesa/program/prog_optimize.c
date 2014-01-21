@@ -509,7 +509,7 @@ _mesa_remove_extra_move_use(struct gl_program *prog)
     *    FOO tmpY, arg0, arg1;
     */
 
-   for (i = 0; i + 1 < prog->NumInstructions; i++) {
+   for (i = 0; i < prog->NumInstructions; i++) {
       const struct prog_instruction *mov = prog->Instructions + i;
       GLuint dst_mask, src_mask;
       if (can_upward_mov_be_modifed(mov) == GL_FALSE)

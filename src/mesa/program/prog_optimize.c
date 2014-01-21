@@ -248,11 +248,13 @@ replace_regs(struct gl_program *prog, gl_register_file file, const GLint map[])
 static GLboolean
 _mesa_remove_dead_code_global(struct gl_program *prog)
 {
-   GLboolean tempRead[REG_ALLOCATE_MAX_PROGRAM_TEMPS][4];
+   bool *tempRead;
    GLboolean *removeInst; /* per-instruction removal flag */
    GLuint i, rem = 0, comp;
 
-   memset(tempRead, 0, sizeof(tempRead));
+   tempRead = calloc(prog->NumTemporaries, 4 * sizeof(bool));
+   if (!tempRead)
+      return false;
 
    if (dbg) {
       fprintf(stderr, "Optimize: Begin dead code removal\n");
@@ -273,7 +275,7 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
          if (inst->SrcReg[j].File == PROGRAM_TEMPORARY) {
             const GLuint index = inst->SrcReg[j].Index;
             GLuint read_mask;
-            ASSERT(index < REG_ALLOCATE_MAX_PROGRAM_TEMPS);
+            ASSERT(index < prog->NumTemporaries);
 	    read_mask = get_src_arg_mask(inst, j, NO_MASK);
 
             if (inst->SrcReg[j].RelAddr) {
@@ -288,7 +290,7 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
                if ((read_mask & (1 << swz)) == 0)
 		  continue;
                if (swz <= SWIZZLE_W)
-                  tempRead[index][swz] = GL_TRUE;
+                  tempRead[index * 4 + swz] = GL_TRUE;
 	    }
          }
       }
@@ -296,7 +298,7 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
       /* check dst reg */
       if (inst->DstReg.File == PROGRAM_TEMPORARY) {
          const GLuint index = inst->DstReg.Index;
-         ASSERT(index < REG_ALLOCATE_MAX_PROGRAM_TEMPS);
+         ASSERT(index < prog->NumTemporaries);
 
          if (inst->DstReg.RelAddr) {
             if (dbg)
@@ -309,10 +311,10 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
              * codes we cannot remove the instruction.  Prevent removal
              * by setting the 'read' flag.
              */
-            tempRead[index][0] = GL_TRUE;
-            tempRead[index][1] = GL_TRUE;
-            tempRead[index][2] = GL_TRUE;
-            tempRead[index][3] = GL_TRUE;
+            tempRead[index * 4 + 0] = GL_TRUE;
+            tempRead[index * 4 + 1] = GL_TRUE;
+            tempRead[index * 4 + 2] = GL_TRUE;
+            tempRead[index * 4 + 3] = GL_TRUE;
          }
       }
    }
@@ -326,7 +328,7 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
          GLint chan, index = inst->DstReg.Index;
 
 	 for (chan = 0; chan < 4; chan++) {
-	    if (!tempRead[index][chan] &&
+	    if (!tempRead[index * 4 + chan] &&
 		inst->DstReg.WriteMask & (1 << chan)) {
 	       if (dbg) {
                   fprintf(stderr, "Remove writemask on %u.%c\n", i,
@@ -357,6 +359,7 @@ _mesa_remove_dead_code_global(struct gl_program *prog)
    }
 
 done:
+   free(tempRead);
    free(removeInst);
    return rem != 0;
 }

@@ -33,6 +33,7 @@
 #include "main/enable.h"
 #include "main/enums.h"
 #include "main/fbobject.h"
+#include "main/image.h"
 #include "main/macros.h"
 #include "main/matrix.h"
 #include "main/multisample.h"
@@ -609,6 +610,13 @@ _mesa_meta_BlitFramebuffer(struct gl_context *ctx,
                            GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,
                            GLbitfield mask, GLenum filter)
 {
+   if (!_mesa_clip_blit(ctx,
+                        &srcX0, &srcY0, &srcX1, &srcY1,
+                        &dstX0, &dstY0, &dstX1, &dstY1)) {
+      /* Everything was clipped away. */
+      return;
+   }
+
    const GLint dstW = abs(dstX1 - dstX0);
    const GLint dstH = abs(dstY1 - dstY0);
    const GLint dstFlipX = (dstX1 - dstX0) / dstW;

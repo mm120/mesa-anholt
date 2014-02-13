@@ -40,12 +40,16 @@
 #include "brw_blorp.h"
 #include "brw_context.h"
 
+#include "main/blit.h"
+#include "main/buffers.h"
 #include "main/enums.h"
+#include "main/fbobject.h"
 #include "main/formats.h"
 #include "main/glformats.h"
 #include "main/texcompress_etc.h"
 #include "main/teximage.h"
 #include "main/streaming-load-memcpy.h"
+#include "drivers/common/meta.h"
 
 #define FILE_DEBUG_FLAG DEBUG_MIPTREE
 
@@ -1538,19 +1542,110 @@ intel_offset_S8(uint32_t stride, uint32_t x, uint32_t y, bool swizzled)
    return u;
 }
 
+static void
+intel_rb_storage_first_mt_slice(struct brw_context *brw,
+                                GLuint rbo,
+                                struct intel_mipmap_tree *mt)
+{
+   struct gl_context *ctx = &brw->ctx;
+   struct gl_renderbuffer *rb;
+   struct intel_renderbuffer *irb;
+
+   /* This turns the GenRenderbuffers name into an actual struct
+    * intel_renderbuffer.
+    */
+   _mesa_BindRenderbuffer(GL_RENDERBUFFER, rbo);
+
+   rb = ctx->CurrentRenderbuffer;
+   irb = intel_renderbuffer(rb);
+
+   rb->Format = mt->format;
+   rb->_BaseFormat = _mesa_base_fbo_format(ctx, mt->format);
+
+   rb->NumSamples = mt->num_samples;
+   rb->Width = mt->logical_width0;
+   rb->Height = mt->logical_height0;
+
+   intel_miptree_reference(&irb->mt, mt);
+}
+
+/**
+ * Implementation of up or downsampling for window-system MSAA miptrees.
+ */
+static void
+intel_miptree_msaa_copy(struct brw_context *brw,
+                        struct intel_mipmap_tree *src_mt,
+                        struct intel_mipmap_tree *dst_mt)
+{
+   struct gl_context *ctx = &brw->ctx;
+   GLuint rbos[2], fbos[2], src_rbo, dst_rbo, src_fbo, dst_fbo;
+   GLenum drawbuffer;
+   GLbitfield attachment, blit_bit;
+
+   if (_mesa_get_format_base_format(src_mt->format) == GL_DEPTH_COMPONENT ||
+       _mesa_get_format_base_format(src_mt->format) == GL_DEPTH_STENCIL) {
+      attachment = GL_DEPTH_ATTACHMENT;
+      drawbuffer = GL_NONE;
+      blit_bit = GL_DEPTH_BUFFER_BIT;
+   } else {
+      attachment = GL_COLOR_ATTACHMENT0;
+      drawbuffer = GL_COLOR_ATTACHMENT0;
+      blit_bit = GL_COLOR_BUFFER_BIT;
+   }
+
+   intel_batchbuffer_emit_mi_flush(brw);
+
+   _mesa_meta_begin(ctx, MESA_META_ALL);
+   _mesa_GenRenderbuffers(2, rbos);
+   _mesa_GenFramebuffers(2, fbos);
+   src_rbo = rbos[0];
+   dst_rbo = rbos[1];
+   src_fbo = fbos[0];
+   dst_fbo = fbos[1];
+
+   _mesa_BindFramebuffer(GL_READ_FRAMEBUFFER, src_fbo);
+   intel_rb_storage_first_mt_slice(brw, src_rbo, src_mt);
+   _mesa_FramebufferRenderbuffer(GL_READ_FRAMEBUFFER, attachment,
+                                 GL_RENDERBUFFER, src_rbo);
+   _mesa_ReadBuffer(drawbuffer);
+
+   _mesa_BindFramebuffer(GL_DRAW_FRAMEBUFFER, dst_fbo);
+   intel_rb_storage_first_mt_slice(brw, dst_rbo, dst_mt);
+   _mesa_FramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, attachment,
+                                 GL_RENDERBUFFER, dst_rbo);
+   _mesa_DrawBuffer(drawbuffer);
+
+   _mesa_BlitFramebuffer(0, 0,
+                         src_mt->logical_width0, src_mt->logical_height0,
+                         0, 0,
+                         dst_mt->logical_width0, dst_mt->logical_height0,
+                         blit_bit, GL_NEAREST);
+
+   _mesa_DeleteRenderbuffers(2, rbos);
+   _mesa_DeleteFramebuffers(2, fbos);
+
+   _mesa_meta_end(ctx);
+
+   intel_batchbuffer_emit_mi_flush(brw);
+}
+
 void
 intel_miptree_updownsample(struct brw_context *brw,
                            struct intel_mipmap_tree *src,
                            struct intel_mipmap_tree *dst)
 {
-   brw_blorp_blit_miptrees(brw,
-                           src, 0 /* level */, 0 /* layer */,
-                           dst, 0 /* level */, 0 /* layer */,
-                           0, 0,
-                           src->logical_width0, src->logical_height0,
-                           0, 0,
-                           dst->logical_width0, dst->logical_height0,
-                           GL_NEAREST, false, false /*mirror x, y*/);
+   if (src->format == MESA_FORMAT_S_UINT8) {
+      brw_blorp_blit_miptrees(brw,
+                              src, 0 /* level */, 0 /* layer */,
+                              dst, 0 /* level */, 0 /* layer */,
+                              0, 0,
+                              src->logical_width0, src->logical_height0,
+                              0, 0,
+                              dst->logical_width0, dst->logical_height0,
+                              GL_NEAREST, false, false /*mirror x, y*/);
+   } else {
+      intel_miptree_msaa_copy(brw, src, dst);
+   }
 
    if (src->stencil_mt) {
       brw_blorp_blit_miptrees(brw,

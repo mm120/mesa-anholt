@@ -1628,6 +1628,31 @@ intel_miptree_map_gtt(struct brw_context *brw,
    assert(y % bh == 0);
    y /= bh;
 
+   /* map_raw is about to do this, but we need it to answer
+    * drm_intel_bo_busy() now.
+    */
+   intel_batchbuffer_flush(brw);
+
+   if (((map->mode & (GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT)) ==
+        (GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT)) &&
+       map->x == 0 &&
+       map->y == 0 &&
+       map->w == mt->region->width &&
+       map->h == mt->region->height &&
+       drm_intel_bo_busy(mt->region->bo)) {
+      unsigned long pitch = mt->region->pitch;
+      drm_intel_bo_unreference(mt->region->bo);
+      mt->region->bo = drm_intel_bo_alloc_tiled(brw->bufmgr,
+                                                "region",
+                                                mt->region->width,
+                                                mt->region->height,
+                                                mt->region->cpp,
+                                                &mt->region->tiling,
+                                                &pitch,
+                                                0);
+      mt->region->pitch = pitch;
+   }
+
    base = intel_miptree_map_raw(brw, mt) + mt->offset;
 
    if (base == NULL)

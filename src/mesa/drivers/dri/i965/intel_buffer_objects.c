@@ -401,8 +401,12 @@ intel_bufferobj_map_range(struct gl_context * ctx,
     * doesn't require the current contents of that range, make a new
     * BO, and we'll copy what they put in there out at unmap or
     * FlushRange time.
+    *
+    * That is, unless they're looking for a persistent mapping -- we would
+    * need to do blits in the MemoryBarrier call, and it's easier to just do a
+    * GPU stall and do a mapping.
     */
-   if (!(access & GL_MAP_UNSYNCHRONIZED_BIT) &&
+   if (!(access & (GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_PERSISTENT_BIT)) &&
        (access & GL_MAP_INVALIDATE_RANGE_BIT) &&
        drm_intel_bo_busy(intel_obj->buffer)) {
       /* Ensure that the base alignment of the allocation meets the alignment
@@ -429,7 +433,8 @@ intel_bufferobj_map_range(struct gl_context * ctx,
 
    if (access & GL_MAP_UNSYNCHRONIZED_BIT)
       drm_intel_gem_bo_map_unsynchronized(intel_obj->buffer);
-   else if (!(access & GL_MAP_READ_BIT)) {
+   else if (!(access & GL_MAP_READ_BIT) ||
+            (access & GL_MAP_COHERENT_BIT)) {
       drm_intel_gem_bo_map_gtt(intel_obj->buffer);
       intel_bufferobj_mark_inactive(intel_obj);
    } else {
@@ -617,6 +622,14 @@ intel_bufferobj_copy_subdata(struct gl_context *ctx,
    intel_batchbuffer_emit_mi_flush(brw);
 }
 
+static void
+intel_bufferobj_memorybarrier(struct gl_context *ctx, GLbitfield barriers)
+{
+   struct brw_context *brw = brw_context(ctx);
+
+   intel_batchbuffer_emit_mi_flush(brw);
+}
+
 void
 intelInitBufferObjectFuncs(struct dd_function_table *functions)
 {
@@ -629,4 +642,5 @@ intelInitBufferObjectFuncs(struct dd_function_table *functions)
    functions->FlushMappedBufferRange = intel_bufferobj_flush_mapped_range;
    functions->UnmapBuffer = intel_bufferobj_unmap;
    functions->CopyBufferSubData = intel_bufferobj_copy_subdata;
+   functions->MemoryBarrier = intel_bufferobj_memorybarrier;
 }

@@ -37,6 +37,7 @@
 #include "main/arbprogram.h"
 #include "main/arrayobj.h"
 #include "main/blend.h"
+#include "main/blit.h"
 #include "main/bufferobj.h"
 #include "main/buffers.h"
 #include "main/colortab.h"
@@ -92,6 +93,41 @@ static void meta_glsl_clear_cleanup(struct clear_state *clear);
 static void meta_glsl_generate_mipmap_cleanup(struct gen_mipmap_state *mipmap);
 static void meta_decompress_cleanup(struct decompress_state *decompress);
 static void meta_drawpix_cleanup(struct drawpix_state *drawpix);
+
+static void
+meta_framebuffer_texture_layer(GLenum fb_target,
+                               GLenum attachment,
+                               const struct gl_texture_image *texImage,
+                               int layer)
+{
+   struct gl_texture_object *texObj = texImage->TexObject;
+   int level = texImage->Level;
+
+   switch (texObj->Target) {
+   case GL_TEXTURE_1D:
+      _mesa_FramebufferTexture1D(fb_target, attachment,
+                                 texObj->Target, texObj->Name, level);
+      break;
+   case GL_TEXTURE_1D_ARRAY:
+   case GL_TEXTURE_2D_ARRAY:
+   case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
+   case GL_TEXTURE_CUBE_MAP_ARRAY:
+   case GL_TEXTURE_3D:
+      _mesa_FramebufferTextureLayer(fb_target, attachment,
+                                    texObj->Name, level, layer);
+      break;
+   case GL_TEXTURE_CUBE_MAP:
+      _mesa_FramebufferTexture2D(fb_target, attachment,
+                                 (GL_TEXTURE_CUBE_MAP_POSITIVE_X +
+                                  texImage->Face),
+                                 texObj->Name, level);
+      break;
+   default:
+      _mesa_FramebufferTexture2D(fb_target, attachment,
+                                 texObj->Target, texObj->Name, level);
+      break;
+   }
+}
 
 GLuint
 _mesa_meta_compile_shader_with_debug(struct gl_context *ctx, GLenum target,
@@ -2421,26 +2457,8 @@ _mesa_meta_check_generate_mipmap_fallback(struct gl_context *ctx, GLenum target,
       _mesa_GenFramebuffers(1, &mipmap->FBO);
    _mesa_BindFramebuffer(GL_FRAMEBUFFER_EXT, mipmap->FBO);
 
-   if (target == GL_TEXTURE_1D) {
-      _mesa_FramebufferTexture1D(GL_FRAMEBUFFER_EXT,
-                                    GL_COLOR_ATTACHMENT0_EXT,
-                                    target, texObj->Name, srcLevel);
-   }
-#if 0
-   /* other work is needed to enable 3D mipmap generation */
-   else if (target == GL_TEXTURE_3D) {
-      GLint zoffset = 0;
-      _mesa_FramebufferTexture3D(GL_FRAMEBUFFER_EXT,
-                                    GL_COLOR_ATTACHMENT0_EXT,
-                                    target, texObj->Name, srcLevel, zoffset);
-   }
-#endif
-   else {
-      /* 2D / cube */
-      _mesa_FramebufferTexture2D(GL_FRAMEBUFFER_EXT,
-                                    GL_COLOR_ATTACHMENT0_EXT,
-                                    target, texObj->Name, srcLevel);
-   }
+   meta_framebuffer_texture_layer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                  baseImage, 0);
 
    status = _mesa_CheckFramebufferStatus(GL_FRAMEBUFFER_EXT);
 
@@ -2834,7 +2852,7 @@ _mesa_meta_GenerateMipmap(struct gl_context *ctx, GLenum target,
    _mesa_unlock_texture(ctx, texObj);
 
    for (dstLevel = baseLevel + 1; dstLevel <= maxLevel; dstLevel++) {
-      const struct gl_texture_image *srcImage;
+      const struct gl_texture_image *srcImage, *dstImage;
       const GLuint srcLevel = dstLevel - 1;
       GLsizei srcWidth, srcHeight, srcDepth;
       GLsizei dstWidth, dstHeight, dstDepth;
@@ -2875,34 +2893,13 @@ _mesa_meta_GenerateMipmap(struct gl_context *ctx, GLenum target,
           */
          break;
       }
+      dstImage = _mesa_select_tex_image(ctx, texObj, faceTarget, dstLevel);
 
       /* limit minification to src level */
       _mesa_TexParameteri(target, GL_TEXTURE_MAX_LEVEL, srcLevel);
 
-      /* Set to draw into the current dstLevel */
-      if (target == GL_TEXTURE_1D) {
-         _mesa_FramebufferTexture1D(GL_FRAMEBUFFER_EXT,
-                                       GL_COLOR_ATTACHMENT0_EXT,
-                                       target,
-                                       texObj->Name,
-                                       dstLevel);
-      }
-      else if (target == GL_TEXTURE_3D) {
-         GLint zoffset = 0; /* XXX unfinished */
-         _mesa_FramebufferTexture3D(GL_FRAMEBUFFER_EXT,
-                                       GL_COLOR_ATTACHMENT0_EXT,
-                                       target,
-                                       texObj->Name,
-                                       dstLevel, zoffset);
-      }
-      else {
-         /* 2D / cube */
-         _mesa_FramebufferTexture2D(GL_FRAMEBUFFER_EXT,
-                                       GL_COLOR_ATTACHMENT0_EXT,
-                                       faceTarget,
-                                       texObj->Name,
-                                       dstLevel);
-      }
+      meta_framebuffer_texture_layer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                     dstImage, 0);
 
       _mesa_DrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
 
@@ -2988,6 +2985,86 @@ get_temp_image_type(struct gl_context *ctx, mesa_format format)
    }
 }
 
+/**
+ * Attempts to wrap the destination texture in an FBO and use
+ * glBlitFramebuffer() to implement glCopyTexSubImage().
+ */
+static bool
+copytexsubimage_using_blit_framebuffer(struct gl_context *ctx, GLuint dims,
+                                       struct gl_texture_image *texImage,
+                                       GLint xoffset,
+                                       GLint yoffset,
+                                       GLint zoffset,
+                                       struct gl_renderbuffer *rb,
+                                       GLint x, GLint y,
+                                       GLsizei width, GLsizei height)
+{
+   struct gl_texture_object *texObj = texImage->TexObject;
+   GLenum target = texObj->Target;
+   GLuint save_draw_fbo, fbo;
+   int layer = target == GL_TEXTURE_1D_ARRAY ? yoffset : zoffset;
+   bool success = false;
+   GLbitfield mask;
+   GLenum status;
+
+   if (!ctx->Extensions.ARB_framebuffer_object)
+      return false;
+
+   _mesa_unlock_texture(ctx, texObj);
+
+   _mesa_meta_begin(ctx, MESA_META_ALL);
+
+   _mesa_GenFramebuffers(1, &fbo);
+   save_draw_fbo = ctx->DrawBuffer->Name;
+   _mesa_BindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+
+   if (rb->_BaseFormat == GL_DEPTH_STENCIL ||
+       rb->_BaseFormat == GL_DEPTH_COMPONENT) {
+      meta_framebuffer_texture_layer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                     texImage, layer);
+      mask = GL_DEPTH_BUFFER_BIT;
+
+      if (rb->_BaseFormat == GL_DEPTH_STENCIL &&
+          texImage->_BaseFormat == GL_DEPTH_STENCIL) {
+         meta_framebuffer_texture_layer(GL_DRAW_FRAMEBUFFER,
+                                        GL_STENCIL_ATTACHMENT,
+                                        texImage, layer);
+         mask |= GL_STENCIL_BUFFER_BIT;
+      }
+      _mesa_DrawBuffer(GL_NONE);
+   } else {
+      meta_framebuffer_texture_layer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                     texImage, layer);
+      mask = GL_COLOR_BUFFER_BIT;
+      _mesa_DrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
+   }
+
+   status = _mesa_CheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+   if (status != GL_FRAMEBUFFER_COMPLETE)
+      goto out;
+
+   ctx->Meta->Blit.no_ctsi_fallback = true;
+   /* Update clip state. */
+   _mesa_update_state(ctx);
+   /* We skip the core BlitFramebuffer checks for format consistency, which
+    * are too strict for CopyTexImage.  We know meta will be fine with format
+    * changes.
+    */
+   _mesa_meta_BlitFramebuffer(ctx, x, y,
+                              x + width, y + height,
+                              xoffset, yoffset,
+                              xoffset + width, yoffset + height,
+                              mask, GL_NEAREST);
+   ctx->Meta->Blit.no_ctsi_fallback = false;
+   success = true;
+
+ out:
+   _mesa_lock_texture(ctx, texObj);
+   _mesa_BindFramebuffer(GL_DRAW_FRAMEBUFFER, save_draw_fbo);
+   _mesa_DeleteFramebuffers(1, &fbo);
+   _mesa_meta_end(ctx);
+   return success;
+}
 
 /**
  * Helper for _mesa_meta_CopyTexSubImage1/2/3D() functions.
@@ -3006,11 +3083,14 @@ _mesa_meta_CopyTexSubImage(struct gl_context *ctx, GLuint dims,
    GLint bpp;
    void *buf;
 
-   /* The gl_renderbuffer is part of the interface for
-    * dd_function_table::CopyTexSubImage, but this implementation does not use
-    * it.
-    */
-   (void) rb;
+   if (copytexsubimage_using_blit_framebuffer(ctx, dims,
+                                              texImage,
+                                              xoffset, yoffset, zoffset,
+                                              rb,
+                                              x, y,
+                                              width, height)) {
+      return;
+   }
 
    /* Choose format/type for temporary image buffer */
    format = _mesa_get_format_base_format(texImage->TexFormat);

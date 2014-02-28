@@ -249,6 +249,7 @@ struct blit_state
    struct blit_shader_table shaders;
    GLuint msaa_shaders[BLIT_MSAA_SHADER_COUNT];
    struct temp_texture depthTex;
+   bool no_ctsi_fallback;
 };
 
 

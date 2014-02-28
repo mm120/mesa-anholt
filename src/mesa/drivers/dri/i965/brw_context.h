@@ -1661,15 +1661,6 @@ brw_blorp_framebuffer(struct brw_context *brw,
                       GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,
                       GLbitfield mask, GLenum filter);
 
-bool
-brw_blorp_copytexsubimage(struct brw_context *brw,
-                          struct gl_renderbuffer *src_rb,
-                          struct gl_texture_image *dst_image,
-                          int slice,
-                          int srcX0, int srcY0,
-                          int dstX0, int dstY0,
-                          int width, int height);
-
 /* gen6_multisample_state.c */
 unsigned
 gen6_determine_sample_mask(struct brw_context *brw);

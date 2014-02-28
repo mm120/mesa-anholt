@@ -99,21 +99,14 @@ intelCopyTexSubImage(struct gl_context *ctx, GLuint dims,
 {
    struct brw_context *brw = brw_context(ctx);
 
-   /* Try BLORP first.  It can handle almost everything. */
-   if (brw_blorp_copytexsubimage(brw, rb, texImage, slice, x, y,
-                                 xoffset, yoffset, width, height))
-      return;
-
-   /* Next, try the BLT engine. */
-   if (intel_copy_texsubimage(brw,
+   /* Try the BLT engine. */
+   if (0 && /* XXX */intel_copy_texsubimage(brw,
                               intel_texture_image(texImage),
                               xoffset, yoffset, slice,
                               intel_renderbuffer(rb), x, y, width, height)) {
       return;
    }
 
-   /* Finally, fall back to meta.  This will likely be slow. */
-   perf_debug("%s - fallback to swrast\n", __FUNCTION__);
    _mesa_meta_CopyTexSubImage(ctx, dims, texImage,
                               xoffset, yoffset, slice,
                               rb, x, y, width, height);

@@ -74,7 +74,7 @@ compute_msaa_layout(struct brw_context *brw, mesa_format format, GLenum target)
       /* Disable MCS on Broadwell for now.  We can enable it once things
        * are working without it.
        */
-      if (brw->gen >= 8) {
+      if (brw->gen >= 6) {
          perf_debug("Missing CMS support on Broadwell.\n");
          return INTEL_MSAA_LAYOUT_UMS;
       }

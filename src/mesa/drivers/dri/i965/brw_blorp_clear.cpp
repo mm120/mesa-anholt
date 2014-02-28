@@ -543,6 +543,7 @@ do_single_blorp_clear(struct brw_context *brw, struct gl_framebuffer *fb,
    DBG("%s to mt %p level %d layer %d\n", __FUNCTION__,
        irb->mt, irb->mt_level, irb->mt_layer);
 
+   //assert(false || !"disabled to test bdw paths");
    brw_blorp_exec(brw, &params);
 
    if (is_fast_clear) {
@@ -604,6 +605,7 @@ brw_blorp_resolve_color(struct brw_context *brw, struct intel_mipmap_tree *mt)
    DBG("%s to mt %p\n", __FUNCTION__, mt);
 
    brw_blorp_rt_resolve_params params(brw, mt);
+   //assert(false || !"disabled to test bdw paths");
    brw_blorp_exec(brw, &params);
    mt->fast_clear_state = INTEL_FAST_CLEAR_STATE_RESOLVED;
 }

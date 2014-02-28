@@ -168,6 +168,7 @@ brw_blorp_blit_miptrees(struct brw_context *brw,
                                 dst_x0, dst_y0,
                                 dst_x1, dst_y1,
                                 filter, mirror_x, mirror_y);
+   assert(false || !"disabled to test bdw paths");
    brw_blorp_exec(brw, &params);
 
    intel_miptree_slice_set_needs_hiz_resolve(dst_mt, dst_level, dst_layer);

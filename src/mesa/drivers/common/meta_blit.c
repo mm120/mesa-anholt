@@ -388,16 +388,6 @@ blitframebuffer_texture(struct gl_context *ctx,
       srcLevel = readAtt->TextureLevel;
       texObj = readAtt->Texture;
       target = texObj->Target;
-
-      switch (target) {
-      case GL_TEXTURE_2D:
-      case GL_TEXTURE_RECTANGLE:
-      case GL_TEXTURE_2D_MULTISAMPLE:
-      case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
-         break;
-      default:
-         return false;
-      }
    } else if (ctx->Driver.BindRenderbufferTexImage) {
       /* Otherwise, we need the driver to be able to bind a renderbuffer as
        * a texture image.
@@ -542,7 +532,9 @@ blitframebuffer_texture(struct gl_context *ctx,
       struct vertex verts[4];
       GLfloat s0, t0, s1, t1;
 
-      if (target == GL_TEXTURE_2D) {
+      if (!(target == GL_TEXTURE_RECTANGLE_ARB ||
+            target == GL_TEXTURE_2D_MULTISAMPLE ||
+            target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY)) {
          const struct gl_texture_image *texImage
             = _mesa_select_tex_image(ctx, texObj, target, srcLevel);
          s0 = srcX0 / (float) texImage->Width;
@@ -551,9 +543,6 @@ blitframebuffer_texture(struct gl_context *ctx,
          t1 = srcY1 / (float) texImage->Height;
       }
       else {
-         assert(target == GL_TEXTURE_RECTANGLE_ARB ||
-                target == GL_TEXTURE_2D_MULTISAMPLE ||
-                target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
          s0 = (float) srcX0;
          s1 = (float) srcX1;
          t0 = (float) srcY0;

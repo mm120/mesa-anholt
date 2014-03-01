@@ -66,6 +66,7 @@ setup_glsl_msaa_blit_shader(struct gl_context *ctx,
    bool dst_is_msaa = false;
    GLenum src_datatype;
    const char *vec4_prefix;
+   const char *sampler_array_suffix = "";
    char *name;
 
    if (src_rb) {
@@ -94,6 +95,7 @@ setup_glsl_msaa_blit_shader(struct gl_context *ctx,
 
    switch (target) {
    case GL_TEXTURE_2D_MULTISAMPLE:
+   case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
       if (src_rb->_BaseFormat == GL_DEPTH_COMPONENT ||
           src_rb->_BaseFormat == GL_DEPTH_STENCIL) {
          if (dst_is_msaa)
@@ -105,6 +107,12 @@ setup_glsl_msaa_blit_shader(struct gl_context *ctx,
             shader_index = BLIT_MSAA_SHADER_2D_MULTISAMPLE_COPY;
          else
             shader_index = BLIT_MSAA_SHADER_2D_MULTISAMPLE_RESOLVE;
+      }
+
+      if (target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) {
+         shader_index += (BLIT_MSAA_SHADER_2D_MULTISAMPLE_ARRAY_RESOLVE -
+                          BLIT_MSAA_SHADER_2D_MULTISAMPLE_RESOLVE);
+         sampler_array_suffix = "Array";
       }
       break;
    default:
@@ -136,6 +144,8 @@ setup_glsl_msaa_blit_shader(struct gl_context *ctx,
    mem_ctx = ralloc_context(NULL);
 
    if (shader_index == BLIT_MSAA_SHADER_2D_MULTISAMPLE_DEPTH_RESOLVE ||
+       shader_index == BLIT_MSAA_SHADER_2D_MULTISAMPLE_ARRAY_DEPTH_RESOLVE ||
+       shader_index == BLIT_MSAA_SHADER_2D_MULTISAMPLE_ARRAY_DEPTH_COPY ||
        shader_index == BLIT_MSAA_SHADER_2D_MULTISAMPLE_DEPTH_COPY) {
       char *sample_index;
       const char *arb_sample_shading_extension_string;
@@ -177,7 +187,7 @@ setup_glsl_msaa_blit_shader(struct gl_context *ctx,
                                   "#version 130\n"
                                   "#extension GL_ARB_texture_multisample : enable\n"
                                   "%s\n"
-                                  "uniform sampler2DMS texSampler;\n"
+                                  "uniform sampler2DMS%s texSampler;\n"
                                   "in vec2 texCoords;\n"
                                   "out vec4 out_color;\n"
                                   "\n"
@@ -186,6 +196,7 @@ setup_glsl_msaa_blit_shader(struct gl_context *ctx,
                                   "   gl_FragDepth = texelFetch(texSampler, ivec2(texCoords), %s).r;\n"
                                   "}\n",
                                   arb_sample_shading_extension_string,
+                                  sampler_array_suffix,
                                   sample_index);
    } else {
       /* You can create 2D_MULTISAMPLE textures with 0 sample count (meaning 1
@@ -275,7 +286,7 @@ setup_glsl_msaa_blit_shader(struct gl_context *ctx,
                                   "#extension GL_ARB_texture_multisample : enable\n"
                                   "%s\n"
                                   "#define gvec4 %svec4\n"
-                                  "uniform %ssampler2DMS texSampler;\n"
+                                  "uniform %ssampler2DMS%s texSampler;\n"
                                   "in vec2 texCoords;\n"
                                   "out gvec4 out_color;\n"
                                   "\n"
@@ -287,6 +298,7 @@ setup_glsl_msaa_blit_shader(struct gl_context *ctx,
                                   arb_sample_shading_extension_string,
                                   vec4_prefix,
                                   vec4_prefix,
+                                  sampler_array_suffix,
                                   merge_function,
                                   sample_resolve);
    }
@@ -319,7 +331,8 @@ setup_glsl_blit_framebuffer(struct gl_context *ctx,
 
    _mesa_meta_setup_vertex_objects(&blit->VAO, &blit->VBO, true, 2, 2, 0);
 
-   if (target == GL_TEXTURE_2D_MULTISAMPLE) {
+   if (target == GL_TEXTURE_2D_MULTISAMPLE ||
+       target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) {
       setup_glsl_msaa_blit_shader(ctx, blit, src_rb, target);
    } else {
       _mesa_meta_setup_blit_shader(ctx, target, &blit->shaders);
@@ -380,6 +393,7 @@ blitframebuffer_texture(struct gl_context *ctx,
       case GL_TEXTURE_2D:
       case GL_TEXTURE_RECTANGLE:
       case GL_TEXTURE_2D_MULTISAMPLE:
+      case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
          break;
       default:
          return false;
@@ -538,7 +552,8 @@ blitframebuffer_texture(struct gl_context *ctx,
       }
       else {
          assert(target == GL_TEXTURE_RECTANGLE_ARB ||
-                target == GL_TEXTURE_2D_MULTISAMPLE);
+                target == GL_TEXTURE_2D_MULTISAMPLE ||
+                target == GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
          s0 = (float) srcX0;
          s1 = (float) srcX1;
          t0 = (float) srcY0;

@@ -107,7 +107,6 @@ ir_vector_reference_visitor::get_variable_entry(ir_variable *var)
    switch (var->data.mode) {
    case ir_var_uniform:
    case ir_var_shader_in:
-   case ir_var_shader_out:
    case ir_var_system_value:
    case ir_var_function_in:
    case ir_var_function_out:
@@ -372,8 +371,19 @@ brw_do_vector_splitting(exec_list *instructions)
 					    entry->var->name,
 					    "xyzw"[i]);
 
-	 entry->components[i] = new(entry->mem_ctx) ir_variable(type, name,
-								ir_var_temporary);
+         ir_variable *new_var;
+
+         if (entry->var->data.mode == ir_var_shader_out) {
+            new_var = entry->var->clone(entry->mem_ctx, NULL);
+            new_var->type = type;
+            new_var->name = ralloc_strdup(new_var, name);
+            new_var->data.location_frac = i;
+         } else {
+            new_var = new(entry->mem_ctx) ir_variable(type, name,
+                                                      ir_var_temporary);
+         }
+
+	 entry->components[i] = new_var;
 	 entry->var->insert_before(entry->components[i]);
       }
 

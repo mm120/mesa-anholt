@@ -1732,7 +1732,7 @@ fs_visitor::compact_virtual_grfs()
       { &pixel_y, 1 },
       { &pixel_w, 1 },
       { &wpos_w, 1 },
-      { &dual_src_output, 1 },
+      { dual_src_output, ARRAY_SIZE(dual_src_output) },
       { outputs, ARRAY_SIZE(outputs) },
       { delta_x, ARRAY_SIZE(delta_x) },
       { delta_y, ARRAY_SIZE(delta_y) },

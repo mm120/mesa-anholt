@@ -70,17 +70,25 @@ fs_visitor::visit(ir_variable *ir)
    } else if (ir->data.mode == ir_var_shader_out) {
       reg = new(this->mem_ctx) fs_reg(this, ir->type);
 
+      int vector_elements =
+         ir->type->is_array() ? ir->type->fields.array->vector_elements
+         : ir->type->vector_elements;
+
       if (ir->data.index > 0) {
-	 assert(ir->data.location == FRAG_RESULT_DATA0);
-	 assert(ir->data.index == 1);
-	 this->dual_src_output = *reg;
+         assert(ir->data.location == FRAG_RESULT_DATA0);
+         assert(ir->data.index == 1);
+         for (unsigned i = 0; i < vector_elements; i++)
+            this->dual_src_output[i + ir->data.location_frac] = offset(*reg, i);
          this->do_dual_src = true;
       } else if (ir->data.location == FRAG_RESULT_COLOR) {
+         fs_reg chan = *reg;
 	 /* Writing gl_FragColor outputs to all color regions. */
-	 for (unsigned int i = 0; i < MAX2(c->key.nr_color_regions, 1); i++) {
-	    this->outputs[i] = *reg;
-	    this->output_components[i] = 4;
-	 }
+         for (int j = 0; j < vector_elements; j++) {
+            for (unsigned i = 0; i < MAX2(c->key.nr_color_regions, 1); i++) {
+               this->outputs[i * 4 + j + ir->data.location_frac] = chan;
+            }
+            chan.reg_offset++;
+         }
       } else if (ir->data.location == FRAG_RESULT_DEPTH) {
 	 this->frag_depth = *reg;
       } else if (ir->data.location == FRAG_RESULT_SAMPLE_MASK) {
@@ -90,16 +98,16 @@ fs_visitor::visit(ir_variable *ir)
 	 assert(ir->data.location >= FRAG_RESULT_DATA0 &&
 		ir->data.location < FRAG_RESULT_DATA0 + BRW_MAX_DRAW_BUFFERS);
 
-	 int vector_elements =
-	    ir->type->is_array() ? ir->type->fields.array->vector_elements
-				 : ir->type->vector_elements;
-
 	 /* General color output. */
 	 for (unsigned int i = 0; i < MAX2(1, ir->type->length); i++) {
 	    int output = ir->data.location - FRAG_RESULT_DATA0 + i;
-	    this->outputs[output] = *reg;
-	    this->outputs[output].reg_offset += vector_elements * i;
-	    this->output_components[output] = vector_elements;
+            fs_reg out = *reg;
+            out.reg_offset += vector_elements * i;
+
+            for (int j = 0; j < vector_elements; j++) {
+               this->outputs[4 * output + j + ir->data.location_frac] = out;
+               out.reg_offset++;
+            }
 	 }
       }
    } else if (ir->data.mode == ir_var_uniform) {
@@ -2600,14 +2608,12 @@ fs_visitor::emit_color_write(int target, int index, int first_color_mrf)
 {
    int reg_width = dispatch_width / 8;
    fs_inst *inst;
-   fs_reg color = outputs[target];
+   fs_reg color = outputs[target * 4 + index];
    fs_reg mrf;
 
    /* If there's no color data to be written, skip it. */
    if (color.file == BAD_FILE)
       return;
-
-   color.reg_offset += index;
 
    if (dispatch_width == 8 || brw->gen >= 6) {
       /* SIMD8 write looks like:
@@ -2709,8 +2715,7 @@ fs_visitor::emit_alpha_test()
                      BRW_CONDITIONAL_NEQ));
    } else {
       /* RT0 alpha */
-      fs_reg color = outputs[0];
-      color.reg_offset += 3;
+      fs_reg color = outputs[3];
 
       /* f0.1 &= func(color, ref) */
       cmp = emit(CMP(reg_null_f, color, fs_reg(c->key.alpha_test_ref),
@@ -2815,23 +2820,23 @@ fs_visitor::emit_fb_writes()
    }
 
    if (do_dual_src) {
-      fs_reg src0 = this->outputs[0];
-      fs_reg src1 = this->dual_src_output;
-
       this->current_annotation = ralloc_asprintf(this->mem_ctx,
 						 "FB write src0");
       for (int i = 0; i < 4; i++) {
-	 fs_inst *inst = emit(MOV(fs_reg(MRF, color_mrf + i, src0.type), src0));
-	 src0.reg_offset++;
-	 inst->saturate = c->key.clamp_fragment_color;
+         fs_reg src0 = this->outputs[0 * 4 + i];
+         if (src0.file != BAD_FILE) {
+            fs_inst *inst = emit(MOV(fs_reg(MRF, color_mrf + i, src0.type),
+                                     src0));
+            inst->saturate = c->key.clamp_fragment_color;
+         }
       }
 
       this->current_annotation = ralloc_asprintf(this->mem_ctx,
 						 "FB write src1");
       for (int i = 0; i < 4; i++) {
+         fs_reg src1 = this->dual_src_output[i];
 	 fs_inst *inst = emit(MOV(fs_reg(MRF, color_mrf + 4 + i, src1.type),
                                   src1));
-	 src1.reg_offset++;
 	 inst->saturate = c->key.clamp_fragment_color;
       }
 
@@ -2864,8 +2869,7 @@ fs_visitor::emit_fb_writes()
       int write_color_mrf = color_mrf;
       if (src0_alpha_to_render_target && target != 0) {
          fs_inst *inst;
-         fs_reg color = outputs[0];
-         color.reg_offset += 3;
+         fs_reg color = outputs[3];
 
          inst = emit(MOV(fs_reg(MRF, write_color_mrf, color.type),
                          color));
@@ -2873,7 +2877,7 @@ fs_visitor::emit_fb_writes()
          write_color_mrf = color_mrf + reg_width;
       }
 
-      for (unsigned i = 0; i < this->output_components[target]; i++)
+      for (unsigned i = 0; i < 4; i++)
          emit_color_write(target, i, write_color_mrf);
 
       bool eot = false;
@@ -2966,7 +2970,7 @@ fs_visitor::fs_visitor(struct brw_context *brw,
                                        hash_table_pointer_compare);
 
    memset(this->outputs, 0, sizeof(this->outputs));
-   memset(this->output_components, 0, sizeof(this->output_components));
+   memset(this->dual_src_output, 0, sizeof(this->dual_src_output));
    this->first_non_payload_grf = 0;
    this->max_grf = brw->gen >= 7 ? GEN7_MRF_HACK_START : BRW_MAX_GRF;
 

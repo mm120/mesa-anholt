@@ -525,9 +525,8 @@ public:
    struct hash_table *variable_ht;
    fs_reg frag_depth;
    fs_reg sample_mask;
-   fs_reg outputs[BRW_MAX_DRAW_BUFFERS];
-   unsigned output_components[BRW_MAX_DRAW_BUFFERS];
-   fs_reg dual_src_output;
+   fs_reg outputs[BRW_MAX_DRAW_BUFFERS * 4];
+   fs_reg dual_src_output[4];
    bool do_dual_src;
    int first_non_payload_grf;
    /** Either BRW_MAX_GRF or GEN7_MRF_HACK_START */

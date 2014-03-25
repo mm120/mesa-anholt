@@ -646,25 +646,25 @@ fs_visitor::get_fp_dst_reg(const prog_dst_register *dst)
          return frag_depth;
       } else if (dst->Index == FRAG_RESULT_COLOR) {
          if (outputs[0].file == BAD_FILE) {
-            outputs[0] = fs_reg(this, glsl_type::vec4_type);
-            output_components[0] = 4;
+            fs_reg reg = fs_reg(this, glsl_type::vec4_type);
 
             /* Tell emit_fb_writes() to smear fragment.color across all the
              * color attachments.
              */
-            for (int i = 1; i < c->key.nr_color_regions; i++) {
-               outputs[i] = outputs[0];
-               output_components[i] = output_components[0];
+            for (int i = 0; i < c->key.nr_color_regions; i++) {
+               for (int j = 0; j < 4; j++)
+                  outputs[i * 4 + j] = offset(reg, j);
             }
          }
          return outputs[0];
       } else {
          int output_index = dst->Index - FRAG_RESULT_DATA0;
-         if (outputs[output_index].file == BAD_FILE) {
-            outputs[output_index] = fs_reg(this, glsl_type::vec4_type);
+         if (outputs[output_index * 4].file == BAD_FILE) {
+            fs_reg reg = fs_reg(this, glsl_type::vec4_type);
+            for (int i = 0; i < 4; i++)
+               outputs[output_index * 4 + i] = offset(reg, i);
          }
-         output_components[output_index] = 4;
-         return outputs[output_index];
+         return outputs[output_index * 4];
       }
 
    case PROGRAM_UNDEFINED:

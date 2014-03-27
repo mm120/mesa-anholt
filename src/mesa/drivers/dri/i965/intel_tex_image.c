@@ -173,7 +173,7 @@ intelTexImage(struct gl_context * ctx,
    DBG("%s target %s level %d %dx%dx%d\n", __FUNCTION__,
        _mesa_lookup_enum_by_nr(texImage->TexObject->Target),
        texImage->Level, texImage->Width, texImage->Height, texImage->Depth);
-
+#if 0
    ok = intel_texsubimage_tiled_memcpy(ctx, dims, texImage,
                                        0, 0, 0, /*x,y,z offsets*/
                                        texImage->Width,
@@ -183,7 +183,7 @@ intelTexImage(struct gl_context * ctx,
                                        true /*for_glTexImage*/);
    if (ok)
       return;
-
+#endif
    /* Attempt to use the blitter for PBO image uploads.
     */
    if (dims <= 2 &&

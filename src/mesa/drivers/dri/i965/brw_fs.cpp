@@ -2069,6 +2069,61 @@ fs_visitor::opt_algebraic()
 }
 
 bool
+fs_visitor::opt_register_renaming()
+{
+   bool progress = false;
+   int depth = 0;
+
+   int remap[virtual_grf_count];
+   memset(remap, -1, sizeof(int) * virtual_grf_count);
+
+   foreach_list(node, &this->instructions) {
+      fs_inst *inst = (fs_inst *) node;
+
+      if (inst->opcode == BRW_OPCODE_IF || inst->opcode == BRW_OPCODE_DO) {
+         depth++;
+      } else if (inst->opcode == BRW_OPCODE_ENDIF ||
+                 inst->opcode == BRW_OPCODE_WHILE) {
+         depth--;
+      }
+
+      /* Rewrite instruction sources. */
+      for (int i = 0; i < 3; i++) {
+         if (inst->src[i].file == GRF &&
+             remap[inst->src[i].reg] != -1 &&
+             remap[inst->src[i].reg] != inst->src[i].reg) {
+            inst->src[i].reg = remap[inst->src[i].reg];
+            progress = true;
+         }
+      }
+
+      int dst = inst->dst.reg;
+
+      if (depth == 0 &&
+          inst->dst.file == GRF &&
+          virtual_grf_sizes[inst->dst.reg] == 1 &&
+          !inst->is_partial_write()) {
+         if (remap[dst] == -1) {
+            remap[dst] = dst;
+         } else {
+            remap[dst] = virtual_grf_alloc(virtual_grf_sizes[dst]);
+            inst->dst.reg = remap[dst];
+            progress = true;
+         }
+      } else if (inst->dst.file == GRF &&
+                 remap[dst] != -1 &&
+                 remap[dst] != dst) {
+         inst->dst.reg = remap[dst];
+         progress = true;
+      }
+   }
+
+   invalidate_live_intervals();
+
+   return progress;
+}
+
+bool
 fs_visitor::compute_to_mrf()
 {
    bool progress = false;
@@ -3024,6 +3079,7 @@ fs_visitor::run()
          progress = opt_peephole_sel() || progress;
          progress = dead_control_flow_eliminate(this) || progress;
          progress = opt_saturate_propagation() || progress;
+         progress = opt_register_renaming() || progress;
          progress = register_coalesce() || progress;
 	 progress = compute_to_mrf() || progress;
       } while (progress);

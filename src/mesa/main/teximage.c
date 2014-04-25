@@ -41,6 +41,7 @@
 #include "imports.h"
 #include "macros.h"
 #include "multisample.h"
+#include "pixel.h"
 #include "state.h"
 #include "texcompress.h"
 #include "texcompress_cpal.h"
@@ -3367,7 +3368,7 @@ _mesa_EGLImageTargetTexture2DOES (GLenum target, GLeglImageOES image)
    }
 
    if (ctx->NewState & _NEW_PIXEL)
-      _mesa_update_state(ctx);
+      _mesa_update_pixel(ctx);
 
    texObj = _mesa_get_current_tex_object(ctx, target);
    _mesa_lock_texture(ctx, texObj);
@@ -3426,7 +3427,7 @@ texsubimage(struct gl_context *ctx, GLuint dims, GLenum target, GLint level,
    }
 
    if (ctx->NewState & _NEW_PIXEL)
-      _mesa_update_state(ctx);
+      _mesa_update_pixel(ctx);
 
    if (texsubimage_error_check(ctx, dims, target, level,
                                xoffset, yoffset, zoffset,

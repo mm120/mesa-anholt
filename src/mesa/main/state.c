@@ -388,7 +388,7 @@ _mesa_update_state_locked( struct gl_context *ctx )
       _mesa_update_stencil( ctx );
 
    if (new_state & _NEW_PIXEL)
-      _mesa_update_pixel( ctx, new_state );
+      _mesa_update_pixel( ctx );
 
    if (new_state & (_NEW_BUFFERS | _NEW_VIEWPORT))
       update_viewport_matrix(ctx);

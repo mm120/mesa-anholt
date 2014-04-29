@@ -40,14 +40,6 @@ gen6_upload_vec4_push_constants(struct brw_context *brw,
                                 struct brw_stage_state *stage_state,
                                 enum state_struct_type type)
 {
-   struct gl_context *ctx = &brw->ctx;
-
-   /* Updates the ParamaterValues[i] pointers for all parameters of the
-    * basic type of PROGRAM_STATE_VAR.
-    */
-   /* XXX: Should this happen somewhere before to get our state flag set? */
-   _mesa_load_state_parameters(ctx, prog->Parameters);
-
    if (prog_data->base.nr_params == 0) {
       stage_state->push_const_size = 0;
    } else {

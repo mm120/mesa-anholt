@@ -229,36 +229,54 @@ update_program(struct gl_context *ctx)
 
 
 /**
- * Examine shader constants and return either _NEW_PROGRAM_CONSTANTS or 0.
+ * Compares ctx->NewState to the set of flags being watched by the various
+ * shader stages' prog->Parameters to see if we need to
+ * _mesa_load_state_parameters() on them to update computed state
+ * (transformation matrices, fog factors, etc.)
+ *
+ * If _mesa_load_state_parameters() is called, _NEW_PROGRAM_CONSTANTS will be
+ * flagged just like for a normal uniform update.
  */
 static GLbitfield
 update_program_constants(struct gl_context *ctx)
 {
    GLbitfield new_state = 0x0;
+   const struct gl_program *last_loaded_prog = NULL;
 
    if (ctx->FragmentProgram._Current) {
-      const struct gl_program_parameter_list *params =
-         ctx->FragmentProgram._Current->Base.Parameters;
-      if (params && params->StateFlags & ctx->NewState) {
+      struct gl_program *prog = &ctx->FragmentProgram._Current->Base;
+      struct gl_program_parameter_list *params = prog->Parameters;
+
+      if (params && (_NEW_PROGRAM | params->StateFlags) & ctx->NewState) {
          new_state |= _NEW_PROGRAM_CONSTANTS;
+
+         last_loaded_prog = prog;
+         _mesa_load_state_parameters(ctx, params);
       }
    }
 
    if (ctx->GeometryProgram._Current) {
-      const struct gl_program_parameter_list *params =
-         ctx->GeometryProgram._Current->Base.Parameters;
+      struct gl_program *prog = &ctx->GeometryProgram._Current->Base;
+      struct gl_program_parameter_list *params = prog->Parameters;
       /*FIXME: StateFlags is always 0 because we have unnamed constant
        *       not state changes */
-      if (params /*&& params->StateFlags & ctx->NewState*/) {
+      if (last_loaded_prog != prog && params
+          /*&& (_NEW_PROGRAM | params->StateFlags) & ctx->NewState*/) {
          new_state |= _NEW_PROGRAM_CONSTANTS;
+         last_loaded_prog = prog;
+         _mesa_load_state_parameters(ctx, params);
       }
    }
 
    if (ctx->VertexProgram._Current) {
-      const struct gl_program_parameter_list *params =
-         ctx->VertexProgram._Current->Base.Parameters;
-      if (params && params->StateFlags & ctx->NewState) {
+      struct gl_program *prog = &ctx->VertexProgram._Current->Base;
+      struct gl_program_parameter_list *params = prog->Parameters;
+      if (last_loaded_prog != prog && params &&
+          (_NEW_PROGRAM | params->StateFlags) & ctx->NewState) {
          new_state |= _NEW_PROGRAM_CONSTANTS;
+
+         last_loaded_prog = prog;
+         _mesa_load_state_parameters(ctx, params);
       }
    }
 

@@ -469,8 +469,6 @@ brw_upload_wm_pull_constants(struct brw_context *brw)
       brw->wm.prog_data->base.binding_table.pull_constants_start;
    unsigned int i;
 
-   _mesa_load_state_parameters(ctx, params);
-
    /* CACHE_NEW_WM_PROG */
    if (brw->wm.prog_data->base.nr_pull_params == 0) {
       if (brw->wm.base.surf_offset[surf_index]) {

@@ -356,8 +356,7 @@ struct brw_stage_prog_data {
    GLuint nr_params;       /**< number of float params/constants */
    GLuint nr_pull_params;
 
-   /* Pointers to tracked values (only valid once
-    * _mesa_load_state_parameters has been called at runtime).
+   /* Pointers to tracked uniform values.
     *
     * These must be the last fields of the struct (see
     * brw_stage_prog_data_compare()).

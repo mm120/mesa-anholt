@@ -259,21 +259,6 @@ _swrast_update_fog_state( struct gl_context *ctx )
 
 
 /**
- * Update state for running fragment programs.  Basically, load the
- * program parameters with current state values.
- */
-static void
-_swrast_update_fragment_program(struct gl_context *ctx, GLbitfield newState)
-{
-   if (!_swrast_use_fragment_program(ctx))
-      return;
-
-   _mesa_load_state_parameters(ctx,
-                               ctx->FragmentProgram._Current->Base.Parameters);
-}
-
-
-/**
  * See if we can do early diffuse+specular (primary+secondary) color
  * add per vertex instead of per-fragment.
  */
@@ -563,9 +548,6 @@ _swrast_validate_derived( struct gl_context *ctx )
 
       if (swrast->NewState & (_NEW_FOG | _NEW_PROGRAM))
          _swrast_update_fog_state( ctx );
-
-      if (swrast->NewState & (_NEW_PROGRAM_CONSTANTS | _NEW_PROGRAM))
-	 _swrast_update_fragment_program( ctx, swrast->NewState );
 
       if (swrast->NewState & (_NEW_TEXTURE | _NEW_PROGRAM)) {
          _swrast_update_texture_samplers( ctx );

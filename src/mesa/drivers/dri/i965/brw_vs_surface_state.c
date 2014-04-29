@@ -46,11 +46,6 @@ brw_upload_vec4_pull_constants(struct brw_context *brw,
    int i;
    uint32_t surf_index = prog_data->base.binding_table.pull_constants_start;
 
-   /* Updates the ParamaterValues[i] pointers for all parameters of the
-    * basic type of PROGRAM_STATE_VAR.
-    */
-   _mesa_load_state_parameters(&brw->ctx, prog->Parameters);
-
    if (!prog_data->base.nr_pull_params) {
       if (stage_state->surf_offset[surf_index]) {
 	 stage_state->surf_offset[surf_index] = 0;

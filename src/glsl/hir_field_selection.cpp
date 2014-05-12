@@ -36,7 +36,7 @@ _mesa_ast_field_selection_to_hir(const ast_expression *expr,
    ir_rvalue *result = NULL;
    ir_rvalue *op;
 
-   op = expr->subexpressions[0]->hir(instructions, state);
+   op = expr->subexpressions[0]->hir(instructions, state, true);
 
    /* There are two kinds of field selection.  There is the selection of a
     * specific field from a structure, and there is the selection of a

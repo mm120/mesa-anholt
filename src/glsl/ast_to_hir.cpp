@@ -98,7 +98,7 @@ _mesa_ast_to_hir(exec_list *instructions, struct _mesa_glsl_parse_state *state)
    state->symbols->push_scope();
 
    foreach_list_typed (ast_node, ast, link, & state->translation_unit)
-      ast->hir(instructions, state);
+      ast->hir(instructions, state, false);
 
    detect_recursion_unlinked(state, instructions);
    detect_conflicting_assignments(state, instructions);
@@ -912,26 +912,13 @@ get_lvalue_copy(exec_list *instructions, ir_rvalue *lvalue)
 
 
 ir_rvalue *
-ast_node::hir(exec_list *instructions, struct _mesa_glsl_parse_state *state)
+ast_node::hir(exec_list *instructions, struct _mesa_glsl_parse_state *state,
+              bool needs_rvalue)
 {
    (void) instructions;
    (void) state;
 
    return NULL;
-}
-
-void
-ast_function_expression::hir_no_rvalue(exec_list *instructions,
-                                       struct _mesa_glsl_parse_state *state)
-{
-   (void)hir(instructions, state);
-}
-
-void
-ast_aggregate_initializer::hir_no_rvalue(exec_list *instructions,
-                                         struct _mesa_glsl_parse_state *state)
-{
-   (void)hir(instructions, state);
 }
 
 static ir_rvalue *
@@ -1026,7 +1013,7 @@ get_scalar_boolean_operand(exec_list *instructions,
 {
    ast_expression *expr = parent_expr->subexpressions[operand];
    void *ctx = state;
-   ir_rvalue *val = expr->hir(instructions, state);
+   ir_rvalue *val = expr->hir(instructions, state, true);
 
    if (val->type->is_boolean() && val->type->is_scalar())
       return val;
@@ -1101,22 +1088,8 @@ constant_one_for_inc_dec(void *ctx, const glsl_type *type)
 
 ir_rvalue *
 ast_expression::hir(exec_list *instructions,
-                    struct _mesa_glsl_parse_state *state)
-{
-   return do_hir(instructions, state, true);
-}
-
-void
-ast_expression::hir_no_rvalue(exec_list *instructions,
-                              struct _mesa_glsl_parse_state *state)
-{
-   do_hir(instructions, state, false);
-}
-
-ir_rvalue *
-ast_expression::do_hir(exec_list *instructions,
-                       struct _mesa_glsl_parse_state *state,
-                       bool needs_rvalue)
+                    struct _mesa_glsl_parse_state *state,
+                    bool needs_rvalue)
 {
    void *ctx = state;
    static const int operations[AST_NUM_OPERATORS] = {
@@ -1188,8 +1161,8 @@ ast_expression::do_hir(exec_list *instructions,
       break;
 
    case ast_assign: {
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
 
       error_emitted =
          do_assignment(instructions, state,
@@ -1200,7 +1173,7 @@ ast_expression::do_hir(exec_list *instructions,
    }
 
    case ast_plus:
-      op[0] = this->subexpressions[0]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
 
       type = unary_arithmetic_result_type(op[0]->type, state, & loc);
 
@@ -1210,7 +1183,7 @@ ast_expression::do_hir(exec_list *instructions,
       break;
 
    case ast_neg:
-      op[0] = this->subexpressions[0]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
 
       type = unary_arithmetic_result_type(op[0]->type, state, & loc);
 
@@ -1224,8 +1197,8 @@ ast_expression::do_hir(exec_list *instructions,
    case ast_sub:
    case ast_mul:
    case ast_div:
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
 
       type = arithmetic_result_type(op[0], op[1],
                                     (this->oper == ast_mul),
@@ -1237,8 +1210,8 @@ ast_expression::do_hir(exec_list *instructions,
       break;
 
    case ast_mod:
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
 
       type = modulus_result_type(op[0]->type, op[1]->type, state, & loc);
 
@@ -1255,8 +1228,8 @@ ast_expression::do_hir(exec_list *instructions,
           error_emitted = true;
        }
 
-       op[0] = this->subexpressions[0]->hir(instructions, state);
-       op[1] = this->subexpressions[1]->hir(instructions, state);
+       op[0] = this->subexpressions[0]->hir(instructions, state, true);
+       op[1] = this->subexpressions[1]->hir(instructions, state, true);
        type = shift_result_type(op[0]->type, op[1]->type, this->oper, state,
                                 &loc);
        result = new(ctx) ir_expression(operations[this->oper], type,
@@ -1268,8 +1241,8 @@ ast_expression::do_hir(exec_list *instructions,
    case ast_greater:
    case ast_lequal:
    case ast_gequal:
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
 
       type = relational_result_type(op[0], op[1], state, & loc);
 
@@ -1287,8 +1260,8 @@ ast_expression::do_hir(exec_list *instructions,
 
    case ast_nequal:
    case ast_equal:
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
 
       /* From page 58 (page 64 of the PDF) of the GLSL 1.50 spec:
        *
@@ -1326,8 +1299,8 @@ ast_expression::do_hir(exec_list *instructions,
    case ast_bit_and:
    case ast_bit_xor:
    case ast_bit_or:
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
       type = bit_logic_result_type(op[0]->type, op[1]->type, this->oper,
                                    state, &loc);
       result = new(ctx) ir_expression(operations[this->oper], type,
@@ -1336,7 +1309,7 @@ ast_expression::do_hir(exec_list *instructions,
       break;
 
    case ast_bit_not:
-      op[0] = this->subexpressions[0]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
 
       if (!state->check_bitwise_operations_allowed(&loc)) {
          error_emitted = true;
@@ -1451,8 +1424,8 @@ ast_expression::do_hir(exec_list *instructions,
    case ast_div_assign:
    case ast_add_assign:
    case ast_sub_assign: {
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
 
       type = arithmetic_result_type(op[0], op[1],
                                     (this->oper == ast_mul_assign),
@@ -1477,8 +1450,8 @@ ast_expression::do_hir(exec_list *instructions,
    }
 
    case ast_mod_assign: {
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
 
       type = modulus_result_type(op[0]->type, op[1]->type, state, & loc);
 
@@ -1499,8 +1472,8 @@ ast_expression::do_hir(exec_list *instructions,
 
    case ast_ls_assign:
    case ast_rs_assign: {
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
       type = shift_result_type(op[0]->type, op[1]->type, this->oper, state,
                                &loc);
       ir_rvalue *temp_rhs = new(ctx) ir_expression(operations[this->oper],
@@ -1517,8 +1490,8 @@ ast_expression::do_hir(exec_list *instructions,
    case ast_and_assign:
    case ast_xor_assign:
    case ast_or_assign: {
-      op[0] = this->subexpressions[0]->hir(instructions, state);
-      op[1] = this->subexpressions[1]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
+      op[1] = this->subexpressions[1]->hir(instructions, state, true);
       type = bit_logic_result_type(op[0]->type, op[1]->type, this->oper,
                                    state, &loc);
       ir_rvalue *temp_rhs = new(ctx) ir_expression(operations[this->oper],
@@ -1550,8 +1523,8 @@ ast_expression::do_hir(exec_list *instructions,
       exec_list then_instructions;
       exec_list else_instructions;
 
-      op[1] = this->subexpressions[1]->hir(&then_instructions, state);
-      op[2] = this->subexpressions[2]->hir(&else_instructions, state);
+      op[1] = this->subexpressions[1]->hir(&then_instructions, state, true);
+      op[2] = this->subexpressions[2]->hir(&else_instructions, state, true);
 
       /* From page 59 (page 65 of the PDF) of the GLSL 1.50 spec:
        *
@@ -1627,7 +1600,7 @@ ast_expression::do_hir(exec_list *instructions,
       this->non_lvalue_description = (this->oper == ast_pre_inc)
          ? "pre-increment operation" : "pre-decrement operation";
 
-      op[0] = this->subexpressions[0]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
       op[1] = constant_one_for_inc_dec(ctx, op[0]->type);
 
       type = arithmetic_result_type(op[0], op[1], false, state, & loc);
@@ -1649,7 +1622,7 @@ ast_expression::do_hir(exec_list *instructions,
    case ast_post_dec: {
       this->non_lvalue_description = (this->oper == ast_post_inc)
          ? "post-increment operation" : "post-decrement operation";
-      op[0] = this->subexpressions[0]->hir(instructions, state);
+      op[0] = this->subexpressions[0]->hir(instructions, state, true);
       op[1] = constant_one_for_inc_dec(ctx, op[0]->type);
 
       error_emitted = op[0]->type->is_error() || op[1]->type->is_error();
@@ -1683,8 +1656,8 @@ ast_expression::do_hir(exec_list *instructions,
    case ast_array_index: {
       YYLTYPE index_loc = subexpressions[1]->get_location();
 
-      op[0] = subexpressions[0]->hir(instructions, state);
-      op[1] = subexpressions[1]->hir(instructions, state);
+      op[0] = subexpressions[0]->hir(instructions, state, true);
+      op[1] = subexpressions[1]->hir(instructions, state, true);
 
       result = _mesa_ast_array_index_to_hir(ctx, state, op[0], op[1],
                                             loc, index_loc);
@@ -1784,7 +1757,7 @@ ast_expression::do_hir(exec_list *instructions,
          previous_tail_pred = instructions->tail_pred;
          previous_operand_loc = ast->get_location();
 
-         result = ast->hir(instructions, state);
+         result = ast->hir(instructions, state, true);
       }
 
       /* Any errors should have already been emitted in the loop above.
@@ -1805,7 +1778,8 @@ ast_expression::do_hir(exec_list *instructions,
 
 ir_rvalue *
 ast_expression_statement::hir(exec_list *instructions,
-                              struct _mesa_glsl_parse_state *state)
+                              struct _mesa_glsl_parse_state *state,
+                              bool needs_rvalue)
 {
    /* It is possible to have expression statements that don't have an
     * expression.  This is the solitary semicolon:
@@ -1817,7 +1791,7 @@ ast_expression_statement::hir(exec_list *instructions,
     * anything in that case.
     */
    if (expression != NULL)
-      expression->hir_no_rvalue(instructions, state);
+      expression->hir(instructions, state, false);
 
    /* Statements do not have r-values.
     */
@@ -1827,13 +1801,14 @@ ast_expression_statement::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_compound_statement::hir(exec_list *instructions,
-                            struct _mesa_glsl_parse_state *state)
+                            struct _mesa_glsl_parse_state *state,
+                            bool needs_rvalue)
 {
    if (new_scope)
       state->symbols->push_scope();
 
    foreach_list_typed (ast_node, ast, link, &this->statements)
-      ast->hir(instructions, state);
+      ast->hir(instructions, state, false);
 
    if (new_scope)
       state->symbols->pop_scope();
@@ -1854,7 +1829,7 @@ process_array_size(exec_node *node,
    exec_list dummy_instructions;
 
    ast_node *array_size = exec_node_data(ast_node, node, link);
-   ir_rvalue *const ir = array_size->hir(& dummy_instructions, state);
+   ir_rvalue *const ir = array_size->hir(& dummy_instructions, state, true);
    YYLTYPE loc = array_size->get_location();
 
    if (ir == NULL) {
@@ -2899,7 +2874,8 @@ process_initializer(ir_variable *var, ast_declaration *decl,
       _mesa_ast_set_aggregate_type(var->type, decl->initializer);
 
    ir_dereference *const lhs = new(state) ir_dereference_variable(var);
-   ir_rvalue *rhs = decl->initializer->hir(initializer_instructions, state);
+   ir_rvalue *rhs = decl->initializer->hir(initializer_instructions, state,
+                                           true);
 
    /* Calculate the constant value if this is a const or uniform
     * declaration.
@@ -3107,7 +3083,8 @@ validate_identifier(const char *identifier, YYLTYPE loc,
 
 ir_rvalue *
 ast_declarator_list::hir(exec_list *instructions,
-                         struct _mesa_glsl_parse_state *state)
+                         struct _mesa_glsl_parse_state *state,
+                         bool needs_rvalue)
 {
    void *ctx = state;
    const struct glsl_type *decl_type;
@@ -3170,7 +3147,7 @@ ast_declarator_list::hir(exec_list *instructions,
    /* The type specifier may contain a structure definition.  Process that
     * before any of the variable declarations.
     */
-   (void) this->type->specifier->hir(instructions, state);
+   (void) this->type->specifier->hir(instructions, state, false);
 
    decl_type = this->type->glsl_type(& type_name, state);
 
@@ -3764,7 +3741,8 @@ ast_declarator_list::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_parameter_declarator::hir(exec_list *instructions,
-                              struct _mesa_glsl_parse_state *state)
+                              struct _mesa_glsl_parse_state *state,
+                              bool needs_rvalue)
 {
    void *ctx = state;
    const struct glsl_type *type;
@@ -3887,7 +3865,7 @@ ast_parameter_declarator::parameters_to_hir(exec_list *ast_parameters,
 
    foreach_list_typed (ast_parameter_declarator, param, link, ast_parameters) {
       param->formal_parameter = formal;
-      param->hir(ir_parameters, state);
+      param->hir(ir_parameters, state, false);
 
       if (param->is_void)
          void_param = param;
@@ -3920,7 +3898,8 @@ emit_function(_mesa_glsl_parse_state *state, ir_function *f)
 
 ir_rvalue *
 ast_function::hir(exec_list *instructions,
-                  struct _mesa_glsl_parse_state *state)
+                  struct _mesa_glsl_parse_state *state,
+                  bool needs_rvalue)
 {
    void *ctx = state;
    ir_function *f = NULL;
@@ -4093,10 +4072,11 @@ ast_function::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_function_definition::hir(exec_list *instructions,
-                             struct _mesa_glsl_parse_state *state)
+                             struct _mesa_glsl_parse_state *state,
+                             bool needs_rvalue)
 {
    prototype->is_definition = true;
-   prototype->hir(instructions, state);
+   prototype->hir(instructions, state, false);
 
    ir_function_signature *signature = prototype->signature;
    if (signature == NULL)
@@ -4128,7 +4108,7 @@ ast_function_definition::hir(exec_list *instructions,
    }
 
    /* Convert the body of the function to HIR. */
-   this->body->hir(&signature->body, state);
+   this->body->hir(&signature->body, state, false);
    signature->is_defined = true;
 
    state->symbols->pop_scope();
@@ -4152,7 +4132,8 @@ ast_function_definition::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_jump_statement::hir(exec_list *instructions,
-                        struct _mesa_glsl_parse_state *state)
+                        struct _mesa_glsl_parse_state *state,
+                        bool needs_rvalue)
 {
    void *ctx = state;
 
@@ -4162,7 +4143,7 @@ ast_jump_statement::hir(exec_list *instructions,
       assert(state->current_function);
 
       if (opt_return_value) {
-         ir_rvalue *ret = opt_return_value->hir(instructions, state);
+         ir_rvalue *ret = opt_return_value->hir(instructions, state, true);
 
          /* The value of the return type can be NULL if the shader says
           * 'return foo();' and foo() is a function that returns void.
@@ -4268,7 +4249,7 @@ ast_jump_statement::hir(exec_list *instructions,
              mode == ast_continue) {
             if (state->loop_nesting_ast->rest_expression) {
                state->loop_nesting_ast->rest_expression->hir(instructions,
-                                                             state);
+                                                             state, false);
             }
             if (state->loop_nesting_ast->mode ==
                 ast_iteration_statement::ast_do_while) {
@@ -4309,11 +4290,12 @@ ast_jump_statement::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_selection_statement::hir(exec_list *instructions,
-                             struct _mesa_glsl_parse_state *state)
+                             struct _mesa_glsl_parse_state *state,
+                             bool needs_rvalue)
 {
    void *ctx = state;
 
-   ir_rvalue *const condition = this->condition->hir(instructions, state);
+   ir_rvalue *const condition = this->condition->hir(instructions, state, true);
 
    /* From page 66 (page 72 of the PDF) of the GLSL 1.50 spec:
     *
@@ -4335,13 +4317,13 @@ ast_selection_statement::hir(exec_list *instructions,
 
    if (then_statement != NULL) {
       state->symbols->push_scope();
-      then_statement->hir(& stmt->then_instructions, state);
+      then_statement->hir(& stmt->then_instructions, state, false);
       state->symbols->pop_scope();
    }
 
    if (else_statement != NULL) {
       state->symbols->push_scope();
-      else_statement->hir(& stmt->else_instructions, state);
+      else_statement->hir(& stmt->else_instructions, state, false);
       state->symbols->pop_scope();
    }
 
@@ -4355,12 +4337,13 @@ ast_selection_statement::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_switch_statement::hir(exec_list *instructions,
-                          struct _mesa_glsl_parse_state *state)
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue)
 {
    void *ctx = state;
 
    ir_rvalue *const test_expression =
-      this->test_expression->hir(instructions, state);
+      this->test_expression->hir(instructions, state, true);
 
    /* From page 66 (page 55 of the PDF) of the GLSL 1.50 spec:
     *
@@ -4421,7 +4404,7 @@ ast_switch_statement::hir(exec_list *instructions,
 
    /* Emit code for body of switch stmt.
     */
-   body->hir(instructions, state);
+   body->hir(instructions, state, false);
 
    hash_table_dtor(state->switch_state.labels_ht);
 
@@ -4440,8 +4423,7 @@ ast_switch_statement::test_to_hir(exec_list *instructions,
 
    /* Cache value of test expression. */
    ir_rvalue *const test_val =
-      test_expression->hir(instructions,
-			   state);
+      test_expression->hir(instructions, state, true);
 
    state->switch_state.test_var = new(ctx) ir_variable(test_val->type,
                                                        "switch_test_tmp",
@@ -4456,10 +4438,11 @@ ast_switch_statement::test_to_hir(exec_list *instructions,
 
 ir_rvalue *
 ast_switch_body::hir(exec_list *instructions,
-                     struct _mesa_glsl_parse_state *state)
+                     struct _mesa_glsl_parse_state *state,
+                     bool needs_rvalue)
 {
    if (stmts != NULL)
-      stmts->hir(instructions, state);
+      stmts->hir(instructions, state, false);
 
    /* Switch bodies do not have r-values. */
    return NULL;
@@ -4467,10 +4450,11 @@ ast_switch_body::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_case_statement_list::hir(exec_list *instructions,
-                             struct _mesa_glsl_parse_state *state)
+                             struct _mesa_glsl_parse_state *state,
+                             bool needs_rvalue)
 {
    foreach_list_typed (ast_case_statement, case_stmt, link, & this->cases)
-      case_stmt->hir(instructions, state);
+      case_stmt->hir(instructions, state, false);
 
    /* Case statements do not have r-values. */
    return NULL;
@@ -4478,9 +4462,10 @@ ast_case_statement_list::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_case_statement::hir(exec_list *instructions,
-                        struct _mesa_glsl_parse_state *state)
+                        struct _mesa_glsl_parse_state *state,
+                        bool needs_rvalue)
 {
-   labels->hir(instructions, state);
+   labels->hir(instructions, state, false);
 
    /* Conditionally set fallthru state based on break state. */
    ir_constant *const false_val = new(state) ir_constant(false);
@@ -4500,7 +4485,7 @@ ast_case_statement::hir(exec_list *instructions,
    ir_if *const test_fallthru = new(state) ir_if(deref_fallthru_guard);
 
    foreach_list_typed (ast_node, stmt, link, & this->stmts)
-      stmt->hir(& test_fallthru->then_instructions, state);
+      stmt->hir(& test_fallthru->then_instructions, state, false);
 
    instructions->push_tail(test_fallthru);
 
@@ -4511,10 +4496,11 @@ ast_case_statement::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_case_label_list::hir(exec_list *instructions,
-                         struct _mesa_glsl_parse_state *state)
+                         struct _mesa_glsl_parse_state *state,
+                         bool needs_rvalue)
 {
    foreach_list_typed (ast_case_label, label, link, & this->labels)
-      label->hir(instructions, state);
+      label->hir(instructions, state, false);
 
    /* Case labels do not have r-values. */
    return NULL;
@@ -4522,7 +4508,8 @@ ast_case_label_list::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_case_label::hir(exec_list *instructions,
-                    struct _mesa_glsl_parse_state *state)
+                    struct _mesa_glsl_parse_state *state,
+                    bool needs_rvalue)
 {
    void *ctx = state;
 
@@ -4536,7 +4523,8 @@ ast_case_label::hir(exec_list *instructions,
       /* Conditionally set fallthru state based on
        * comparison of cached test expression value to case label.
        */
-      ir_rvalue *const label_rval = this->test_value->hir(instructions, state);
+      ir_rvalue *const label_rval = this->test_value->hir(instructions, state,
+                                                          true);
       ir_constant *label_const = label_rval->constant_expression_value();
 
       if (!label_const) {
@@ -4607,7 +4595,7 @@ ast_iteration_statement::condition_to_hir(exec_list *instructions,
 
    if (condition != NULL) {
       ir_rvalue *const cond =
-         condition->hir(instructions, state);
+         condition->hir(instructions, state, false);
 
       if ((cond == NULL)
           || !cond->type->is_boolean() || !cond->type->is_scalar()) {
@@ -4636,7 +4624,8 @@ ast_iteration_statement::condition_to_hir(exec_list *instructions,
 
 ir_rvalue *
 ast_iteration_statement::hir(exec_list *instructions,
-                             struct _mesa_glsl_parse_state *state)
+                             struct _mesa_glsl_parse_state *state,
+                             bool needs_rvalue)
 {
    void *ctx = state;
 
@@ -4646,7 +4635,7 @@ ast_iteration_statement::hir(exec_list *instructions,
       state->symbols->push_scope();
 
    if (init_statement != NULL)
-      init_statement->hir(instructions, state);
+      init_statement->hir(instructions, state, false);
 
    ir_loop *const stmt = new(ctx) ir_loop();
    instructions->push_tail(stmt);
@@ -4666,10 +4655,10 @@ ast_iteration_statement::hir(exec_list *instructions,
       condition_to_hir(&stmt->body_instructions, state);
 
    if (body != NULL)
-      body->hir(& stmt->body_instructions, state);
+      body->hir(& stmt->body_instructions, state, false);
 
    if (rest_expression != NULL)
-      rest_expression->hir(& stmt->body_instructions, state);
+      rest_expression->hir(& stmt->body_instructions, state, false);
 
    if (mode == ast_do_while)
       condition_to_hir(&stmt->body_instructions, state);
@@ -4728,7 +4717,8 @@ is_valid_default_precision_type(const struct glsl_type *const type)
 
 ir_rvalue *
 ast_type_specifier::hir(exec_list *instructions,
-                        struct _mesa_glsl_parse_state *state)
+                        struct _mesa_glsl_parse_state *state,
+                        bool needs_rvalue)
 {
    if (this->default_precision == ast_precision_none && this->structure == NULL)
       return NULL;
@@ -4826,7 +4816,7 @@ ast_type_specifier::hir(exec_list *instructions,
     *    S s = { ... };                 (is_declaration = false)
     */
    if (this->structure != NULL && this->structure->is_declaration)
-      return this->structure->hir(instructions, state);
+      return this->structure->hir(instructions, state, needs_rvalue);
 
    return NULL;
 }
@@ -4884,7 +4874,7 @@ ast_process_structure_or_interface_block(exec_list *instructions,
    foreach_list_typed (ast_declarator_list, decl_list, link, declarations) {
       const char *type_name;
 
-      decl_list->type->specifier->hir(instructions, state);
+      decl_list->type->specifier->hir(instructions, state, false);
 
       /* Section 10.9 of the GLSL ES 1.00 specification states that
        * embedded structure definitions have been removed from the language.
@@ -5000,7 +4990,8 @@ ast_process_structure_or_interface_block(exec_list *instructions,
 
 ir_rvalue *
 ast_struct_specifier::hir(exec_list *instructions,
-                          struct _mesa_glsl_parse_state *state)
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue)
 {
    YYLTYPE loc = this->get_location();
 
@@ -5103,7 +5094,8 @@ private:
 
 ir_rvalue *
 ast_interface_block::hir(exec_list *instructions,
-                         struct _mesa_glsl_parse_state *state)
+                         struct _mesa_glsl_parse_state *state,
+                         bool needs_rvalue)
 {
    YYLTYPE loc = this->get_location();
 
@@ -5474,7 +5466,8 @@ ast_interface_block::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_gs_input_layout::hir(exec_list *instructions,
-                         struct _mesa_glsl_parse_state *state)
+                         struct _mesa_glsl_parse_state *state,
+                         bool needs_rvalue)
 {
    YYLTYPE loc = this->get_location();
 
@@ -5536,7 +5529,8 @@ ast_gs_input_layout::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_cs_input_layout::hir(exec_list *instructions,
-                         struct _mesa_glsl_parse_state *state)
+                         struct _mesa_glsl_parse_state *state,
+                         bool needs_rvalue)
 {
    YYLTYPE loc = this->get_location();
 

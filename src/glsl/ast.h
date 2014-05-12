@@ -60,7 +60,8 @@ public:
     * Convert the AST node to the high-level intermediate representation
     */
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    /**
     * Retrieve the source location of an AST node
@@ -214,15 +215,9 @@ public:
 
    static const char *operator_string(enum ast_operators op);
 
-   virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
-
-   virtual void hir_no_rvalue(exec_list *instructions,
-                              struct _mesa_glsl_parse_state *state);
-
-   ir_rvalue *do_hir(exec_list *instructions,
-                     struct _mesa_glsl_parse_state *state,
-                     bool needs_rvalue);
+   ir_rvalue *hir(exec_list *instructions,
+                  struct _mesa_glsl_parse_state *state,
+                  bool needs_rvalue);
 
    virtual void print(void) const;
 
@@ -292,10 +287,8 @@ public:
    }
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
-
-   virtual void hir_no_rvalue(exec_list *instructions,
-                              struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
 private:
    /**
@@ -368,10 +361,8 @@ public:
    const glsl_type *constructor_type;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-                          struct _mesa_glsl_parse_state *state);
-
-   virtual void hir_no_rvalue(exec_list *instructions,
-                              struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 };
 
 /**
@@ -390,7 +381,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    int new_scope;
    exec_list statements;
@@ -652,7 +644,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    const char *name;
    /* List of ast_declarator_list * */
@@ -702,7 +695,8 @@ public:
 
    virtual void print(void) const;
 
-   ir_rvalue *hir(exec_list *, struct _mesa_glsl_parse_state *);
+   ir_rvalue *hir(exec_list *, struct _mesa_glsl_parse_state *,
+                  bool needs_rvalue);
 
    const char *type_name;
    ast_struct_specifier *structure;
@@ -738,7 +732,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_fully_specified_type *type;
    /** List of 'ast_declaration *' */
@@ -770,7 +765,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_fully_specified_type *type;
    const char *identifier;
@@ -800,7 +796,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_fully_specified_type *return_type;
    const char *identifier;
@@ -838,7 +835,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_expression *expression;
 };
@@ -850,7 +848,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    /**
     * An test value of NULL means 'default'.
@@ -865,7 +864,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    /**
     * A list of case labels.
@@ -880,7 +880,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_case_label_list *labels;
 
@@ -897,7 +898,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    /**
     * A list of cases.
@@ -912,7 +914,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_case_statement_list *stmts;
 };
@@ -926,7 +929,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_expression *condition;
    ast_node *then_statement;
@@ -941,7 +945,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_expression *test_expression;
    ast_node *body;
@@ -957,7 +962,8 @@ public:
 
    virtual void print(void) const;
 
-   virtual ir_rvalue *hir(exec_list *, struct _mesa_glsl_parse_state *);
+   virtual ir_rvalue *hir(exec_list *, struct _mesa_glsl_parse_state *,
+                          bool needs_rvalue);
 
    enum ast_iteration_modes {
       ast_for,
@@ -988,7 +994,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    enum ast_jump_modes {
       ast_continue,
@@ -1010,7 +1017,8 @@ public:
    virtual void print(void) const;
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_function *prototype;
    ast_compound_statement *body;
@@ -1027,7 +1035,8 @@ public:
    }
 
    virtual ir_rvalue *hir(exec_list *instructions,
-			  struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
    ast_type_qualifier layout;
    const char *block_name;
@@ -1067,7 +1076,8 @@ public:
    }
 
    virtual ir_rvalue *hir(exec_list *instructions,
-                          struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
 private:
    const GLenum prim_type;
@@ -1088,7 +1098,8 @@ public:
    }
 
    virtual ir_rvalue *hir(exec_list *instructions,
-                          struct _mesa_glsl_parse_state *state);
+                          struct _mesa_glsl_parse_state *state,
+                          bool needs_rvalue);
 
 private:
    unsigned local_size[3];

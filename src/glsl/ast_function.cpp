@@ -43,7 +43,7 @@ process_parameters(exec_list *instructions, exec_list *actual_parameters,
 
    foreach_list (n, parameters) {
       ast_node *const ast = exec_node_data(ast_node, n, link);
-      ir_rvalue *result = ast->hir(instructions, state);
+      ir_rvalue *result = ast->hir(instructions, state, false);
 
       ir_constant *const constant = result->constant_expression_value();
       if (constant != NULL)
@@ -1474,7 +1474,8 @@ process_record_constructor(exec_list *instructions,
 
 ir_rvalue *
 ast_function_expression::hir(exec_list *instructions,
-			     struct _mesa_glsl_parse_state *state)
+			     struct _mesa_glsl_parse_state *state,
+                             bool needs_rvalue)
 {
    void *ctx = state;
    /* There are three sorts of function calls.
@@ -1560,7 +1561,7 @@ ast_function_expression::hir(exec_list *instructions,
 
       foreach_list (n, &this->expressions) {
 	 ast_node *ast = exec_node_data(ast_node, n, link);
-	 ir_rvalue *result = ast->hir(instructions, state)->as_rvalue();
+	 ir_rvalue *result = ast->hir(instructions, state, true)->as_rvalue();
 
 	 /* From page 50 (page 56 of the PDF) of the GLSL 1.50 spec:
 	  *
@@ -1741,7 +1742,8 @@ ast_function_expression::hir(exec_list *instructions,
 
 ir_rvalue *
 ast_aggregate_initializer::hir(exec_list *instructions,
-                               struct _mesa_glsl_parse_state *state)
+                               struct _mesa_glsl_parse_state *state,
+                               bool needs_rvalue)
 {
    void *ctx = state;
    YYLTYPE loc = this->get_location();

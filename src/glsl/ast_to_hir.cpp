@@ -887,7 +887,7 @@ do_assignment(exec_list *instructions, struct _mesa_glsl_parse_state *state,
    } else {
       if (!error_emitted)
          instructions->push_tail(new(ctx) ir_assignment(lhs, rhs));
-      *out_rvalue = NULL;
+      *out_rvalue = rhs;
    }
 
    return error_emitted;
@@ -2829,6 +2829,7 @@ get_variable_being_redeclared(ir_variable *var, YYLTYPE loc,
 ir_rvalue *
 process_initializer(ir_variable *var, ast_declaration *decl,
 		    ast_fully_specified_type *type,
+                    bool needs_rvalue,
 		    exec_list *initializer_instructions,
 		    struct _mesa_glsl_parse_state *state)
 {
@@ -2931,7 +2932,7 @@ process_initializer(ir_variable *var, ast_declaration *decl,
          do_assignment(initializer_instructions, state,
                        NULL,
                        lhs, rhs,
-                       &result, true,
+                       &result, needs_rvalue,
                        true,
                        type->get_location());
          initializer_type = result->type;
@@ -3644,7 +3645,7 @@ ast_declarator_list::hir(exec_list *instructions,
 
       if (decl->initializer != NULL) {
          result = process_initializer((earlier == NULL) ? var : earlier,
-                                      decl, this->type,
+                                      decl, this->type, needs_rvalue,
                                       &initializer_instructions, state);
       }
 

@@ -1507,6 +1507,19 @@ _mesa_glsl_compile_shader(struct gl_context *ctx, struct gl_shader *shader,
 }
 
 } /* extern "C" */
+
+static bool
+do_lower_sub_to_add_neg(exec_list *ir)
+{
+   return lower_instructions(ir, SUB_TO_ADD_NEG);
+}
+
+static bool
+do_lower_jumps_wrapper(exec_list *ir)
+{
+   return do_lower_jumps(ir);
+}
+
 /**
  * Do the set of common optimizations passes
  *
@@ -1531,49 +1544,76 @@ do_common_optimization(exec_list *ir, bool linked,
                        const struct gl_shader_compiler_options *options,
                        bool native_integers)
 {
+#define OPT1(func, enable)       { func, NULL, #func, enable, false }
+#define OPT2(func, enable, arg) { NULL, func, #func, enable, arg }
+   struct {
+      bool (*func)(exec_list *ir);
+      bool (*func2)(exec_list *ir, bool arg);
+      const char *name;
+      bool enabled;
+      bool arg;
+   } opts[] = {
+      OPT1(do_lower_sub_to_add_neg, true),
+      OPT1(do_function_inlining, linked),
+      OPT1(do_dead_functions, linked),
+      OPT1(do_structure_splitting, linked),
+      OPT1(do_if_simplification, true),
+      OPT1(opt_flatten_nested_if_blocks, true),
+      OPT1(do_copy_propagation, true),
+      OPT1(do_copy_propagation_elements, true),
+      OPT1(opt_flip_matrices, options->OptimizeForAOS && !linked),
+      OPT1(do_vectorize, linked && options->OptimizeForAOS),
+
+      OPT2(do_dead_code, linked, uniform_locations_assigned),
+      OPT1(do_dead_code_unlinked, !linked),
+
+      OPT1(do_dead_code_local, true),
+      OPT1(do_tree_grafting, true),
+      OPT1(do_constant_propagation, true),
+      OPT1(do_constant_variable, linked),
+      OPT1(do_constant_variable_unlinked, !linked),
+      OPT1(do_constant_folding, true),
+      OPT1(do_cse, true),
+      OPT2(do_algebraic, true, native_integers),
+      OPT1(do_lower_jumps_wrapper, true),
+      OPT1(do_vec_index_to_swizzle, true),
+      OPT2(lower_vector_insert, true, false),
+      OPT1(do_swizzle_swizzle, true),
+      OPT1(do_noop_swizzle, true),
+
+      OPT2(optimize_split_arrays, true, linked),
+      OPT1(optimize_redundant_jumps, true),
+   };
    GLboolean progress = GL_FALSE;
 
-   progress = lower_instructions(ir, SUB_TO_ADD_NEG) || progress;
+   for (unsigned i = 0; i < ARRAY_SIZE(opts); i++) {
+      if (opts[i].enabled) {
+         static bool debug = true;
+         bool result;
 
-   if (linked) {
-      progress = do_function_inlining(ir) || progress;
-      progress = do_dead_functions(ir) || progress;
-      progress = do_structure_splitting(ir) || progress;
+         if (debug) {
+            fprintf(stderr, "OPT start: %s\n", opts[i].name);
+         }
+
+         if (opts[i].func)
+            result = opts[i].func(ir);
+         else
+            result = opts[i].func2(ir, opts[i].arg);
+         progress = progress || result;
+
+         if (debug) {
+            fprintf(stderr, "OPT end:   %s%s\n",
+                    opts[i].name, result ? ": progress" : "");
+            validate_ir_tree(ir);
+
+            if (result) {
+               fprintf(stderr, "IR:\n");
+               _mesa_print_ir(stderr, ir, NULL);
+               fprintf(stderr, "\n");
+            }
+         }
+      }
    }
-   progress = do_if_simplification(ir) || progress;
-   progress = opt_flatten_nested_if_blocks(ir) || progress;
-   progress = do_copy_propagation(ir) || progress;
-   progress = do_copy_propagation_elements(ir) || progress;
-
-   if (options->OptimizeForAOS && !linked)
-      progress = opt_flip_matrices(ir) || progress;
-
-   if (linked && options->OptimizeForAOS) {
-      progress = do_vectorize(ir) || progress;
-   }
-
-   if (linked)
-      progress = do_dead_code(ir, uniform_locations_assigned) || progress;
-   else
-      progress = do_dead_code_unlinked(ir) || progress;
-   progress = do_dead_code_local(ir) || progress;
-   progress = do_tree_grafting(ir) || progress;
-   progress = do_constant_propagation(ir) || progress;
-   if (linked)
-      progress = do_constant_variable(ir) || progress;
-   else
-      progress = do_constant_variable_unlinked(ir) || progress;
-   progress = do_constant_folding(ir) || progress;
-   progress = do_cse(ir) || progress;
-   progress = do_algebraic(ir, native_integers) || progress;
-   progress = do_lower_jumps(ir) || progress;
-   progress = do_vec_index_to_swizzle(ir) || progress;
-   progress = lower_vector_insert(ir, false) || progress;
-   progress = do_swizzle_swizzle(ir) || progress;
-   progress = do_noop_swizzle(ir) || progress;
-
-   progress = optimize_split_arrays(ir, linked) || progress;
-   progress = optimize_redundant_jumps(ir) || progress;
 
    loop_state *ls = analyze_loop_variables(ir);
    if (ls->loop_found) {

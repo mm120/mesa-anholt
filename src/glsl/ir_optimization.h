@@ -84,7 +84,6 @@ void do_dead_builtin_varyings(struct gl_context *ctx,
                               unsigned num_tfeedback_decls,
                               class tfeedback_decl *tfeedback_decls);
 bool do_dead_code(exec_list *instructions, bool uniform_locations_assigned);
-bool do_dead_code_local(exec_list *instructions);
 bool do_dead_code_unlinked(exec_list *instructions);
 bool do_dead_functions(exec_list *instructions);
 bool opt_flip_matrices(exec_list *instructions);

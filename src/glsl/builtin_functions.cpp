@@ -732,7 +732,11 @@ builtin_builder::create_shader()
 
    shader->symbols->add_variable(gl_ModelViewProjectionMatrix);
 
-   gl_Vertex = in_var(glsl_type::vec4_type, "gl_Vertex");
+   gl_Vertex = new(mem_ctx) ir_variable(glsl_type::vec4_type, "gl_Vertex",
+                                        ir_var_shader_in);
+   gl_Vertex->data.location = VERT_ATTRIB_POS;
+   gl_Vertex->data.explicit_location = true;
+   gl_Vertex->data.read_only = true;
    shader->symbols->add_variable(gl_Vertex);
 }
 

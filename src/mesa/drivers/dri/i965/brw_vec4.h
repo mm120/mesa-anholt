@@ -36,6 +36,7 @@ extern "C" {
 
 #include "brw_context.h"
 #include "brw_eu.h"
+#include "intel_asm_printer.h"
 
 #ifdef __cplusplus
 }; /* extern "C" */
@@ -650,7 +651,8 @@ public:
    const unsigned *generate_assembly(exec_list *insts, unsigned *asm_size);
 
 private:
-   void generate_code(exec_list *instructions);
+   void generate_code(exec_list *instructions, int *num_annotations,
+                      struct annotation **annotation);
    void generate_vec4_instruction(vec4_instruction *inst,
                                   struct brw_reg dst,
                                   struct brw_reg *src);

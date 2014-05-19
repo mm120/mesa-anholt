@@ -740,7 +740,8 @@ public:
                                      unsigned *assembly_size);
 
 private:
-   void generate_code(exec_list *instructions);
+   void generate_code(exec_list *instructions, int *num_annotations,
+                      struct annotation **annotation);
    void generate_fb_write(fs_inst *inst);
    void generate_linterp(fs_inst *inst, struct brw_reg dst,
                          struct brw_reg *src);

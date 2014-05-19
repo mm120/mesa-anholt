@@ -1322,12 +1322,9 @@ fs_generator::generate_untyped_surface_read(fs_inst *inst, struct brw_reg dst,
 }
 
 void
-fs_generator::generate_code(exec_list *instructions)
+fs_generator::generate_code(exec_list *instructions, int *num_annotations,
+                            struct annotation **annotation)
 {
-   int last_native_insn_offset = p->next_insn_offset;
-   const char *last_annotation_string = NULL;
-   const void *last_annotation_ir = NULL;
-
    if (unlikely(debug_flag)) {
       if (prog) {
          fprintf(stderr,
@@ -1344,54 +1341,52 @@ fs_generator::generate_code(exec_list *instructions)
       }
    }
 
+   int block_num = 0;
+   int ann_num = 0;
+   int ann_size = 1024;
    cfg_t *cfg = NULL;
-   if (unlikely(debug_flag))
+   struct annotation *ann = NULL;
+
+   if (unlikely(debug_flag)) {
       cfg = new(mem_ctx) cfg_t(instructions);
+      ann = rzalloc_array(NULL, struct annotation, ann_size);
+   }
 
    foreach_list(node, instructions) {
       fs_inst *inst = (fs_inst *)node;
       struct brw_reg src[3], dst;
 
       if (unlikely(debug_flag)) {
-	 foreach_list(node, &cfg->block_list) {
-	    bblock_link *link = (bblock_link *)node;
-	    bblock_t *block = link->block;
+         if (ann_num == ann_size) {
+            ann_size *= 2;
+            ann = reralloc(NULL, ann, struct annotation, ann_size);
+         }
 
-	    if (block->start == inst) {
-	       fprintf(stderr, "   START B%d", block->block_num);
-	       foreach_list(predecessor_node, &block->parents) {
-		  bblock_link *predecessor_link =
-		     (bblock_link *)predecessor_node;
-		  bblock_t *predecessor_block = predecessor_link->block;
-		  fprintf(stderr, " <-B%d", predecessor_block->block_num);
-	       }
-	       fprintf(stderr, "\n");
-	    }
-	 }
+         ann[ann_num].offset = p->next_insn_offset;
+         ann[ann_num].ir = inst->ir;
+         ann[ann_num].annotation = inst->annotation;
 
-	 if (last_annotation_ir != inst->ir) {
-	    last_annotation_ir = inst->ir;
-	    if (last_annotation_ir) {
-	       fprintf(stderr, "   ");
-               if (prog)
-                  ((ir_instruction *)inst->ir)->fprint(stderr);
-               else {
-                  const prog_instruction *fpi;
-                  fpi = (const prog_instruction *)inst->ir;
-                  fprintf(stderr, "%d: ",
-                          (int)(fpi - (fp ? fp->Base.Instructions : 0)));
-                  _mesa_fprint_instruction_opt(stderr,
-                                               fpi,
-                                               0, PROG_PRINT_DEBUG, NULL);
-               }
-	       fprintf(stderr, "\n");
-	    }
-	 }
-	 if (last_annotation_string != inst->annotation) {
-	    last_annotation_string = inst->annotation;
-	    if (last_annotation_string)
-	       fprintf(stderr, "   %s\n", last_annotation_string);
-	 }
+         if (cfg->blocks[block_num]->start == inst) {
+            ann[ann_num].block_start = cfg->blocks[block_num];
+         }
+
+         /* There is no hardware DO instruction on Gen6+, so since DO always
+          * starts a basic block, we need to set the .block_start of the next
+          * instruction's annotation with a pointer to the bblock started by
+          * the DO.
+          *
+          * There's also only complication from emitting an annotation without
+          * a corresponding hardware instruction to disassemble.
+          */
+         if (brw->gen >= 6 && inst->opcode == BRW_OPCODE_DO) {
+            ann_num--;
+         }
+
+         if (cfg->blocks[block_num]->end == inst) {
+            ann[ann_num].block_end = cfg->blocks[block_num];
+            block_num++;
+         }
+         ann_num++;
       }
 
       for (unsigned int i = 0; i < 3; i++) {
@@ -1792,7 +1787,9 @@ fs_generator::generate_code(exec_list *instructions)
          /* This is the place where the final HALT needs to be inserted if
           * we've emitted any discards.  If not, this will emit no code.
           */
-         patch_discard_jumps_to_fb_writes();
+         if (!patch_discard_jumps_to_fb_writes()) {
+            ann_num--;
+         }
          break;
 
       default:
@@ -1804,44 +1801,18 @@ fs_generator::generate_code(exec_list *instructions)
 	 }
 	 abort();
       }
-
-      if (unlikely(debug_flag)) {
-	 brw_disassemble(brw, p->store, last_native_insn_offset, p->next_insn_offset, stderr);
-
-	 foreach_list(node, &cfg->block_list) {
-	    bblock_link *link = (bblock_link *)node;
-	    bblock_t *block = link->block;
-
-	    if (block->end == inst) {
-	       fprintf(stderr, "   END B%d", block->block_num);
-	       foreach_list(successor_node, &block->children) {
-		  bblock_link *successor_link =
-		     (bblock_link *)successor_node;
-		  bblock_t *successor_block = successor_link->block;
-		  fprintf(stderr, " ->B%d", successor_block->block_num);
-	       }
-	       fprintf(stderr, "\n");
-	    }
-	 }
-      }
-
-      last_native_insn_offset = p->next_insn_offset;
-   }
-
-   if (unlikely(debug_flag)) {
-      fprintf(stderr, "\n");
    }
 
    brw_set_uip_jip(p);
 
-   /* OK, while the INTEL_DEBUG=wm above is very nice for debugging FS
-    * emit issues, it doesn't get the jump distances into the output,
-    * which is often something we want to debug.  So this is here in
-    * case you're doing that.
-    */
-   if (0) {
-      brw_disassemble(brw, p->store, 0, p->next_insn_offset, stderr);
+   if (unlikely(debug_flag)) {
+      if (ann_num == ann_size) {
+         ann = reralloc(NULL, ann, struct annotation, ann_size + 1);
+      }
+      ann[ann_num].offset = p->next_insn_offset;
    }
+   *num_annotations = ann_num;
+   *annotation = ann;
 }
 
 const unsigned *
@@ -1851,10 +1822,21 @@ fs_generator::generate_assembly(exec_list *simd8_instructions,
 {
    assert(simd8_instructions || simd16_instructions);
 
+   const struct gl_program *prog = fp ? &fp->Base : NULL;
+
    if (simd8_instructions) {
+      struct annotation *annotation;
+      int num_annotations;
+
       dispatch_width = 8;
-      generate_code(simd8_instructions);
-      brw_compact_instructions(p, 0, 0, NULL);
+      generate_code(simd8_instructions, &num_annotations, &annotation);
+      brw_compact_instructions(p, 0, num_annotations, annotation);
+
+      if (unlikely(debug_flag)) {
+         dump_assembly(p->store, num_annotations, annotation, brw, prog,
+                       brw_disassemble);
+         ralloc_free(annotation);
+      }
    }
 
    if (simd16_instructions) {
@@ -1868,9 +1850,19 @@ fs_generator::generate_assembly(exec_list *simd8_instructions,
 
       brw_set_compression_control(p, BRW_COMPRESSION_COMPRESSED);
 
+      struct annotation *annotation;
+      int num_annotations;
+
       dispatch_width = 16;
-      generate_code(simd16_instructions);
-      brw_compact_instructions(p, prog_data->prog_offset_16, 0, NULL);
+      generate_code(simd16_instructions, &num_annotations, &annotation);
+      brw_compact_instructions(p, prog_data->prog_offset_16,
+                               num_annotations, annotation);
+
+      if (unlikely(debug_flag)) {
+         dump_assembly(p->store, num_annotations, annotation, brw, prog,
+                       brw_disassemble);
+         ralloc_free(annotation);
+      }
    }
 
    return brw_get_program(p, assembly_size);

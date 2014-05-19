@@ -46,6 +46,7 @@ extern "C" {
 #include "brw_eu.h"
 #include "brw_wm.h"
 #include "brw_shader.h"
+#include "intel_asm_printer.h"
 }
 #include "gen8_generator.h"
 #include "glsl/glsl_types.h"
@@ -611,7 +612,8 @@ public:
                                      unsigned *assembly_size);
 
 private:
-   void generate_code(exec_list *instructions);
+   void generate_code(exec_list *instructions, int *num_annotations,
+                      struct annotation **annotation);
    void generate_fb_write(fs_inst *inst);
    void generate_blorp_fb_write(fs_inst *inst);
    void generate_pixel_xy(struct brw_reg dst, bool is_x);

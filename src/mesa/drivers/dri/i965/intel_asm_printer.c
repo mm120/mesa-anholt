@@ -52,7 +52,7 @@ dump_assembly(void *assembly, int num_annotations, struct annotation *annotation
          last_annotation_ir = annotation[i].ir;
          if (last_annotation_ir) {
             fprintf(stderr, "   ");
-            if (prog)
+            if (!prog->Instructions)
                fprint_ir(stderr, annotation[i].ir);
             else {
                const struct prog_instruction *pi =

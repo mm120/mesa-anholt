@@ -429,18 +429,18 @@ SAMPLE_instruction: SAMPLE_OP maskedDstReg ',' swizzleSrcReg ',' texImageUnit ',
 	      GLbitfield target_mask = 0;
 
 
-	      $$->Base.TexSrcUnit = $6;
+	      $$->Base->TexSrcUnit = $6;
 
 	      if ($8 < 0) {
 		 shadow_tex = tex_mask;
 
-		 $$->Base.TexSrcTarget = -$8;
-		 $$->Base.TexShadow = 1;
+		 $$->Base->TexSrcTarget = -$8;
+		 $$->Base->TexShadow = 1;
 	      } else {
-		 $$->Base.TexSrcTarget = $8;
+		 $$->Base->TexSrcTarget = $8;
 	      }
 
-	      target_mask = (1U << $$->Base.TexSrcTarget);
+	      target_mask = (1U << $$->Base->TexSrcTarget);
 
 	      /* If this texture unit was previously accessed and that access
 	       * had a different texture target, generate an error.
@@ -472,8 +472,8 @@ KIL_instruction: KIL swizzleSrcReg
 	| KIL ccTest
 	{
 	   $$ = asm_instruction_ctor(OPCODE_KIL_NV, NULL, NULL, NULL, NULL);
-	   $$->Base.DstReg.CondMask = $2.CondMask;
-	   $$->Base.DstReg.CondSwizzle = $2.CondSwizzle;
+	   $$->Base->DstReg.CondMask = $2.CondMask;
+	   $$->Base->DstReg.CondSwizzle = $2.CondSwizzle;
 	   state->fragment.UsesKill = 1;
 	}
 	;
@@ -487,18 +487,18 @@ TXD_instruction: TXD_OP maskedDstReg ',' swizzleSrcReg ',' swizzleSrcReg ',' swi
 	      GLbitfield target_mask = 0;
 
 
-	      $$->Base.TexSrcUnit = $10;
+	      $$->Base->TexSrcUnit = $10;
 
 	      if ($12 < 0) {
 		 shadow_tex = tex_mask;
 
-		 $$->Base.TexSrcTarget = -$12;
-		 $$->Base.TexShadow = 1;
+		 $$->Base->TexSrcTarget = -$12;
+		 $$->Base->TexShadow = 1;
 	      } else {
-		 $$->Base.TexSrcTarget = $12;
+		 $$->Base->TexSrcTarget = $12;
 	      }
 
-	      target_mask = (1U << $$->Base.TexSrcTarget);
+	      target_mask = (1U << $$->Base->TexSrcTarget);
 
 	      /* If this texture unit was previously accessed and that access
 	       * had a different texture target, generate an error.
@@ -2241,30 +2241,30 @@ asm_instruction_set_operands(struct asm_instruction *inst,
     * destination register.
     */
    if (dst == NULL) {
-      init_dst_reg(& inst->Base.DstReg);
+      init_dst_reg(& inst->Base->DstReg);
    } else {
-      inst->Base.DstReg = *dst;
+      inst->Base->DstReg = *dst;
    }
 
    /* The only instruction that doesn't have any source registers is the
     * condition-code based KIL instruction added by NV_fragment_program_option.
     */
    if (src0 != NULL) {
-      inst->Base.SrcReg[0] = src0->Base;
+      inst->Base->SrcReg[0] = src0->Base;
       inst->SrcReg[0] = *src0;
    } else {
       init_src_reg(& inst->SrcReg[0]);
    }
 
    if (src1 != NULL) {
-      inst->Base.SrcReg[1] = src1->Base;
+      inst->Base->SrcReg[1] = src1->Base;
       inst->SrcReg[1] = *src1;
    } else {
       init_src_reg(& inst->SrcReg[1]);
    }
 
    if (src2 != NULL) {
-      inst->Base.SrcReg[2] = src2->Base;
+      inst->Base->SrcReg[2] = src2->Base;
       inst->SrcReg[2] = *src2;
    } else {
       init_src_reg(& inst->SrcReg[2]);
@@ -2282,8 +2282,13 @@ asm_instruction_ctor(gl_inst_opcode op,
    struct asm_instruction *inst = CALLOC_STRUCT(asm_instruction);
 
    if (inst) {
-      _mesa_init_instructions(& inst->Base, 1);
-      inst->Base.Opcode = op;
+      inst->Base = _mesa_alloc_instructions(1);
+      if (!inst->Base) {
+         free(inst);
+         return NULL;
+      }
+      _mesa_init_instructions(inst->Base, 1);
+      inst->Base->Opcode = op;
 
       asm_instruction_set_operands(inst, dst, src0, src1, src2);
    }
@@ -2302,12 +2307,17 @@ asm_instruction_copy_ctor(const struct prog_instruction *base,
    struct asm_instruction *inst = CALLOC_STRUCT(asm_instruction);
 
    if (inst) {
-      _mesa_init_instructions(& inst->Base, 1);
-      inst->Base.Opcode = base->Opcode;
-      inst->Base.CondUpdate = base->CondUpdate;
-      inst->Base.CondDst = base->CondDst;
-      inst->Base.SaturateMode = base->SaturateMode;
-      inst->Base.Precision = base->Precision;
+      inst->Base = _mesa_alloc_instructions(1);
+      if (!inst->Base) {
+         free(inst);
+         return NULL;
+      }
+      _mesa_init_instructions(inst->Base, 1);
+      inst->Base->Opcode = base->Opcode;
+      inst->Base->CondUpdate = base->CondUpdate;
+      inst->Base->CondDst = base->CondDst;
+      inst->Base->SaturateMode = base->SaturateMode;
+      inst->Base->Precision = base->Precision;
 
       asm_instruction_set_operands(inst, dst, src0, src1, src2);
    }
@@ -2758,7 +2768,7 @@ _mesa_parse_arb_program(struct gl_context *ctx, GLenum target, const GLubyte *st
    for (i = 0; i < state->prog->NumInstructions; i++) {
       struct asm_instruction *const temp = inst->next;
 
-      state->prog->Instructions[i] = inst->Base;
+      state->prog->Instructions[i] = *inst->Base;
       inst = temp;
    }
 
@@ -2788,6 +2798,7 @@ _mesa_parse_arb_program(struct gl_context *ctx, GLenum target, const GLubyte *st
 error:
    for (inst = state->inst_head; inst != NULL; inst = temp) {
       temp = inst->next;
+      _mesa_free_instructions(inst->Base, 1);
       free(inst);
    }
 

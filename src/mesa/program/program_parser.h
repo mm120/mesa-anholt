@@ -122,7 +122,7 @@ struct asm_src_register {
 
 
 struct asm_instruction {
-   struct prog_instruction Base;
+   struct prog_instruction *Base;
    struct asm_instruction *next;
    struct asm_src_register SrcReg[3];
 };

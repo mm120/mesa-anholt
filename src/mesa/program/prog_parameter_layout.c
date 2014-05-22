@@ -150,8 +150,8 @@ _mesa_layout_parameters(struct asm_parser_state *state)
 	     * array.  Now that the base of the parameter array is known, the
 	     * index can be updated to its actual value.
 	     */
-	    inst->Base.SrcReg[i] = inst->SrcReg[i].Base;
-	    inst->Base.SrcReg[i].Index +=
+	    inst->Base->SrcReg[i] = inst->SrcReg[i].Base;
+	    inst->Base->SrcReg[i].Index +=
 	       inst->SrcReg[i].Symbol->param_binding_begin;
 	 }
       }
@@ -178,7 +178,7 @@ _mesa_layout_parameters(struct asm_parser_state *state)
 	    continue;
 	 }
 
-	 inst->Base.SrcReg[i] = inst->SrcReg[i].Base;
+	 inst->Base->SrcReg[i] = inst->SrcReg[i].Base;
 	 p = & state->prog->Parameters->Parameters[idx];
 
 	 switch (p->Type) {
@@ -186,16 +186,16 @@ _mesa_layout_parameters(struct asm_parser_state *state)
 	    const gl_constant_value *const v =
 	       state->prog->Parameters->ParameterValues[idx];
 
-	    inst->Base.SrcReg[i].Index =
+	    inst->Base->SrcReg[i].Index =
 	       _mesa_add_unnamed_constant(layout, v, p->Size, & swizzle);
 
-	    inst->Base.SrcReg[i].Swizzle = 
-	       _mesa_combine_swizzles(swizzle, inst->Base.SrcReg[i].Swizzle);
+	    inst->Base->SrcReg[i].Swizzle =
+	       _mesa_combine_swizzles(swizzle, inst->Base->SrcReg[i].Swizzle);
 	    break;
 	 }
 
 	 case PROGRAM_STATE_VAR:
-	    inst->Base.SrcReg[i].Index =
+	    inst->Base->SrcReg[i].Index =
 	       _mesa_add_state_reference(layout, p->StateIndexes);
 	    break;
 
@@ -204,7 +204,7 @@ _mesa_layout_parameters(struct asm_parser_state *state)
 	 }
 
 	 inst->SrcReg[i].Base.File = p->Type;
-	 inst->Base.SrcReg[i].File = p->Type;
+	 inst->Base->SrcReg[i].File = p->Type;
       }
    }
 

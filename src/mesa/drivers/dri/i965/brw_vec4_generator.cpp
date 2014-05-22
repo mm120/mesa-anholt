@@ -1261,8 +1261,8 @@ vec4_generator::generate_vec4_instruction(vec4_instruction *instruction,
 }
 
 void
-vec4_generator::generate_code(exec_list *instructions, int *num_annotations,
-                              struct annotation **annotation)
+vec4_generator::generate_code(exec_list *instructions,
+                              struct annotation_info *annotation)
 {
    if (unlikely(debug_flag)) {
       if (shader_prog) {
@@ -1274,53 +1274,18 @@ vec4_generator::generate_code(exec_list *instructions, int *num_annotations,
       }
    }
 
-   int block_num = 0;
-   int ann_num = 0;
-   int ann_size = 1024;
    cfg_t *cfg = NULL;
-   struct annotation *ann = NULL;
 
    if (unlikely(debug_flag)) {
       cfg = new(mem_ctx) cfg_t(instructions);
-      ann = rzalloc_array(NULL, struct annotation, ann_size);
    }
 
    foreach_list(node, instructions) {
       vec4_instruction *inst = (vec4_instruction *)node;
       struct brw_reg src[3], dst;
 
-      if (unlikely(debug_flag)) {
-         if (ann_num == ann_size) {
-            ann_size *= 2;
-            ann = reralloc(NULL, ann, struct annotation, ann_size);
-         }
-
-         ann[ann_num].offset = p->next_insn_offset;
-         ann[ann_num].ir = inst->ir;
-         ann[ann_num].annotation = inst->annotation;
-
-         if (cfg->blocks[block_num]->start == inst) {
-            ann[ann_num].block_start = cfg->blocks[block_num];
-         }
-
-         /* There is no hardware DO instruction on Gen6+, so since DO always
-          * starts a basic block, we need to set the .block_start of the next
-          * instruction's annotation with a pointer to the bblock started by
-          * the DO.
-          *
-          * There's also only complication from emitting an annotation without
-          * a corresponding hardware instruction to disassemble.
-          */
-         if (brw->gen >= 6 && inst->opcode == BRW_OPCODE_DO) {
-            ann_num--;
-         }
-
-         if (cfg->blocks[block_num]->end == inst) {
-            ann[ann_num].block_end = cfg->blocks[block_num];
-            block_num++;
-         }
-         ann_num++;
-      }
+      if (unlikely(debug_flag))
+         annotate(brw, annotation, cfg, inst, p->next_insn_offset);
 
       for (unsigned int i = 0; i < 3; i++) {
 	 src[i] = inst->get_src(this->prog_data, i);
@@ -1353,32 +1318,24 @@ vec4_generator::generate_code(exec_list *instructions, int *num_annotations,
    }
 
    brw_set_uip_jip(p);
-
-   if (unlikely(debug_flag)) {
-      if (ann_num == ann_size) {
-         ann = reralloc(NULL, ann, struct annotation, ann_size + 1);
-      }
-      ann[ann_num].offset = p->next_insn_offset;
-   }
-   *num_annotations = ann_num;
-   *annotation = ann;
+   annotation_finalize(annotation, p->next_insn_offset);
 }
 
 const unsigned *
 vec4_generator::generate_assembly(exec_list *instructions,
                                   unsigned *assembly_size)
 {
-   struct annotation *annotation;
-   int num_annotations;
+   struct annotation_info annotation;
+   memset(&annotation, 0, sizeof(annotation));
 
    brw_set_access_mode(p, BRW_ALIGN_16);
-   generate_code(instructions, &num_annotations, &annotation);
-   brw_compact_instructions(p, 0, num_annotations, annotation);
+   generate_code(instructions, &annotation);
+   brw_compact_instructions(p, 0, annotation.ann_count, annotation.ann);
 
    if (unlikely(debug_flag)) {
-      dump_assembly(p->store, num_annotations, annotation, brw, prog,
-                    brw_disassemble);
-      ralloc_free(annotation);
+      dump_assembly(p->store, annotation.ann_count, annotation.ann,
+                    brw, prog, brw_disassemble);
+      ralloc_free(annotation.ann);
    }
 
    return brw_get_program(p, assembly_size);

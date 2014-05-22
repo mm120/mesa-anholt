@@ -1322,8 +1322,8 @@ fs_generator::generate_untyped_surface_read(fs_inst *inst, struct brw_reg dst,
 }
 
 void
-fs_generator::generate_code(exec_list *instructions, int *num_annotations,
-                            struct annotation **annotation)
+fs_generator::generate_code(exec_list *instructions,
+                            struct annotation_info *annotation)
 {
    if (unlikely(debug_flag)) {
       if (prog) {
@@ -1341,53 +1341,18 @@ fs_generator::generate_code(exec_list *instructions, int *num_annotations,
       }
    }
 
-   int block_num = 0;
-   int ann_num = 0;
-   int ann_size = 1024;
    cfg_t *cfg = NULL;
-   struct annotation *ann = NULL;
 
    if (unlikely(debug_flag)) {
       cfg = new(mem_ctx) cfg_t(instructions);
-      ann = rzalloc_array(NULL, struct annotation, ann_size);
    }
 
    foreach_list(node, instructions) {
       fs_inst *inst = (fs_inst *)node;
       struct brw_reg src[3], dst;
 
-      if (unlikely(debug_flag)) {
-         if (ann_num == ann_size) {
-            ann_size *= 2;
-            ann = reralloc(NULL, ann, struct annotation, ann_size);
-         }
-
-         ann[ann_num].offset = p->next_insn_offset;
-         ann[ann_num].ir = inst->ir;
-         ann[ann_num].annotation = inst->annotation;
-
-         if (cfg->blocks[block_num]->start == inst) {
-            ann[ann_num].block_start = cfg->blocks[block_num];
-         }
-
-         /* There is no hardware DO instruction on Gen6+, so since DO always
-          * starts a basic block, we need to set the .block_start of the next
-          * instruction's annotation with a pointer to the bblock started by
-          * the DO.
-          *
-          * There's also only complication from emitting an annotation without
-          * a corresponding hardware instruction to disassemble.
-          */
-         if (brw->gen >= 6 && inst->opcode == BRW_OPCODE_DO) {
-            ann_num--;
-         }
-
-         if (cfg->blocks[block_num]->end == inst) {
-            ann[ann_num].block_end = cfg->blocks[block_num];
-            block_num++;
-         }
-         ann_num++;
-      }
+      if (unlikely(debug_flag))
+         annotate(brw, annotation, cfg, inst, p->next_insn_offset);
 
       for (unsigned int i = 0; i < 3; i++) {
 	 src[i] = brw_reg_from_fs_reg(&inst->src[i]);
@@ -1788,7 +1753,7 @@ fs_generator::generate_code(exec_list *instructions, int *num_annotations,
           * we've emitted any discards.  If not, this will emit no code.
           */
          if (!patch_discard_jumps_to_fb_writes()) {
-            ann_num--;
+            annotation->ann_count--;
          }
          break;
 
@@ -1804,15 +1769,7 @@ fs_generator::generate_code(exec_list *instructions, int *num_annotations,
    }
 
    brw_set_uip_jip(p);
-
-   if (unlikely(debug_flag)) {
-      if (ann_num == ann_size) {
-         ann = reralloc(NULL, ann, struct annotation, ann_size + 1);
-      }
-      ann[ann_num].offset = p->next_insn_offset;
-   }
-   *num_annotations = ann_num;
-   *annotation = ann;
+   annotation_finalize(annotation, p->next_insn_offset);
 }
 
 const unsigned *
@@ -1825,17 +1782,17 @@ fs_generator::generate_assembly(exec_list *simd8_instructions,
    const struct gl_program *prog = fp ? &fp->Base : NULL;
 
    if (simd8_instructions) {
-      struct annotation *annotation;
-      int num_annotations;
+      struct annotation_info annotation;
+      memset(&annotation, 0, sizeof(annotation));
 
       dispatch_width = 8;
-      generate_code(simd8_instructions, &num_annotations, &annotation);
-      brw_compact_instructions(p, 0, num_annotations, annotation);
+      generate_code(simd8_instructions, &annotation);
+      brw_compact_instructions(p, 0, annotation.ann_count, annotation.ann);
 
       if (unlikely(debug_flag)) {
-         dump_assembly(p->store, num_annotations, annotation, brw, prog,
-                       brw_disassemble);
-         ralloc_free(annotation);
+         dump_assembly(p->store, annotation.ann_count, annotation.ann,
+                       brw, prog, brw_disassemble);
+         ralloc_free(annotation.ann);
       }
    }
 
@@ -1850,18 +1807,18 @@ fs_generator::generate_assembly(exec_list *simd8_instructions,
 
       brw_set_compression_control(p, BRW_COMPRESSION_COMPRESSED);
 
-      struct annotation *annotation;
-      int num_annotations;
+      struct annotation_info annotation;
+      memset(&annotation, 0, sizeof(annotation));
 
       dispatch_width = 16;
-      generate_code(simd16_instructions, &num_annotations, &annotation);
+      generate_code(simd16_instructions, &annotation);
       brw_compact_instructions(p, prog_data->prog_offset_16,
-                               num_annotations, annotation);
+                               annotation.ann_count, annotation.ann);
 
       if (unlikely(debug_flag)) {
-         dump_assembly(p->store, num_annotations, annotation, brw, prog,
-                       brw_disassemble);
-         ralloc_free(annotation);
+         dump_assembly(p->store, annotation.ann_count, annotation.ann,
+                       brw, prog, brw_disassemble);
+         ralloc_free(annotation.ann);
       }
    }
 

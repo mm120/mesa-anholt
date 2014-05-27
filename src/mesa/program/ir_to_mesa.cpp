@@ -2366,22 +2366,22 @@ print_program(struct prog_instruction *mesa_instructions,
       struct prog_instruction *mesa_inst = mesa_instructions + i;
       ir_instruction *ir = mesa_instruction_annotation[i];
 
-      fprintf(stdout, "%3d: ", i);
+      fprintf(stderr, "%3d: ", i);
 
       if (last_ir != ir && ir) {
 	 int j;
 
 	 for (j = 0; j < indent; j++) {
-	    fprintf(stdout, " ");
+	    fprintf(stderr, " ");
 	 }
-	 ir->print();
-	 printf("\n");
+	 ir->fprint(stderr);
+	 fprintf(stderr, "\n");
 	 last_ir = ir;
 
-	 fprintf(stdout, "     "); /* line number spacing. */
+	 fprintf(stderr, "     "); /* line number spacing. */
       }
 
-      indent = _mesa_fprint_instruction_opt(stdout, mesa_inst, indent,
+      indent = _mesa_fprint_instruction_opt(stderr, mesa_inst, indent,
 					    PROG_PRINT_DEBUG, NULL);
    }
 }

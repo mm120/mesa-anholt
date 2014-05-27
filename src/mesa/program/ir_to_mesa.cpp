@@ -2965,6 +2965,14 @@ get_mesa_program(struct gl_context *ctx,
       goto fail_exit;
    }
 
+   if (ctx->_Shader->Flags & GLSL_DUMP) {
+      fprintf(stderr, "\n");
+      fprintf(stderr, "Optimized Mesa IR for linked %s program %d:\n",
+              target_string, shader_program->Name);
+      _mesa_fprint_program_opt(stderr, prog, PROG_PRINT_DEBUG, true);
+      fflush(stderr);
+   }
+
    return prog;
 
 fail_exit:

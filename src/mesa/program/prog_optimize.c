@@ -415,7 +415,8 @@ find_next_use(const struct gl_program *prog,
             }
             if (_mesa_num_inst_dst_regs(inst->Opcode) == 1 &&
                 inst->DstReg.File == PROGRAM_TEMPORARY &&
-                inst->DstReg.Index == index) {
+                inst->DstReg.Index == index &&
+                !inst->DstReg.RelAddr) {
                mask &= ~inst->DstReg.WriteMask;
                if (mask == 0)
                   return WRITE;

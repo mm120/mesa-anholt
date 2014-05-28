@@ -3079,8 +3079,14 @@ _mesa_glsl_link_shader(struct gl_context *ctx, struct gl_shader_program *prog)
    prog->LinkStatus = GL_TRUE;
 
    for (i = 0; i < prog->NumShaders; i++) {
-      if (!prog->Shaders[i]->CompileStatus) {
+      struct gl_shader *sh = prog->Shaders[i];
+      if (!sh->CompileStatus) {
 	 linker_error(prog, "linking with uncompiled shader");
+      } else {
+         /* If we'd freed the compiled IR after a previous link in order to
+          * save memory, recreate it.
+          */
+         _mesa_glsl_lazy_recompile_ir(ctx, sh);
       }
    }
 
@@ -3102,6 +3108,21 @@ _mesa_glsl_link_shader(struct gl_context *ctx, struct gl_shader_program *prog)
       if (prog->InfoLog && prog->InfoLog[0] != 0) {
 	 fprintf(stderr, "GLSL shader program %d info log:\n", prog->Name);
 	 fprintf(stderr, "%s\n", prog->InfoLog);
+      }
+   }
+
+   /* Free the compiled shaders' IR now that they've been linked into a
+    * program.  This saves memory in the common case of people using each
+    * shader in one program, at the cost of needing to lazily recompile one
+    * set of them if somebody does actually use the same gl_shader in multiple
+    * gl_shader_programs.
+    */
+   if (prog->LinkStatus && !ctx->RecompiledAnyShaders) {
+      for (i = 0; i < prog->NumShaders; i++) {
+         struct gl_shader *sh = prog->Shaders[i];
+
+         ralloc_free(sh->ir);
+         sh->ir = NULL;
       }
    }
 }

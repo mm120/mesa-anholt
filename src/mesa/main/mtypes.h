@@ -4210,6 +4210,12 @@ struct gl_context
    /*@}*/
 
    /**
+    * Set if we've had to recompile any shaders in order to link them into a
+    * new program after we'd freed their IR.
+    */
+   bool RecompiledAnyShaders;
+
+   /**
     * False if this context was created without a config. This is needed
     * because the initial state of glDrawBuffers depends on this
     */

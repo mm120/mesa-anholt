@@ -803,6 +803,8 @@ shader_source(struct gl_context *ctx, GLuint shader, const GLchar *source)
    if (!sh)
       return;
 
+   _mesa_glsl_lazy_recompile_ir(ctx, sh);
+
    /* free old shader source string and install new one */
    free((void *)sh->Source);
    sh->Source = source;
@@ -812,6 +814,23 @@ shader_source(struct gl_context *ctx, GLuint shader, const GLchar *source)
 #endif
 }
 
+/**
+ * Used to ensure that there is a valid set of IR in the program when we might
+ * have freed it after glLinkProgram() on the assumption that nobody would go
+ * looking for it again.
+*/
+void
+_mesa_glsl_lazy_recompile_ir(struct gl_context *ctx, struct gl_shader *sh)
+{
+   if (sh->ir || !sh->CompileStatus)
+      return;
+
+   _mesa_glsl_compile_shader(ctx, sh, false, false);
+   /* The recompile had better have succeeded! */
+   assert(sh->CompileStatus);
+
+   ctx->RecompiledAnyShaders = true;
+}
 
 /**
  * Compile a shader.

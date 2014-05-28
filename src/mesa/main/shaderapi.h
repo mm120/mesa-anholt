@@ -228,6 +228,9 @@ extern GLuint GLAPIENTRY
 _mesa_CreateShaderProgramv(GLenum type, GLsizei count,
                            const GLchar* const *strings);
 
+void
+_mesa_glsl_lazy_recompile_ir(struct gl_context *ctx, struct gl_shader *sh);
+
 #ifdef __cplusplus
 }
 #endif

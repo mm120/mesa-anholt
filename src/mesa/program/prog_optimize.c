@@ -1088,7 +1088,7 @@ find_live_intervals(struct gl_program *prog,
          const struct interval *inv = liveIntervals->Intervals + i;
          fprintf(stderr, "Reg[%d] live [%d, %d]:",
                       inv->Reg, inv->Start, inv->End);
-         if (1) {
+         if (inv->Start != -1) {
             GLuint j;
             for (j = 0; j < inv->Start; j++)
                fprintf(stderr, " ");

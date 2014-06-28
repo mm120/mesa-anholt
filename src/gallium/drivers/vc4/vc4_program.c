@@ -279,8 +279,6 @@ emit_tgsi_instruction(struct tgsi_to_qir *trans,
         if (tgsi_op == TGSI_OPCODE_END)
                 return;
 
-        tgsi_dump_instruction(tgsi_inst, asdf++);
-
         if (tgsi_op > ARRAY_SIZE(op_trans) || !op_trans[tgsi_op].func) {
                 fprintf(stderr, "unknown tgsi inst: ");
                 tgsi_dump_instruction(tgsi_inst, asdf++);
@@ -331,7 +329,7 @@ emit_frag_init(struct tgsi_to_qir *trans, struct vc4_shader_state *so)
 {
         /* XXX: lols */
         for (int i = 0; i < 4; i++) {
-                trans->inputs[i] = qir_uniform_ui(trans, fui(i / 4.0));
+                trans->inputs[i] = qir_uniform_ui(trans, fui(1.0));
         }
 
 }
@@ -468,8 +466,10 @@ vc4_shader_tgsi_to_qir(struct vc4_shader_state *so, enum qstage stage)
         ret = tgsi_parse_init(&trans->parser, so->base.tokens);
         assert(ret == TGSI_PARSE_OK);
 
-        fprintf(stderr, "TGSI:\n");
-        tgsi_dump(so->base.tokens, 0);
+        if (vc4_debug & VC4_DEBUG_TGSI) {
+                fprintf(stderr, "TGSI:\n");
+                tgsi_dump(so->base.tokens, 0);
+        }
 
         switch (stage) {
         case QSTAGE_FRAG:
@@ -511,12 +511,22 @@ vc4_shader_tgsi_to_qir(struct vc4_shader_state *so, enum qstage stage)
                 break;
         }
 
-        qir_dump(c);
+        if (vc4_debug & VC4_DEBUG_QIR) {
+                fprintf(stderr, "QIR:\n");
+                qir_dump(c);
+        }
 
         tgsi_parse_free(&trans->parser);
         free(trans->temps);
 
         vc4_generate_code(c);
+
+        if (vc4_debug & VC4_DEBUG_SHADERDB) {
+                fprintf(stderr, "SHADER-DB: %s: %d instructions\n",
+                        qir_get_stage_name(c->stage), c->num_qpu_insts);
+                fprintf(stderr, "SHADER-DB: %s: %d uniforms\n",
+                        qir_get_stage_name(c->stage), trans->num_uniforms);
+        }
 
         return trans;
 }
@@ -639,7 +649,7 @@ vc4_get_uniform_bo(struct vc4_context *vc4, struct vc4_shader_state *shader,
                         map[i] = fui(vc4->framebuffer.height * -16.0f / 2.0f);
                         break;
                 }
-#if 1
+#if 0
                 fprintf(stderr, "%p/%d: %d: 0x%08x (%f)\n",
                         shader, shader_index, i, map[i], uif(map[i]));
 #endif

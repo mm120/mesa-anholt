@@ -261,6 +261,16 @@ tgsi_to_qir_dp4(struct tgsi_to_qir *trans,
 }
 
 static void
+tgsi_to_qir_abs(struct tgsi_to_qir *trans,
+                 struct tgsi_full_instruction *tgsi_inst,
+                 enum qop op, struct qreg dst, struct qreg *src, int i)
+{
+        struct qcompile *c = trans->c;
+        struct qreg arg = src[0 * 4 + i];
+        qir_emit(c, qir_inst(QOP_FMAXABS, dst, arg, arg));
+}
+
+static void
 emit_tgsi_instruction(struct tgsi_to_qir *trans,
                       struct tgsi_full_instruction *tgsi_inst)
 {
@@ -273,7 +283,7 @@ emit_tgsi_instruction(struct tgsi_to_qir *trans,
                              struct qreg dst, struct qreg *src, int i);
         } op_trans[] = {
                 [TGSI_OPCODE_MOV] = { QOP_MOV, tgsi_to_qir_alu },
-                [TGSI_OPCODE_ABS] = { QOP_FMAXABS, tgsi_to_qir_alu },
+                [TGSI_OPCODE_ABS] = { 0, tgsi_to_qir_abs },
                 [TGSI_OPCODE_MUL] = { QOP_FMUL, tgsi_to_qir_alu },
                 [TGSI_OPCODE_ADD] = { QOP_FADD, tgsi_to_qir_alu },
                 [TGSI_OPCODE_SUB] = { QOP_FSUB, tgsi_to_qir_alu },

@@ -39,7 +39,6 @@
 struct tgsi_to_qir {
         struct tgsi_parse_context parser;
         struct qcompile *c;
-        struct qreg undef;
         struct qreg *temps;
         struct qreg *inputs;
         struct qreg *outputs;
@@ -77,7 +76,7 @@ get_temp_for_uniform(struct tgsi_to_qir *trans, uint32_t uniform)
         struct qreg t = qir_get_temp(c);
         struct qreg u = { QFILE_UNIF, uniform };
 
-        qir_emit(c, qir_inst(QOP_MOV, t, u, trans->undef));
+        qir_emit(c, qir_inst(QOP_MOV, t, u, c->undef));
 
         trans->uniforms[uniform] = t;
         return t;
@@ -115,7 +114,7 @@ static struct qreg
 get_src(struct tgsi_to_qir *trans, struct tgsi_src_register *src, int i)
 {
         struct qcompile *c = trans->c;
-        struct qreg r = trans->undef;
+        struct qreg r = c->undef;
 
         uint32_t s = i;
         switch (i) {
@@ -374,7 +373,7 @@ emit_vert_init(struct tgsi_to_qir *trans)
         for (int i = 0; i < 4; i++) {
                 trans->inputs[i] = qir_get_temp(c);
                 qir_emit(c, qir_inst(QOP_VPM_READ, trans->inputs[i],
-                                     trans->undef, trans->undef));
+                                     c->undef, c->undef));
         }
 }
 
@@ -387,7 +386,7 @@ emit_coord_init(struct tgsi_to_qir *trans)
         for (int i = 0; i < 4; i++) {
                 trans->inputs[i] = qir_get_temp(c);
                 qir_emit(c, qir_inst(QOP_VPM_READ, trans->inputs[i],
-                                     trans->undef, trans->undef));
+                                     c->undef, c->undef));
         }
 }
 
@@ -409,8 +408,8 @@ emit_frag_end(struct tgsi_to_qir *trans)
         };
 
         qir_emit(c, qir_inst4(QOP_PACK_COLORS, t, swizzled_outputs));
-        qir_emit(c, qir_inst(QOP_TLB_COLOR_WRITE, trans->undef,
-                             t, trans->undef));
+        qir_emit(c, qir_inst(QOP_TLB_COLOR_WRITE, c->undef,
+                             t, c->undef));
 }
 
 static void
@@ -428,14 +427,14 @@ emit_scaled_viewport_write(struct tgsi_to_qir *trans)
                 qir_emit(c, qir_inst(QOP_FMUL, xy[i],
                                      trans->outputs[i], scale));
                 xyi[i] = qir_get_temp(c);
-                qir_emit(c, qir_inst(QOP_FTOI, xyi[i], xy[i], trans->undef));
+                qir_emit(c, qir_inst(QOP_FTOI, xyi[i], xy[i], c->undef));
         }
 
         struct qreg packed_xy = qir_get_temp(c);
         qir_emit(c, qir_inst(QOP_PACK_SCALED, packed_xy, xyi[0], xyi[1]));
 
-        qir_emit(c, qir_inst(QOP_VPM_WRITE, trans->undef, packed_xy,
-                             trans->undef));
+        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef, packed_xy,
+                             c->undef));
 }
 
 static void
@@ -444,8 +443,8 @@ emit_zs_write(struct tgsi_to_qir *trans)
         struct qcompile *c = trans->c;
 
         /* XXX: rescale */
-        qir_emit(c, qir_inst(QOP_VPM_WRITE, trans->undef,
-                             trans->outputs[2], trans->undef));
+        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef,
+                             trans->outputs[2], c->undef));
 }
 
 static void
@@ -454,8 +453,8 @@ emit_1_wc_write(struct tgsi_to_qir *trans)
         struct qcompile *c = trans->c;
 
         /* XXX: RCP */
-        qir_emit(c, qir_inst(QOP_VPM_WRITE, trans->undef,
-                             trans->outputs[3], trans->undef));
+        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef,
+                             trans->outputs[3], c->undef));
 }
 
 static void
@@ -474,8 +473,8 @@ emit_coord_end(struct tgsi_to_qir *trans)
 
         for (int i = 0; i < 4; i++) {
                 trans->inputs[i] = qir_get_temp(c);
-                qir_emit(c, qir_inst(QOP_VPM_WRITE, trans->undef,
-                                     trans->outputs[i], trans->undef));
+                qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef,
+                                     trans->outputs[i], c->undef));
         }
 
         emit_scaled_viewport_write(trans);

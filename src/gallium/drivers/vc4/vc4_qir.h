@@ -126,6 +126,7 @@ struct qcompile {
 
         uint64_t *qpu_insts;
         uint32_t num_qpu_insts;
+        struct qreg undef;
 };
 
 struct qcompile *qir_compile_init(void);

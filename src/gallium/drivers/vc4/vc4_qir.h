@@ -68,6 +68,7 @@ enum qop {
         QOP_VPM_WRITE,
         QOP_VPM_READ,
         QOP_TLB_COLOR_WRITE,
+        QOP_VARY_ADD_C,
 };
 
 struct simple_node {

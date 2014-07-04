@@ -144,6 +144,7 @@ void qir_emit(struct qcompile *c, struct qinst *inst);
 struct qreg qir_get_temp(struct qcompile *c);
 int qir_get_op_nsrc(enum qop qop);
 bool qir_reg_equals(struct qreg a, struct qreg b);
+bool qir_has_side_effects(struct qinst *inst);
 
 void qir_dump(struct qcompile *c);
 void qir_dump_inst(struct qinst *inst);
@@ -151,5 +152,6 @@ const char *qir_get_stage_name(enum qstage stage);
 
 void qir_optimize(struct qcompile *c);
 bool qir_opt_algebraic(struct qcompile *c);
+bool qir_opt_dead_code(struct qcompile *c);
 
 #endif /* VC4_QIR_H */

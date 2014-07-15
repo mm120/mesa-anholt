@@ -71,6 +71,24 @@ enum qop {
         QOP_VPM_READ,
         QOP_TLB_COLOR_WRITE,
         QOP_VARY_ADD_C,
+
+        /** Texture x coordinate parameter write */
+        QOP_TEX_S,
+        /** Texture y coordinate parameter write */
+        QOP_TEX_T,
+        /** Texture border color parameter or cube map z coordinate write */
+        QOP_TEX_R,
+        /** Texture LOD bias parameter write */
+        QOP_TEX_B,
+        /**
+         * Signal of texture read being necessary and then reading r4 into
+         * the destination
+         */
+        QOP_TEX_RESULT,
+        QOP_R4_UNPACK_A,
+        QOP_R4_UNPACK_B,
+        QOP_R4_UNPACK_C,
+        QOP_R4_UNPACK_D
 };
 
 struct simple_node {
@@ -119,6 +137,25 @@ enum quniform_contents {
         QUNIFORM_VIEWPORT_X_SCALE,
         QUNIFORM_VIEWPORT_Y_SCALE,
         /** @} */
+
+        /**
+         * A reference to a texture config parameter 0 uniform.
+         *
+         * This is a uniform implicitly loaded with a QPU_W_TMU* write, which
+         * defines texture type, miplevels, and such.  It will be found as a
+         * parameter to the first QOP_TEX_[STRB] instruction in a sequence.
+         */
+        QUNIFORM_TEXTURE_CONFIG_P0,
+
+        /**
+         * A reference to a texture config parameter 1 uniform.
+         *
+         * This is a uniform implicitly loaded with a QPU_W_TMU* write, which
+         * defines texture width, height, filters, and wrap modes.  It will be
+         * found as a parameter to the second QOP_TEX_[STRB] instruction in a
+         * sequence.
+         */
+        QUNIFORM_TEXTURE_CONFIG_P1,
 };
 
 struct qcompile {
@@ -176,6 +213,20 @@ qir_##name(struct qcompile *c, struct qreg a, struct qreg b)             \
         return t;                                                        \
 }
 
+#define QIR_NODST_1(name)                                               \
+static inline void                                                      \
+qir_##name(struct qcompile *c, struct qreg a)                           \
+{                                                                       \
+        qir_emit(c, qir_inst(QOP_##name, c->undef, a, c->undef));       \
+}
+
+#define QIR_NODST_2(name)                                               \
+static inline void                                                      \
+qir_##name(struct qcompile *c, struct qreg a, struct qreg b)            \
+{                                                                       \
+        qir_emit(c, qir_inst(QOP_##name, c->undef, a, b));       \
+}
+
 QIR_ALU1(MOV)
 QIR_ALU2(FADD)
 QIR_ALU2(FSUB)
@@ -191,11 +242,10 @@ QIR_ALU1(EXP2)
 QIR_ALU1(LOG2)
 QIR_ALU2(PACK_SCALED)
 QIR_ALU1(VARY_ADD_C)
-
-static inline void
-qir_VPM_WRITE(struct qcompile *c, struct qreg a)
-{
-        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef, a, c->undef));
-}
+QIR_NODST_1(VPM_WRITE)
+QIR_NODST_2(TEX_S)
+QIR_NODST_2(TEX_T)
+QIR_NODST_2(TEX_R)
+QIR_NODST_2(TEX_B)
 
 #endif /* VC4_QIR_H */

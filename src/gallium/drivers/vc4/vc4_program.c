@@ -35,6 +35,7 @@
 #include "vc4_context.h"
 #include "vc4_qpu.h"
 #include "vc4_qir.h"
+#include "simpenrose/simpenrose.h"
 
 struct tgsi_to_qir {
         struct tgsi_parse_context parser;
@@ -154,6 +155,10 @@ get_src(struct tgsi_to_qir *trans, struct tgsi_src_register *src, int i)
         case TGSI_FILE_INPUT:
                 r = trans->inputs[src->Index * 4 + s];
                 break;
+        case TGSI_FILE_SAMPLER:
+        case TGSI_FILE_SAMPLER_VIEW:
+                r = c->undef;
+                break;
         default:
                 fprintf(stderr, "unknown src file %d\n", src->File);
                 abort();
@@ -248,6 +253,59 @@ tgsi_to_qir_lrp(struct tgsi_to_qir *trans,
 
         qir_emit(c, qir_inst(QOP_FADD, dst,
                              src[2 * 4 + i], src0_times_src1_minus_src2));
+}
+
+static void
+tgsi_to_qir_tex(struct tgsi_to_qir *trans,
+                struct tgsi_full_instruction *tgsi_inst,
+                enum qop op, struct qreg *src)
+{
+        struct qcompile *c = trans->c;
+
+        assert(!tgsi_inst->Instruction.Saturate);
+
+        struct qreg s = src[0 * 4 + 0];
+        struct qreg t = src[0 * 4 + 1];
+
+        if (tgsi_inst->Instruction.Opcode == TGSI_OPCODE_TXP) {
+                struct qreg proj = qir_get_temp(c);
+                struct qreg temp;
+
+                qir_emit(c, qir_inst(QOP_RCP, proj, src[0 * 4 + 3], c->undef));
+
+                temp = qir_get_temp(c);
+                qir_emit(c, qir_inst(QOP_FMUL, temp, s, proj));
+                s = temp;
+
+                temp = qir_get_temp(c);
+                qir_emit(c, qir_inst(QOP_FMUL, temp, t, proj));
+                t = temp;
+        }
+
+        uint32_t tex_and_sampler = 0; /* XXX */
+        struct qreg sampler_p0 = add_uniform(trans, QUNIFORM_TEXTURE_CONFIG_P0,
+                                             tex_and_sampler);
+        struct qreg sampler_p1 = add_uniform(trans, QUNIFORM_TEXTURE_CONFIG_P1,
+                                             tex_and_sampler);
+
+        qir_emit(c, qir_inst(QOP_TEX_T, c->undef, t, sampler_p0));
+        if (tgsi_inst->Instruction.Opcode == TGSI_OPCODE_TXB) {
+                qir_emit(c, qir_inst(QOP_TEX_B, c->undef, src[0 * 4 + 3],
+                                     sampler_p1));
+                qir_emit(c, qir_inst(QOP_TEX_S, c->undef, s,
+                                     add_uniform(trans, QUNIFORM_CONSTANT, 0)));
+        } else {
+                qir_emit(c, qir_inst(QOP_TEX_S, c->undef, s, sampler_p1));
+        }
+
+        qir_emit(c, qir_inst(QOP_TEX_RESULT, c->undef, c->undef, c->undef));
+
+        for (int i = 0; i < 4; i++) {
+                if (tgsi_inst->Dst[0].Register.WriteMask & (1 << i));
+                qir_emit(c, qir_inst(QOP_R4_UNPACK_A + i,
+                                     get_dst(trans, tgsi_inst, i),
+                                     c->undef, c->undef));
+        }
 }
 
 static void
@@ -380,19 +438,30 @@ emit_tgsi_instruction(struct tgsi_to_qir *trans,
         if (tgsi_op == TGSI_OPCODE_END)
                 return;
 
-        if (tgsi_op > ARRAY_SIZE(op_trans) || !op_trans[tgsi_op].func) {
-                fprintf(stderr, "unknown tgsi inst: ");
-                tgsi_dump_instruction(tgsi_inst, asdf++);
-                fprintf(stderr, "\n");
-                abort();
-        }
-
         struct qreg src_regs[12];
         for (int s = 0; s < 3; s++) {
                 for (int i = 0; i < 4; i++) {
                         src_regs[4 * s + i] =
                                 get_src(trans, &tgsi_inst->Src[s].Register, i);
                 }
+        }
+
+        switch (tgsi_op) {
+        case TGSI_OPCODE_TEX:
+        case TGSI_OPCODE_TXP:
+        case TGSI_OPCODE_TXB:
+                tgsi_to_qir_tex(trans, tgsi_inst,
+                                op_trans[tgsi_op].op, src_regs);
+                return;
+        default:
+                break;
+        }
+
+        if (tgsi_op > ARRAY_SIZE(op_trans) || !(op_trans[tgsi_op].func)) {
+                fprintf(stderr, "unknown tgsi inst: ");
+                tgsi_dump_instruction(tgsi_inst, asdf++);
+                fprintf(stderr, "\n");
+                abort();
         }
 
         for (int i = 0; i < 4; i++) {
@@ -864,9 +933,70 @@ vc4_shader_state_delete(struct pipe_context *pctx, void *hwcso)
         free(so);
 }
 
+static uint32_t translate_wrap(uint32_t p_wrap)
+{
+        switch (p_wrap) {
+        case PIPE_TEX_WRAP_REPEAT:
+                return 0;
+        case PIPE_TEX_WRAP_CLAMP:
+        case PIPE_TEX_WRAP_CLAMP_TO_EDGE:
+                return 1;
+        case PIPE_TEX_WRAP_MIRROR_REPEAT:
+                return 2;
+        case PIPE_TEX_WRAP_CLAMP_TO_BORDER:
+                return 3;
+        default:
+                fprintf(stderr, "Unknown wrap mode %d\n", p_wrap);
+                assert(!"not reached");
+                return 0;
+        }
+}
+
+static uint32_t
+get_texture_p0(struct vc4_texture_stateobj *texstate,
+               uint32_t tex_and_sampler)
+{
+        uint32_t texi = (tex_and_sampler >> 0) & 0xff;
+        struct pipe_sampler_view *texture = texstate->textures[texi];
+        struct vc4_resource *rsc = vc4_resource(texture->texture);
+
+        return (texture->u.tex.last_level |
+                simpenrose_hw_addr(rsc->bo->map) /* XXX */
+                /* XXX: data type */);
+}
+
+static uint32_t
+get_texture_p1(struct vc4_texture_stateobj *texstate,
+               uint32_t tex_and_sampler)
+{
+        uint32_t texi = (tex_and_sampler >> 0) & 0xff;
+        uint32_t sampi = (tex_and_sampler >> 8) & 0xff;
+        struct pipe_sampler_view *texture = texstate->textures[texi];
+        struct pipe_sampler_state *sampler = texstate->samplers[sampi];
+        static const uint32_t mipfilter_map[] = {
+                [PIPE_TEX_MIPFILTER_NEAREST] = 2,
+                [PIPE_TEX_MIPFILTER_LINEAR] = 4,
+                [PIPE_TEX_MIPFILTER_NONE] = 0
+        };
+        static const uint32_t imgfilter_map[] = {
+                [PIPE_TEX_FILTER_NEAREST] = 1,
+                [PIPE_TEX_FILTER_LINEAR] = 0,
+        };
+
+        return ((1 << 31) /* XXX: data type */|
+                (texture->texture->height0 << 20) |
+                (texture->texture->width0 << 8) |
+                (imgfilter_map[sampler->mag_img_filter] << 7) |
+                ((imgfilter_map[sampler->min_img_filter] +
+                  mipfilter_map[sampler->min_mip_filter]) << 4) |
+                (translate_wrap(sampler->wrap_t) << 2) |
+                (translate_wrap(sampler->wrap_s) << 0));
+}
+
 void
 vc4_get_uniform_bo(struct vc4_context *vc4, struct vc4_compiled_shader *shader,
                    struct vc4_constbuf_stateobj *cb,
+                   struct vc4_texture_stateobj *texstate,
                    int shader_index, struct vc4_bo **out_bo,
                    uint32_t *out_offset)
 {
@@ -875,6 +1005,7 @@ vc4_get_uniform_bo(struct vc4_context *vc4, struct vc4_compiled_shader *shader,
         uint32_t *map = vc4_bo_map(ubo);
 
         for (int i = 0; i < uinfo->count; i++) {
+
                 switch (uinfo->contents[i]) {
                 case QUNIFORM_CONSTANT:
                         map[i] = uinfo->data[i];
@@ -887,6 +1018,14 @@ vc4_get_uniform_bo(struct vc4_context *vc4, struct vc4_compiled_shader *shader,
                         break;
                 case QUNIFORM_VIEWPORT_Y_SCALE:
                         map[i] = fui(vc4->framebuffer.height * -16.0f / 2.0f);
+                        break;
+
+                case QUNIFORM_TEXTURE_CONFIG_P0:
+                        map[i] = get_texture_p0(texstate, uinfo->data[i]);
+                        break;
+
+                case QUNIFORM_TEXTURE_CONFIG_P1:
+                        map[i] = get_texture_p1(texstate, uinfo->data[i]);
                         break;
                 }
 #if 0

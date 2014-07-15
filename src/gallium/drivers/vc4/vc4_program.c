@@ -226,6 +226,30 @@ tgsi_to_qir_mad(struct tgsi_to_qir *trans,
 }
 
 static void
+tgsi_to_qir_lrp(struct tgsi_to_qir *trans,
+                 struct tgsi_full_instruction *tgsi_inst,
+                 enum qop op, struct qreg dst, struct qreg *src, int i)
+{
+        struct qcompile *c = trans->c;
+        struct qreg src1_minus_src2 = qir_get_temp(c);
+        struct qreg src0_times_src1_minus_src2 = qir_get_temp(c);
+
+        /* LRP is:
+         *    src0 * src1 + (1 - src0) * src2.
+         * -> src0 * src1 + src2 - src0 * src2
+         * -> src2 + src0 * (src1 - src2)
+         */
+        qir_emit(c, qir_inst(QOP_FSUB, src1_minus_src2,
+                             src[1 * 4 + i], src[2 * 4 + i]));
+
+        qir_emit(c, qir_inst(QOP_FMUL, src0_times_src1_minus_src2,
+                             src[0 * 4 + i], src1_minus_src2));
+
+        qir_emit(c, qir_inst(QOP_FADD, dst,
+                             src[2 * 4 + i], src0_times_src1_minus_src2));
+}
+
+static void
 tgsi_to_qir_dp(struct tgsi_to_qir *trans,
                struct tgsi_full_instruction *tgsi_inst,
                int num, struct qreg dst, struct qreg *src, int i)
@@ -347,6 +371,7 @@ emit_tgsi_instruction(struct tgsi_to_qir *trans,
                 [TGSI_OPCODE_EX2] = { QOP_EXP2, tgsi_to_qir_alu },
                 [TGSI_OPCODE_LG2] = { QOP_LOG2, tgsi_to_qir_alu },
                 [TGSI_OPCODE_LIT] = { QOP_MOV, tgsi_to_qir_alu }, /* XXX */
+                [TGSI_OPCODE_LRP] = { 0, tgsi_to_qir_lrp },
         };
         static int asdf = 0;
         uint32_t tgsi_op = tgsi_inst->Instruction.Opcode;

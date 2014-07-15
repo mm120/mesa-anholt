@@ -72,44 +72,44 @@ struct vc4_vs_key {
 };
 
 static struct qreg
-get_temp_for_uniform(struct tgsi_to_qir *trans, uint32_t uniform)
+add_uniform(struct tgsi_to_qir *trans,
+            enum quniform_contents contents,
+            uint32_t data)
+{
+        uint32_t uniform = trans->num_uniforms++;
+        struct qreg u = { QFILE_UNIF, uniform };
+
+        trans->uniform_contents[uniform] = contents;
+        trans->uniform_data[uniform] = data;
+
+        return u;
+}
+
+static struct qreg
+get_temp_for_uniform(struct tgsi_to_qir *trans, enum quniform_contents contents,
+                     uint32_t data)
 {
         struct qcompile *c = trans->c;
+
+        for (int i = 0; i < trans->num_uniforms; i++) {
+                if (trans->uniform_contents[i] == contents &&
+                    trans->uniform_data[i] == data)
+                        return trans->uniforms[i];
+        }
+
         struct qreg t = qir_get_temp(c);
-        struct qreg u = { QFILE_UNIF, uniform };
+        struct qreg u = add_uniform(trans, contents, data);
 
         qir_emit(c, qir_inst(QOP_MOV, t, u, c->undef));
 
-        trans->uniforms[uniform] = t;
+        trans->uniforms[u.index] = t;
         return t;
 }
 
 static struct qreg
 qir_uniform_ui(struct tgsi_to_qir *trans, uint32_t ui)
 {
-        for (int i = 0; i < trans->num_uniforms; i++) {
-                if (trans->uniform_contents[i] == QUNIFORM_CONSTANT &&
-                    trans->uniform_data[i] == ui)
-                        return trans->uniforms[i];
-        }
-
-        trans->uniform_contents[trans->num_uniforms] = QUNIFORM_CONSTANT;
-        trans->uniform_data[trans->num_uniforms] = ui;
-        return get_temp_for_uniform(trans, trans->num_uniforms++);
-}
-
-static struct qreg
-qir_uniform(struct tgsi_to_qir *trans, uint32_t index)
-{
-        for (int i = 0; i < trans->num_uniforms; i++) {
-                if (trans->uniform_contents[i] == QUNIFORM_UNIFORM &&
-                    trans->uniform_data[i] == index)
-                        return trans->uniforms[i];
-        }
-
-        trans->uniform_contents[trans->num_uniforms] = QUNIFORM_UNIFORM;
-        trans->uniform_data[trans->num_uniforms] = index;
-        return get_temp_for_uniform(trans, trans->num_uniforms++);
+        return get_temp_for_uniform(trans, QUNIFORM_CONSTANT, ui);
 }
 
 static struct qreg
@@ -148,7 +148,8 @@ get_src(struct tgsi_to_qir *trans, struct tgsi_src_register *src, int i)
                 r = trans->consts[src->Index * 4 + s];
                 break;
         case TGSI_FILE_CONSTANT:
-                r = qir_uniform(trans, src->Index * 4 + s);
+                r = get_temp_for_uniform(trans, QUNIFORM_UNIFORM,
+                                         src->Index * 4 + s);
                 break;
         case TGSI_FILE_INPUT:
                 r = trans->inputs[src->Index * 4 + s];

@@ -232,6 +232,46 @@ tgsi_to_qir_mad(struct tgsi_to_qir *trans,
 }
 
 static void
+tgsi_to_qir_lit(struct tgsi_to_qir *trans,
+                 struct tgsi_full_instruction *tgsi_inst,
+                 enum qop op, struct qreg dst, struct qreg *src, int i)
+{
+        struct qcompile *c = trans->c;
+
+        switch (i) {
+        case 0:
+        case 3:
+                qir_emit(c, qir_inst(QOP_MOV, dst,
+                                     qir_uniform_ui(trans, fui(1.0)), c->undef));
+                break;
+        case 1:
+                qir_emit(c, qir_inst(QOP_FMAX, dst,
+                                     src[0 * 4 + 0],
+                                     qir_uniform_ui(trans, 0)));
+                break;
+        case 2: {
+                struct qreg srcy_clamp = qir_get_temp(c);
+                qir_emit(c, qir_inst(QOP_FMAX, srcy_clamp,
+                                     src[0 * 4 + 0], qir_uniform_ui(trans, 0)));
+
+                struct qreg log = qir_get_temp(c);
+                qir_emit(c, qir_inst(QOP_LOG2, log, srcy_clamp, c->undef));
+                /* XXX: Clamp src.w to -128..128 */
+                struct qreg mul = qir_get_temp(c);
+                qir_emit(c, qir_inst(QOP_FMUL, mul, src[0 * 4 + 3], log));
+                struct qreg exp = qir_get_temp(c);
+                qir_emit(c, qir_inst(QOP_EXP2, exp, mul, c->undef));
+
+                qir_emit(c, qir_inst4(QOP_CMP, dst,
+                                      (struct qreg[4]){src[0 * 4 + 0],
+                                                      qir_uniform_ui(trans, 0),
+                                                      exp}));
+                break;
+        }
+        }
+}
+
+static void
 tgsi_to_qir_lrp(struct tgsi_to_qir *trans,
                  struct tgsi_full_instruction *tgsi_inst,
                  enum qop op, struct qreg dst, struct qreg *src, int i)
@@ -445,7 +485,7 @@ emit_tgsi_instruction(struct tgsi_to_qir *trans,
                 [TGSI_OPCODE_RSQ] = { QOP_RSQ, tgsi_to_qir_alu },
                 [TGSI_OPCODE_EX2] = { QOP_EXP2, tgsi_to_qir_alu },
                 [TGSI_OPCODE_LG2] = { QOP_LOG2, tgsi_to_qir_alu },
-                [TGSI_OPCODE_LIT] = { QOP_MOV, tgsi_to_qir_alu }, /* XXX */
+                [TGSI_OPCODE_LIT] = { 0, tgsi_to_qir_lit },
                 [TGSI_OPCODE_LRP] = { 0, tgsi_to_qir_lrp },
                 [TGSI_OPCODE_POW] = { 0, tgsi_to_qir_pow },
         };

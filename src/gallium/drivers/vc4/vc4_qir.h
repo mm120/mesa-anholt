@@ -248,4 +248,12 @@ QIR_NODST_2(TEX_T)
 QIR_NODST_2(TEX_R)
 QIR_NODST_2(TEX_B)
 
+static inline struct qreg
+qir_CMP(struct qcompile *c, struct qreg cmp, struct qreg a, struct qreg b)
+{
+        struct qreg t = qir_get_temp(c);
+        qir_emit(c, qir_inst4(QOP_CMP, t, cmp, a, b, c->undef));
+        return t;
+}
+
 #endif /* VC4_QIR_H */

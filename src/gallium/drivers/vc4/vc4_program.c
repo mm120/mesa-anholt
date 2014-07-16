@@ -205,7 +205,13 @@ tgsi_to_qir_alu(struct tgsi_to_qir *trans,
                 enum qop op, struct qreg dst, struct qreg *src, int i)
 {
         struct qcompile *c = trans->c;
-        qir_emit(c, qir_inst(op, dst, src[0 * 4 + i], src[1 * 4 + i]));
+        struct qreg srcs[4] = {
+                src[0 * 4 + i],
+                src[1 * 4 + i],
+                src[2 * 4 + i]
+        };
+
+        qir_emit(c, qir_inst4(op, dst, srcs));
 }
 
 static void
@@ -331,6 +337,7 @@ emit_tgsi_instruction(struct tgsi_to_qir *trans,
                 [TGSI_OPCODE_SNE] = { QOP_SNE, tgsi_to_qir_alu },
                 [TGSI_OPCODE_SGE] = { QOP_SGE, tgsi_to_qir_alu },
                 [TGSI_OPCODE_SLT] = { QOP_SLT, tgsi_to_qir_alu },
+                [TGSI_OPCODE_CMP] = { QOP_CMP, tgsi_to_qir_alu },
                 [TGSI_OPCODE_MAD] = { 0, tgsi_to_qir_mad },
                 [TGSI_OPCODE_DP2] = { 0, tgsi_to_qir_dp2 },
                 [TGSI_OPCODE_DP3] = { 0, tgsi_to_qir_dp3 },

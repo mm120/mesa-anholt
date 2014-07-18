@@ -35,7 +35,9 @@
 #include "vc4_context.h"
 #include "vc4_qpu.h"
 #include "vc4_qir.h"
+#ifdef USE_VC4_SIMULATOR
 #include "simpenrose/simpenrose.h"
+#endif
 
 struct tgsi_to_qir {
         struct tgsi_parse_context parser;
@@ -997,7 +999,11 @@ get_texture_p0(struct vc4_texture_stateobj *texstate,
         struct vc4_resource *rsc = vc4_resource(texture->texture);
 
         return (texture->u.tex.last_level |
+#if USE_VC4_SIMULATOR
                 simpenrose_hw_addr(rsc->bo->map) /* XXX */
+#else
+                0 /* XXX */
+#endif
                 /* XXX: data type */);
 }
 

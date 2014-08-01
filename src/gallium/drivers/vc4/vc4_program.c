@@ -704,21 +704,26 @@ emit_frag_end(struct tgsi_to_qir *trans)
 }
 
 static void
-emit_scaled_viewport_write(struct tgsi_to_qir *trans)
+emit_scaled_viewport_write(struct tgsi_to_qir *trans, struct qreg rcp_w)
 {
         struct qcompile *c = trans->c;
-        struct qreg xy[2], xyi[2];
+        struct qreg xyi[2];
 
         for (int i = 0; i < 2; i++) {
                 trans->uniform_contents[trans->num_uniforms] =
                         QUNIFORM_VIEWPORT_X_SCALE + i;
                 struct qreg scale = { QFILE_UNIF, trans->num_uniforms++ };
 
-                xy[i] = qir_get_temp(c);
-                qir_emit(c, qir_inst(QOP_FMUL, xy[i],
+                struct qreg screenspace_scaled = qir_get_temp(c);
+                qir_emit(c, qir_inst(QOP_FMUL, screenspace_scaled,
                                      trans->outputs[i], scale));
+
+                struct qreg rcp_w_scaled = qir_get_temp(c);
+                qir_emit(c, qir_inst(QOP_FMUL, rcp_w_scaled,
+                                     screenspace_scaled, rcp_w));
+
                 xyi[i] = qir_get_temp(c);
-                qir_emit(c, qir_inst(QOP_FTOI, xyi[i], xy[i], c->undef));
+                qir_emit(c, qir_inst(QOP_FTOI, xyi[i], rcp_w_scaled, c->undef));
         }
 
         struct qreg packed_xy = qir_get_temp(c);
@@ -729,23 +734,23 @@ emit_scaled_viewport_write(struct tgsi_to_qir *trans)
 }
 
 static void
-emit_zs_write(struct tgsi_to_qir *trans)
+emit_zs_write(struct tgsi_to_qir *trans, struct qreg rcp_w)
 {
         struct qcompile *c = trans->c;
 
         /* XXX: rescale */
-        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef,
-                             trans->outputs[2], c->undef));
+        struct qreg t = qir_get_temp(c);
+        qir_emit(c, qir_inst(QOP_FMUL, t, trans->outputs[2], rcp_w));
+
+        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef, t,c->undef));
 }
 
 static void
-emit_1_wc_write(struct tgsi_to_qir *trans)
+emit_rcp_wc_write(struct tgsi_to_qir *trans, struct qreg rcp_w)
 {
         struct qcompile *c = trans->c;
 
-        /* XXX: RCP */
-        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef,
-                             trans->outputs[3], c->undef));
+        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef, rcp_w, c->undef));
 }
 
 static void
@@ -753,9 +758,12 @@ emit_vert_end(struct tgsi_to_qir *trans)
 {
         struct qcompile *c = trans->c;
 
-        emit_scaled_viewport_write(trans);
-        emit_zs_write(trans);
-        emit_1_wc_write(trans);
+        struct qreg rcp_w = qir_get_temp(c);
+        qir_emit(c, qir_inst(QOP_RCP, rcp_w, trans->outputs[3], c->undef));
+
+        emit_scaled_viewport_write(trans, rcp_w);
+        emit_zs_write(trans, rcp_w);
+        emit_rcp_wc_write(trans, rcp_w);
 
         for (int i = 4; i < trans->num_outputs; i++) {
                 qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef,
@@ -768,15 +776,18 @@ emit_coord_end(struct tgsi_to_qir *trans)
 {
         struct qcompile *c = trans->c;
 
+        struct qreg rcp_w = qir_get_temp(c);
+        qir_emit(c, qir_inst(QOP_RCP, rcp_w, trans->outputs[3], c->undef));
+
         for (int i = 0; i < 4; i++) {
                 trans->inputs[i] = qir_get_temp(c);
                 qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef,
                                      trans->outputs[i], c->undef));
         }
 
-        emit_scaled_viewport_write(trans);
-        emit_zs_write(trans);
-        emit_1_wc_write(trans);
+        emit_scaled_viewport_write(trans, rcp_w);
+        emit_zs_write(trans, rcp_w);
+        emit_rcp_wc_write(trans, rcp_w);
 }
 
 static struct tgsi_to_qir *

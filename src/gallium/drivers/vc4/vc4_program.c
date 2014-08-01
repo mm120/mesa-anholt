@@ -738,11 +738,18 @@ emit_zs_write(struct tgsi_to_qir *trans, struct qreg rcp_w)
 {
         struct qcompile *c = trans->c;
 
-        /* XXX: rescale */
-        struct qreg t = qir_get_temp(c);
-        qir_emit(c, qir_inst(QOP_FMUL, t, trans->outputs[2], rcp_w));
+        struct qreg zscale = add_uniform(trans, QUNIFORM_VIEWPORT_Z_SCALE, 0);
+        struct qreg zscaled = qir_get_temp(c);
+        qir_emit(c, qir_inst(QOP_FMUL, zscaled, trans->outputs[2], zscale));
 
-        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef, t,c->undef));
+        struct qreg zoffset = add_uniform(trans, QUNIFORM_VIEWPORT_Z_OFFSET, 0);
+        struct qreg zoffseted = qir_get_temp(c);
+        qir_emit(c, qir_inst(QOP_FADD, zoffseted, zscaled, zoffset));
+
+        struct qreg z_wscaled = qir_get_temp(c);
+        qir_emit(c, qir_inst(QOP_FMUL, z_wscaled, zoffseted, rcp_w));
+
+        qir_emit(c, qir_inst(QOP_VPM_WRITE, c->undef, z_wscaled, c->undef));
 }
 
 static void
@@ -1209,6 +1216,13 @@ vc4_write_uniforms(struct vc4_context *vc4, struct vc4_compiled_shader *shader,
                 case QUNIFORM_VIEWPORT_Y_SCALE:
                         cl_u32(&vc4->uniforms, fui(vc4->framebuffer.height *
                                                    -16.0f / 2.0f));
+                        break;
+
+                case QUNIFORM_VIEWPORT_Z_OFFSET:
+                        cl_u32(&vc4->uniforms, fui(vc4->viewport.translate[2]));
+                        break;
+                case QUNIFORM_VIEWPORT_Z_SCALE:
+                        cl_u32(&vc4->uniforms, fui(vc4->viewport.scale[2]));
                         break;
 
                 case QUNIFORM_TEXTURE_CONFIG_P0:

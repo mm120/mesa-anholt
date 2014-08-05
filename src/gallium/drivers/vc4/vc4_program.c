@@ -537,6 +537,37 @@ emit_vertex_input(struct tgsi_to_qir *trans, int attr)
 }
 
 static void
+emit_fragcoord_input(struct tgsi_to_qir *trans, int attr)
+{
+        struct qcompile *c = trans->c;
+        struct qreg dst, t;
+
+        /* X */
+        dst = qir_get_temp(c);
+        trans->inputs[attr * 4 + 0] = dst;
+        qir_emit(c, qir_inst(QOP_FRAG_X, dst, c->undef, c->undef));
+
+        /* Y */
+        dst = qir_get_temp(c);
+        trans->inputs[attr * 4 + 1] = dst;
+        qir_emit(c, qir_inst(QOP_FRAG_Y, dst, c->undef, c->undef));
+
+        /* Z */
+        dst = qir_get_temp(c);
+        trans->inputs[attr * 4 + 2] = dst;
+        t = qir_get_temp(c);
+        qir_emit(c, qir_inst(QOP_FRAG_Z, t, c->undef, c->undef));
+        qir_emit(c, qir_inst(QOP_FMUL, dst,
+                             t, qir_uniform_ui(trans, fui(1.0/0xffffff))));
+
+        /* W */
+        dst = qir_get_temp(c);
+        trans->inputs[attr * 4 + 3] = dst;
+        qir_emit(c, qir_inst(QOP_FRAG_RCP_W, dst, c->undef, c->undef));
+
+}
+
+static void
 emit_fragment_input(struct tgsi_to_qir *trans, int attr)
 {
         struct qcompile *c = trans->c;
@@ -572,7 +603,12 @@ emit_tgsi_declaration(struct tgsi_to_qir *trans,
                      i <= decl->Range.Last;
                      i++) {
                         if (c->stage == QSTAGE_FRAG) {
-                                emit_fragment_input(trans, i);
+                                if (decl->Semantic.Name ==
+                                    TGSI_SEMANTIC_POSITION) {
+                                        emit_fragcoord_input(trans, i);
+                                } else {
+                                        emit_fragment_input(trans, i);
+                                }
                         } else {
                                 emit_vertex_input(trans, i);
                         }

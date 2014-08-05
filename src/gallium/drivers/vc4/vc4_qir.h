@@ -74,6 +74,11 @@ enum qop {
         QOP_TLB_COLOR_WRITE,
         QOP_VARY_ADD_C,
 
+        QOP_FRAG_X,
+        QOP_FRAG_Y,
+        QOP_FRAG_Z,
+        QOP_FRAG_RCP_W,
+
         /** Texture x coordinate parameter write */
         QOP_TEX_S,
         /** Texture y coordinate parameter write */

@@ -59,6 +59,7 @@ enum qop {
         QOP_CMP,
 
         QOP_FTOI,
+        QOP_ITOF,
         QOP_RCP,
         QOP_RSQ,
         QOP_EXP2,
